@@ -3,8 +3,13 @@
 void
 GpioHost::SetState(bool state)
 {
+    auto changed = (m_state != state);
     m_state = state;
 
+    if (!changed)
+    {
+        return;
+    }
     for (auto& listener : m_listeners)
     {
         listener(state);
