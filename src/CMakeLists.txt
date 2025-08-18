@@ -1,5 +1,6 @@
 add_subdirectory(base_thread)
 add_subdirectory(button_debouncer)
+add_subdirectory(httpd_client)
 add_subdirectory(nmea_parser)
 add_subdirectory(rotary_encoder)
 add_subdirectory(timer_manager)
