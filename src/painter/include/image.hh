@@ -1,7 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <lvgl.h>
+#include <memory>
 #include <span>
 
 class Image
@@ -45,4 +47,44 @@ public:
 
 private:
     const size_t m_data16_size;
+};
+
+
+class StandaloneImage : public Image
+{
+public:
+    StandaloneImage(std::unique_ptr<uint8_t[]> data,
+                    size_t width,
+                    size_t height,
+                    unsigned pixel_size)
+        : Image(std::span<const uint8_t>({data.get(), width * height * pixel_size}),
+                width,
+                height,
+                pixel_size != 2)
+        , m_data(std::move(data))
+    {
+    }
+
+    uint16_t *WritableData16()
+    {
+        return reinterpret_cast<uint16_t*>(m_data.get());
+    }
+
+protected:
+    std::unique_ptr<uint8_t[]> m_data;
+};
+
+
+class SingleColorImage : public StandaloneImage
+{
+public:
+    SingleColorImage(size_t width, size_t height, unsigned pixel_size, uint16_t rgb585)
+        : StandaloneImage(
+              std::make_unique<uint8_t[]>(width * height * pixel_size), width, height, pixel_size)
+    {
+        auto rgb565_data =
+            std::span<uint16_t>(reinterpret_cast<uint16_t*>(m_data.get()), width * height);
+        std::ranges::for_each(
+            rgb565_data.begin(), rgb565_data.end(), [rgb585](uint16_t& pixel) { pixel = rgb585; });
+    }
 };
