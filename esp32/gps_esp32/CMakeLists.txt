@@ -12,7 +12,7 @@ PUBLIC
     idf::freertos
     uart_esp32
     idf::esp_timer
-    maelir_interface
+    libmaelir_interface
     nmea_parser
 )
 

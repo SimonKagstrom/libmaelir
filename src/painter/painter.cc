@@ -47,7 +47,7 @@ Prepare(const auto& image, auto& to)
         height = hal::kDisplayHeight - to.y;
     }
 
-    return std::array {height, width, from_y, from_x, std::max(0, row_length)};
+    return std::array {height, width, from_y, from_x, std::max(int32_t(0), row_length)};
 }
 
 } // namespace
