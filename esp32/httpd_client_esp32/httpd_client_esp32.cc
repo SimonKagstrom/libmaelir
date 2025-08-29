@@ -11,9 +11,10 @@ public:
     Impl() = default;
     ~Impl() = default;
 
-    static esp_err_t WriteCallback(esp_http_client_event_t *evt)
+    static esp_err_t WriteCallback(esp_http_client_event_t* evt)
     {
-        if (evt->event_id == HTTP_EVENT_ON_DATA && evt->user_data && evt->data_len > 0) {
+        if (evt->event_id == HTTP_EVENT_ON_DATA && evt->user_data && evt->data_len > 0)
+        {
             auto* response_data = static_cast<std::vector<std::byte>*>(evt->user_data);
             const std::byte* data = static_cast<const std::byte*>(evt->data);
             response_data->insert(response_data->end(), data, data + evt->data_len);
@@ -41,16 +42,18 @@ HttpdClient::Get(const std::string& url, milliseconds timeout)
 
     esp_http_client_config_t config = {};
     config.url = url.c_str();
+    config.is_async = false;
     config.auth_type = HTTP_AUTH_TYPE_BASIC;
     config.transport_type = HTTP_TRANSPORT_OVER_SSL;
     config.timeout_ms = static_cast<int>(timeout.count());
-    config.event_handler = [](esp_http_client_event_t *evt) -> esp_err_t {
+    config.event_handler = [](esp_http_client_event_t* evt) -> esp_err_t {
         return Impl::WriteCallback(evt);
     };
     config.user_data = &m_impl->response_data;
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client) {
+    if (!client)
+    {
         return std::nullopt;
     }
 
@@ -58,9 +61,12 @@ HttpdClient::Get(const std::string& url, milliseconds timeout)
     int status = esp_http_client_get_status_code(client);
     esp_http_client_cleanup(client);
 
-    if (err == ESP_OK && status == 200) {
+    if (err == ESP_OK && status == 200)
+    {
         return m_impl->response_data;
-    } else {
+    }
+    else
+    {
         return std::nullopt;
     }
 }
