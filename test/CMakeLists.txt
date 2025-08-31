@@ -1,4 +1,6 @@
 add_subdirectory(../ libmaelir)
+add_subdirectory(mock_filesystem)
+add_subdirectory(mock_httpd_client)
 
 add_library(os_unittest EXCLUDE_FROM_ALL
     os/base_thread_unittest.cc
