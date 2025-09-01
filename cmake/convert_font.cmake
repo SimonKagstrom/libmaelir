@@ -1,3 +1,6 @@
+# Find the lv_font_conv executable
+find_program(LV_FONT_CONV_EXECUTABLE NAMES lv_font_conv REQUIRED)
+
 function(convert_font BASE_NAME TTF SIZE_PIXELS EXTRA_SYMBOLS)
     set(DEST_LIBRARY ${BASE_NAME}_library)
     set(OUTPUT_DIR ${CMAKE_BINARY_DIR}/generated/${BASE_NAME}/)
