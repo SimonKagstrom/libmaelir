@@ -69,6 +69,11 @@ public:
         Start(name, ThreadCore::kCore0, priority, kDefaultStackSize);
     }
 
+    void Start(const char* name, ThreadPriority priority, uint32_t stack_size)
+    {
+        Start(name, ThreadCore::kCore0, priority, stack_size);
+    }
+
     void Start(const char* name, ThreadCore core, ThreadPriority priority)
     {
         Start(name, core, priority, kDefaultStackSize);
