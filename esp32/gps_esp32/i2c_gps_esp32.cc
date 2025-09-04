@@ -1,6 +1,7 @@
 #include "i2c_gps_esp32.hh"
 
 I2cGps::I2cGps(uint8_t scl_pin, uint8_t sda_pin)
+    : m_parser(std::make_unique<NmeaParser>())
 {
     const i2c_master_bus_config_t i2c_mst_config = {
         .i2c_port = I2C_NUM_1,
@@ -40,21 +41,20 @@ I2cGps::WaitForData(os::binary_semaphore& semaphore)
 {
     std::optional<hal::RawGpsData> data;
 
-    memset(m_line_buf.data(), 0, m_line_buf.size());
+    memset(m_buffer.data(), 0, m_buffer.size());
     auto err = i2c_master_transmit_receive(m_dev_handle,
-                                           reinterpret_cast<uint8_t*>(m_line_buf.data()),
-                                           m_line_buf.size(),
-                                           reinterpret_cast<uint8_t*>(m_line_buf.data()),
-                                           m_line_buf.size(),
+                                           reinterpret_cast<uint8_t*>(m_buffer.data()),
+                                           m_buffer.size(),
+                                           reinterpret_cast<uint8_t*>(m_buffer.data()),
+                                           m_buffer.size(),
                                            -1);
 
     if (err == ESP_OK)
     {
-        if (m_line_buf[0] != ' ')
+        if (m_buffer[0] != ' ')
         {
-            printf("XXX: %s\n", m_line_buf.data());
+            data = m_parser->PushData(std::string_view(m_buffer.data(), m_buffer.size()));
         }
-        //        data = m_parser->PushData(std::string_view(m_line_buf.data(), m_line_buf.size()));
     }
     os::Sleep(100ms);
     semaphore.release();
