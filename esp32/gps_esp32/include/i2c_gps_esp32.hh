@@ -19,5 +19,5 @@ private:
 
     std::array<char, 256> m_buffer;
 
-    std::unique_ptr<NmeaParser> m_parser;
+    NmeaParser m_parser;
 };

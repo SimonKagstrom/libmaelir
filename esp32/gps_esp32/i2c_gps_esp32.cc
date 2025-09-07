@@ -1,7 +1,6 @@
 #include "i2c_gps_esp32.hh"
 
 I2cGps::I2cGps(uint8_t scl_pin, uint8_t sda_pin)
-    : m_parser(std::make_unique<NmeaParser>())
 {
     const i2c_master_bus_config_t i2c_mst_config = {
         .i2c_port = I2C_NUM_1,
@@ -53,7 +52,7 @@ I2cGps::WaitForData(os::binary_semaphore& semaphore)
     {
         if (m_buffer[0] != ' ')
         {
-            data = m_parser->PushData(std::string_view(m_buffer.data(), m_buffer.size()));
+            data = m_parser.PushData(std::string_view(m_buffer.data(), m_buffer.size()));
         }
     }
     os::Sleep(100ms);
