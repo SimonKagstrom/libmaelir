@@ -26,10 +26,12 @@ private:
 
     void ParseLine(std::string_view line);
     void ParseGppgaData(std::string_view line);
+    void ParseGnggaData(std::string_view line);
+    void ParseGnrmcData(std::string_view line);
     void ParseGpvtgData(std::string_view line);
 
     State m_state {State::kWaitForDollar};
-    etl::string<192> m_current_line;
+    etl::string<257> m_current_line;
 
     etl::vector<hal::RawGpsData, 8> m_pending_data;
 };

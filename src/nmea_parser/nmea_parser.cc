@@ -107,6 +107,146 @@ NmeaParser::ParseLine(std::string_view line)
         // $GPVTG,360.0,T,348.7,M,000.0,N,000.0,K*43
         ParseGpvtgData(line.substr(7));
     }
+    else if (line.starts_with("$GNRMC,"))
+    {
+        // $GNRMC,072446.00,A,3130.5226316,N,12024.0937010,E,0.01,0.00,040620,0.0,E,D*3D
+        ParseGnrmcData(line.substr(7));
+    }
+    // i2c one, but the same info can be found with GNRMC.
+    // $GNGGA,072446.00,3130.5226316,N,12024.0937010,E,4,27,0.5,31.924,M,0.000,M,2.0,*44
+}
+
+void
+NmeaParser::ParseGnggaData(std::string_view line)
+{
+    auto index = 0;
+    std::optional<float> latitude;
+    std::optional<float> longitude;
+
+    // time      latitude  N/S longitude E/W fix status satelites hdop altitude M height M time difftime checksum
+    // 072446.00,3130.5226316,N,12024.0937010,E,4,27,0.5,31.924,M,0.000,M,2.0,*44
+    constexpr auto kTimeIndex = 0;
+    constexpr auto kLatitudeIndex = 1;
+    constexpr auto kLatitudeDirectionIndex = 2;
+    constexpr auto kLongitudeIndex = 3;
+    constexpr auto kLongitudeDirectionIndex = 4;
+    constexpr auto kFixIndex = 5;
+
+    auto valid = false;
+    for (const auto sub_range : std::views::split(line, ','))
+    {
+        const auto word = std::string_view(sub_range.begin(), sub_range.end());
+
+        switch (index)
+        {
+        case kLatitudeIndex:
+            latitude = ToDegrees(word);
+            break;
+        case kLatitudeDirectionIndex:
+            if (word == "S")
+            {
+                latitude = -latitude.value();
+            }
+            break;
+        case kLongitudeIndex:
+            longitude = ToDegrees(word);
+            break;
+        case kLongitudeDirectionIndex:
+            if (word == "W")
+            {
+                longitude = -longitude.value();
+            }
+            break;
+        case kFixIndex:
+            valid = word != "0";
+            break;
+        default:
+            break;
+        }
+
+        index++;
+    }
+
+    if (valid && latitude && longitude)
+    {
+        hal::RawGpsData cur;
+
+        cur.position = {latitude.value(), longitude.value()};
+        m_pending_data.push_back(cur);
+    }
+}
+
+void
+NmeaParser::ParseGnrmcData(std::string_view line)
+{
+    auto index = 0;
+    std::optional<float> latitude;
+    std::optional<float> longitude;
+    std::optional<float> speed;
+    std::optional<float> heading;
+
+    // time      status latitude  N/S longitude E/W speed course date magnetic variation checksum
+    // 072446.00,A,3130.5226316,N,12024.0937010,E,0.01,0.00,040620,0.0,E,D*3D
+    constexpr auto kTimeIndex = 0;
+    constexpr auto kStatusIndex = 1;
+    constexpr auto kLatitudeIndex = 2;
+    constexpr auto kLatitudeDirectionIndex = 3;
+    constexpr auto kLongitudeIndex = 4;
+    constexpr auto kLongitudeDirectionIndex = 5;
+    constexpr auto kSpeedIndex = 6;
+    constexpr auto kHeadingIndex = 7;
+
+    auto valid = false;
+    for (const auto sub_range : std::views::split(line, ','))
+    {
+        const auto word = std::string_view(sub_range.begin(), sub_range.end());
+
+        switch (index)
+        {
+        case kLatitudeIndex:
+            latitude = ToDegrees(word);
+            break;
+        case kLatitudeDirectionIndex:
+            if (word == "S")
+            {
+                latitude = -latitude.value();
+            }
+            break;
+        case kLongitudeIndex:
+            longitude = ToDegrees(word);
+            break;
+        case kLongitudeDirectionIndex:
+            if (word == "W")
+            {
+                longitude = -longitude.value();
+            }
+            break;
+        case kStatusIndex:
+            valid = word == "A";
+            break;
+        case kSpeedIndex:
+            speed = std::strtof(word.data(), nullptr);
+            break;
+        case kHeadingIndex:
+            heading = std::strtof(word.data(), nullptr);
+            break;
+        default:
+            break;
+        }
+
+        index++;
+    }
+
+    if (valid && latitude && longitude && speed && heading)
+    {
+        hal::RawGpsData cur;
+
+        cur.position = {latitude.value(), longitude.value()};
+        cur.speed = speed.value();
+        cur.heading = heading.value();
+
+        m_pending_data.push_back(cur);
+    }
 }
 
 void
