@@ -9,10 +9,10 @@ function(convert_font BASE_NAME TTF SIZE_PIXELS EXTRA_SYMBOLS)
 
     add_custom_command(
         OUTPUT ${out_c} ${out_h}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../lvgl/scripts/built_in_font/
+        WORKING_DIRECTORY ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../external/lvgl/scripts/built_in_font/
         COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR}
         COMMAND
-            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../lvgl/scripts/built_in_font/built_in_font_gen.py
+            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../external/lvgl/scripts/built_in_font/built_in_font_gen.py
             --bpp 4
             --range 0x20-0x7f
             --symbols ${EXTRA_SYMBOLS}
