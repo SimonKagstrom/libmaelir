@@ -136,6 +136,11 @@ protected:
         return m_semaphore;
     }
 
+    os::TimerManager& GetTimerManager()
+    {
+        return m_timer_manager;
+    }
+
 private:
     struct Impl;
 
