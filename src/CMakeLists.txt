@@ -7,6 +7,7 @@ add_subdirectory(painter)
 add_subdirectory(rotary_encoder)
 add_subdirectory(std_filesystem)
 add_subdirectory(timer_manager)
+add_subdirectory(ui_menu)
 
 
 add_library(libmaelir_interface INTERFACE)
