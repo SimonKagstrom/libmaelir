@@ -9,6 +9,7 @@ add_subdirectory(httpd_ota_updater_esp32)
 add_subdirectory(httpd_client_esp32)
 add_subdirectory(nvm_esp32)
 add_subdirectory(uart_esp32)
+add_subdirectory(pm_esp32)
 add_subdirectory(os)
 
 add_library(httpd_client_implementation ALIAS httpd_client_esp32)
