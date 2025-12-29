@@ -1,3 +1,6 @@
+set(CONFIG_LV_BUILD_DEMOS OFF)
+set(CONFIG_LV_BUILD_EXAMPLES OFF)
+
 add_subdirectory(lvgl)
 
 if ("${IDF_TARGET}" STREQUAL "")

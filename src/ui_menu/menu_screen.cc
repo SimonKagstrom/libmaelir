@@ -26,7 +26,7 @@ MenuScreen::MenuScreen(os::TimerManager& timer_manager,
     lv_menu_set_mode_root_back_button(m_menu, LV_MENU_ROOT_BACK_BUTTON_ENABLED);
 
     auto back_button = lv_menu_get_main_header_back_button(m_menu);
-    lv_obj_set_style_bg_color(m_screen, lv_obj_get_style_bg_color(m_menu, 0), 0);
+    lv_obj_set_style_bg_color(m_screen, lv_obj_get_style_bg_color(m_menu, lv_part_t::LV_PART_MAIN), 0);
 
     // Apply the style to the back button when it is focused
     lv_obj_add_style(back_button, &m_style_selected, LV_STATE_FOCUSED);
@@ -111,7 +111,7 @@ MenuScreen::Page::AddBooleanEntry(const char* text,
     lv_label_set_text(label, text);
 
     auto boolean_switch = lv_switch_create(cont);
-    lv_obj_add_state(boolean_switch, default_value ? LV_STATE_CHECKED : 0);
+    lv_obj_add_state(boolean_switch, default_value ? lv_state_t::LV_STATE_CHECKED : lv_state_t::LV_STATE_DEFAULT);
     // Highlight the label as well
     lv_obj_add_flag(boolean_switch, LV_OBJ_FLAG_EVENT_BUBBLE);
     lv_obj_set_style_bg_color(
