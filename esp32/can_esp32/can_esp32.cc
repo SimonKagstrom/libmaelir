@@ -73,6 +73,7 @@ CanEsp32::SendFrame(uint32_t id, std::span<const uint8_t> data)
     tx_msg.buffer = (uint8_t*)data.data();
     tx_msg.buffer_len = data.size();
 
+    ESP_ERROR_CHECK(twai_node_transmit(m_node_hdl, &tx_msg, 0));
     return twai_node_transmit_wait_all_done(m_node_hdl, -1) == ESP_OK;
 }
 
