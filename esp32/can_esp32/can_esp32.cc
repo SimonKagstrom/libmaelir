@@ -1,6 +1,12 @@
 #include "can_esp32.hh"
 
+namespace
+{
+os::binary_semaphore g_dummy_sem {0};
+}
+
 CanEsp32::CanEsp32(gpio_num_t tx_pin, gpio_num_t rx_pin, int baud_rate_bps)
+    : m_wakeup_semaphore(&g_dummy_sem)
 {
     twai_onchip_node_config_t node_config = {};
 
@@ -30,18 +36,23 @@ CanEsp32::CanEsp32(gpio_num_t tx_pin, gpio_num_t rx_pin, int baud_rate_bps)
     ESP_ERROR_CHECK(twai_node_register_event_callbacks(m_node_hdl, &user_cbs, this));
 }
 
+
 std::unique_ptr<ListenerCookie>
-CanEsp32::AttachWakeupListener(os::binary_semaphore& sem)
+CanEsp32::Start(os::binary_semaphore& sem)
 {
+    // Should be stopped already, but make sure
+    Stop();
     m_wakeup_semaphore = &sem;
 
-    return std::make_unique<ListenerCookie>([this]() { m_wakeup_semaphore = nullptr; });
-}
-
-void
-CanEsp32::Start()
-{
+    // Clear pending frames
+    uint8_t idx;
+    while (m_rx_queue.pop(idx))
+    {
+        m_rx_free_buffer_indicies.push(idx);
+    }
     twai_node_enable(m_node_hdl);
+
+    return std::make_unique<ListenerCookie>([this]() { m_wakeup_semaphore = &g_dummy_sem; });
 }
 
 void
@@ -92,10 +103,7 @@ CanEsp32::TwaiRxCb(const twai_rx_done_event_data_t* edata)
 
         rv = true;
     }
-    if (m_wakeup_semaphore)
-    {
-        m_wakeup_semaphore->release_from_isr();
-    }
+    m_wakeup_semaphore->release_from_isr();
 
     m_rx_queue.push(idx);
 

@@ -24,14 +24,12 @@ public:
 
     virtual ~ICan() = default;
 
-    virtual void Start() = 0;
+    [[nodiscard]] virtual std::unique_ptr<ListenerCookie> Start(os::binary_semaphore& sem) = 0;
     virtual void Stop() = 0;
 
     virtual bool SendFrame(uint32_t id, std::span<const uint8_t> data) = 0;
 
     virtual std::optional<Frame> ReceiveFrame() = 0;
-
-    virtual std::unique_ptr<ListenerCookie> AttachWakeupListener(os::binary_semaphore& sem) = 0;
 };
 
 } // namespace hal
