@@ -4,8 +4,10 @@
 #include "semaphore.hh"
 #include "time.hh"
 
-#include <etl/vector.h>
+#include <array>
 #include <optional>
+#include <ranges>
+#include <span>
 
 namespace hal
 {
@@ -14,12 +16,47 @@ class ICan
 public:
     static constexpr size_t kMaxDataLength = 8;
 
-    struct Frame
+    class Frame
     {
-        uint32_t id {0};
-        milliseconds timestamp {0};
+    public:
+        // For readers
+        auto Data() const
+        {
+            return std::span<const uint8_t> {m_data, m_length};
+        }
 
-        etl::vector<uint8_t, kMaxDataLength> data;
+        bool IsInvalid() const
+        {
+            return m_length == 0;
+        }
+
+        uint32_t Id() const
+        {
+            return m_id;
+        }
+
+
+        // For the driver
+        void Set(uint32_t id, uint8_t length)
+        {
+            m_id = id;
+            m_length = length;
+        }
+
+        void Invalidate()
+        {
+            m_length = 0;
+        }
+
+        uint8_t* RawData()
+        {
+            return m_data;
+        }
+
+    private:
+        uint32_t m_id;
+        uint8_t m_length;
+        uint8_t m_data[kMaxDataLength];
     };
 
     virtual ~ICan() = default;

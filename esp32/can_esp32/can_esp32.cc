@@ -90,17 +90,15 @@ CanEsp32::TwaiRxCb(const twai_rx_done_event_data_t* edata)
     }
 
     auto& frame = m_rx_buffers[idx];
-    frame.data.clear(); // Empty if the receive fails, ignore the message
+    frame.Invalidate();
 
     twai_frame_t rx_frame = {
-        .buffer = frame.data.data(),
+        .buffer = frame.RawData(),
         .buffer_len = hal::ICan::kMaxDataLength,
     };
     if (twai_node_receive_from_isr(m_node_hdl, &rx_frame) == ESP_OK)
     {
-        frame.id = rx_frame.header.id;
-        frame.timestamp = milliseconds(rx_frame.header.timestamp / 1000);
-        frame.data.uninitialized_resize(rx_frame.header.dlc);
+        frame.Set(rx_frame.header.id, rx_frame.header.dlc);
 
         rv = true;
     }
@@ -121,10 +119,12 @@ CanEsp32::ReceiveFrame()
         return std::nullopt;
     }
 
+    // Do a copy of the value (since the index is returned). The frame is very small anyway
+    static_assert(sizeof(hal::ICan::Frame) == 16);
     auto frame = m_rx_buffers[idx];
     m_rx_free_buffer_indicies.push(idx);
 
-    if (frame.data.empty())
+    if (frame.IsInvalid())
     {
         // Some sort of error frame. Maybe signal some other way
         return std::nullopt;
