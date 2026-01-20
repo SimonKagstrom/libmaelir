@@ -3,11 +3,9 @@
 #include <cstdint>
 #include <optional>
 
+#include "i_display_properties.hh"
 namespace hal
 {
-
-constexpr auto kDisplayWidth = 480;
-constexpr auto kDisplayHeight = 480;
 
 class IDisplay
 {

@@ -1,5 +1,6 @@
 add_subdirectory(base_thread)
 add_subdirectory(button_debouncer)
+add_subdirectory(displays)
 add_subdirectory(filesystem)
 add_subdirectory(httpd_client)
 add_subdirectory(nmea_parser)
@@ -18,4 +19,5 @@ target_include_directories(libmaelir_interface INTERFACE
 
 target_link_libraries(libmaelir_interface INTERFACE
     etl::etl
+    display_properties
 )
