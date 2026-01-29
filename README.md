@@ -1,7 +1,8 @@
 # libmaelir
 libmaelir is a support library for esp32 development, also targeting unittest and
-qt builds. It's used by https://github.com/SimonKagstrom/maelir currently, but maybe
-others in the future.
+qt builds. It's used by https://github.com/SimonKagstrom/maelir and
+https://github.com/SimonKagstrom/radbuzz currently, but maybe others in the
+future.
 
 ## Building
 Only the unit tests can be built separately:
