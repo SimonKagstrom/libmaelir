@@ -16,17 +16,17 @@ enable_testing()
 
 add_subdirectory(.. libmaelir_unittest)
 
-add_executable(ut_libmaelir
+add_executable(unittest_libmaelir
     main.cc
     test_nmea_parser.cc
     test_timer_manager.cc
 )
 
-target_link_libraries(ut_libmaelir
+target_link_libraries(unittest_libmaelir
     os_unittest
     nmea_parser
     timer_manager
     doctest::doctest
     trompeloeil::trompeloeil
 )
-add_test(NAME unittest COMMAND ut)
+add_test(NAME unittest_libmaelir COMMAND unittest_libmaelir)
