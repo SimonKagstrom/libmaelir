@@ -2,7 +2,7 @@
 
 #include <mutex>
 
-ApplicationState::ReadOnlyState::ReadOnlyState(ApplicationState& parent)
+ApplicationState::ReadOnly::ReadOnly(ApplicationState& parent)
     : m_parent(parent)
 {
 }
@@ -80,14 +80,14 @@ ApplicationState::NotifyChange(unsigned index)
 }
 
 
-ApplicationState::ReadWriteState
+ApplicationState::ReadWrite
 ApplicationState::CheckoutReadWrite()
 {
-    return ApplicationState::ReadWriteState(*this);
+    return ApplicationState::ReadWrite(*this);
 }
 
-ApplicationState::ReadOnlyState
+ApplicationState::ReadOnly
 ApplicationState::CheckoutReadonly()
 {
-    return ApplicationState::ReadOnlyState(*this);
+    return ApplicationState::ReadOnly(*this);
 }

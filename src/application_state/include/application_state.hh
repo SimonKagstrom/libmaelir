@@ -39,7 +39,7 @@ public:
     };
 
 
-    class ReadOnlyState
+    class ReadOnly
     {
     public:
         friend class ApplicationState;
@@ -51,12 +51,12 @@ public:
         }
 
     protected:
-        explicit ReadOnlyState(ApplicationState& parent);
+        explicit ReadOnly(ApplicationState& parent);
 
         ApplicationState& m_parent;
     };
 
-    class ReadWriteState : public ReadOnlyState
+    class ReadWrite : public ReadOnly
     {
     public:
         friend class ApplicationState;
@@ -69,7 +69,7 @@ public:
         }
 
     private:
-        using ReadOnlyState::ReadOnlyState;
+        using ReadOnly::ReadOnly;
     };
 
 
@@ -105,10 +105,10 @@ public:
         template <typename S>
         void Set(const auto& value)
         {
-            std::lock_guard lock(m_parent.m_mutex);
-
             if constexpr (!std::disjunction_v<std::is_same<S, T>...>)
             {
+                std::lock_guard lock(m_parent.m_mutex);
+
                 m_parent.SetUnlocked<S>(value);
             }
             else
@@ -156,10 +156,10 @@ public:
         template <typename S>
         void Set(const auto& value)
         {
-            std::lock_guard lock(m_parent.m_mutex);
-
             if constexpr (!std::disjunction_v<std::is_same<S, T>...>)
             {
+                std::lock_guard lock(m_parent.m_mutex);
+
                 m_parent.SetUnlocked<S>(value);
             }
             else
@@ -207,9 +207,9 @@ public:
     }
 
     // Checkout a local copy of the global state. Rewritten when the unique ptr is released
-    ReadWriteState CheckoutReadWrite();
+    ReadWrite CheckoutReadWrite();
 
-    ReadOnlyState CheckoutReadonly();
+    ReadOnly CheckoutReadonly();
 
 
     template <class... T>
