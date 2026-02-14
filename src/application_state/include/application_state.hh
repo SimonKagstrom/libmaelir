@@ -139,6 +139,60 @@ public:
     };
 
 
+    template <class... T>
+    class QueuedWriter
+    {
+    public:
+        friend class ApplicationState;
+
+        ~QueuedWriter()
+        {
+            std::lock_guard lock(m_parent.m_mutex);
+
+            (void)std::initializer_list<int> {((
+                m_changed.test(AS::IndexOf<T>()) ? (m_parent.SetUnlocked<T>(Get<T>()), 0) : 0))...};
+        }
+
+        template <typename S>
+        void Set(const auto& value)
+        {
+            std::lock_guard lock(m_parent.m_mutex);
+
+            if constexpr (!std::disjunction_v<std::is_same<S, T>...>)
+            {
+                m_parent.SetUnlocked<S>(value);
+            }
+            else
+            {
+                m_state.template GetRef<S>() = value;
+
+                m_changed.set(AS::IndexOf<S>());
+            }
+        }
+
+    private:
+        explicit QueuedWriter(ApplicationState& parent)
+            : m_parent(parent)
+        {
+            // No initialization, these are write-only
+        }
+
+        template <typename S>
+        auto Get()
+        {
+            // These are write-only, so reads are not allowed
+            static_assert(std::disjunction_v<std::is_same<S, T>...>);
+
+            return m_state.template GetRef<S>();
+        }
+
+        ApplicationState& m_parent;
+        AS::storage::partial_state<T...> m_state;
+
+        ParameterBitset m_changed;
+    };
+
+
     ApplicationState();
 
 
@@ -162,6 +216,12 @@ public:
     auto CheckoutPartialSnapshot()
     {
         return PartialSnapshot<T...>(*this);
+    }
+
+    template <class... T>
+    auto CheckoutQueuedWriter()
+    {
+        return QueuedWriter<T...>(*this);
     }
 
 private:
