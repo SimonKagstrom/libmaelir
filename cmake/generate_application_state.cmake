@@ -1,5 +1,5 @@
 function(generate_application_state DEST_LIBRARY INPUT_FILE_LIST)
-    set(OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/generated/application_state/)
+    set(OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DEST_LIBRARY}_generated/application_state/)
 
     set(out_cc ${OUTPUT_DIRECTORY}/generated_application_state.cc)
     set(out_hh ${OUTPUT_DIRECTORY}/generated_application_state.hh)

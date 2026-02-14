@@ -59,6 +59,9 @@ consteval auto IndexOf<struct {{ asp.parameter.name }}>()
 
 namespace storage
 {
+// Dummy function to cause a linker error if an orphan parameter is accessed
+bool &OrphanNotFound();
+
 struct state
 {
     {%- for asp in application_state_parameters %}
@@ -84,6 +87,13 @@ inline auto &state::GetRef<struct {{ asp.parameter.name }}>()
 }
 {% endfor %}
 
+{% for param in orphans %}
+template<>
+inline auto &state::GetRef<struct {{ param.name }}>()
+{
+    return OrphanNotFound();
+}
+{% endfor %}
 
 } // namespace storage
 

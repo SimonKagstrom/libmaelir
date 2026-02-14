@@ -61,7 +61,11 @@ class ApplicationStateParameter:
 
 
 def generate_output(
-    template_directory, output_directory, parameters, application_state_parameters
+    template_directory,
+    output_directory,
+    parameters,
+    application_state_parameters,
+    orphans,
 ):
     assert (
         len(application_state_parameters) > 0
@@ -69,6 +73,7 @@ def generate_output(
 
     context = {
         "parameters": [param.__dict__() for param in parameters.values()],
+        "orphans": [param.__dict__() for param in orphans],
         "application_state_parameters": [
             asp.__dict__() for asp in application_state_parameters
         ],
@@ -83,6 +88,7 @@ def generate_output(
         parameters=context["parameters"],
         application_state_parameters=context["application_state_parameters"],
         max_index=context["max_index"],
+        orphans=context["orphans"],
     )
     with open(
         os.path.join(output_directory, "generated_application_state.hh"), "w"
@@ -93,6 +99,7 @@ def generate_output(
     cc_output = cc_template.render(
         parameters=context["parameters"],
         application_state_parameters=context["application_state_parameters"],
+        orphans=context["orphans"],
     )
     with open(
         os.path.join(output_directory, "generated_application_state.cc"), "w"
@@ -151,6 +158,12 @@ if __name__ == "__main__":
             ApplicationStateParameter(name, parameters[name], default_value)
         )
 
+    orphans = [
+        param
+        for param in parameters.values()
+        if param not in [asp.parameter for asp in application_state]
+    ]
+
     # Sort the application state by alignment (smallest first)
     application_state.sort(
         key=lambda asp: type_size_mapping[asp.parameter.type], reverse=False
@@ -159,4 +172,6 @@ if __name__ == "__main__":
     for i, asp in enumerate(application_state):
         asp.set_index(i)
 
-    generate_output(template_directory, output_directory, parameters, application_state)
+    generate_output(
+        template_directory, output_directory, parameters, application_state, orphans
+    )
