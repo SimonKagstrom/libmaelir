@@ -16,6 +16,9 @@ public:
     {
     }
 
+    ListenerImpl(const ListenerImpl&) = delete;
+    ListenerImpl& operator=(const ListenerImpl&) = delete;
+
     ~ListenerImpl() final
     {
         m_parent.DetachListener(this);
@@ -65,6 +68,11 @@ ApplicationState::DetachListener(const ListenerImpl* impl)
 void
 ApplicationState::NotifyChange(unsigned index)
 {
+    if (index >= m_listeners.size())
+    {
+        return;
+    }
+
     for (auto listener : m_listeners[index])
     {
         listener->Awake();

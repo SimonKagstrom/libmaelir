@@ -83,8 +83,8 @@ public:
         {
             std::lock_guard lock(m_parent.m_mutex);
 
-            (void)std::initializer_list<int> {((
-                m_changed.test(AS::IndexOf<T>()) ? (m_parent.SetUnlocked<T>(Get<T>()), 0) : 0))...};
+            (void)std::initializer_list<int> {
+                (m_changed.test(AS::IndexOf<T>()) ? (m_parent.SetUnlocked<T>(Get<T>()), 0) : 0)...};
         }
 
         template <typename S>
@@ -149,8 +149,8 @@ public:
         {
             std::lock_guard lock(m_parent.m_mutex);
 
-            (void)std::initializer_list<int> {((
-                m_changed.test(AS::IndexOf<T>()) ? (m_parent.SetUnlocked<T>(Get<T>()), 0) : 0))...};
+            (void)std::initializer_list<int> {
+                (m_changed.test(AS::IndexOf<T>()) ? (m_parent.SetUnlocked<T>(Get<T>()), 0) : 0)...};
         }
 
         template <typename S>
