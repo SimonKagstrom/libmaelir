@@ -109,13 +109,7 @@ public:
         {
             static_assert(std::disjunction_v<std::is_same<S, T>...>);
 
-            if (value == Get<S>())
-            {
-                return;
-            }
-
             m_state.template GetRef<S>() = value;
-
             m_changed.set(AS::IndexOf<S>());
         }
 
@@ -157,8 +151,8 @@ public:
         void Set(const auto& value)
         {
             static_assert(std::disjunction_v<std::is_same<S, T>...>);
-            m_state.template GetRef<S>() = value;
 
+            m_state.template GetRef<S>() = value;
             m_changed.set(AS::IndexOf<S>());
         }
 
