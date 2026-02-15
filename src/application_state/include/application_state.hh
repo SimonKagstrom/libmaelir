@@ -247,21 +247,18 @@ private:
     template <typename T>
     void SetUnlocked(const auto& value)
     {
+        if (value == GetValue<T>())
+        {
+            return;
+        }
+
+
         if constexpr (T::IsAtomic())
         {
-            if (value == Get<T>())
-            {
-                return;
-            }
             m_global_state.GetRef<T>() = value;
         }
         else
         {
-            if (value == *Get<T>())
-            {
-                return;
-            }
-
             auto& ref = m_global_state.GetRef<T>();
 
             m_global_state.GetRef<T>() = std::make_shared<std::decay_t<decltype(*ref)>>(value);
