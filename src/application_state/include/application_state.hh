@@ -25,6 +25,8 @@ struct partial_state : public T...
     {
         return static_cast<S&>(*this).template GetRef<S>();
     }
+
+    // In the future, maybe provide a IndexOfPartial here, for local indicies (bitmask)
 };
 
 } // namespace AS::storage
@@ -81,6 +83,11 @@ public:
 
         ~PartialSnapshot()
         {
+            if (m_changed.none())
+            {
+                return;
+            }
+
             std::lock_guard lock(m_parent.m_mutex);
 
             (void)std::initializer_list<int> {
@@ -90,38 +97,26 @@ public:
         template <typename S>
         auto Get()
         {
-            // If S not in T, return the global state
-            if constexpr (!std::disjunction_v<std::is_same<S, T>...>)
-            {
-                return m_parent.Get<S>();
-            }
-            else
-            {
-                // Never a shared_ptr
-                return m_state.template GetRef<S>();
-            }
+            // Require that S is in T...
+            static_assert(std::disjunction_v<std::is_same<S, T>...>);
+
+            // Never a shared_ptr
+            return m_state.template GetRef<S>();
         }
 
         template <typename S>
         void Set(const auto& value)
         {
-            if constexpr (!std::disjunction_v<std::is_same<S, T>...>)
+            static_assert(std::disjunction_v<std::is_same<S, T>...>);
+
+            if (value == Get<S>())
             {
-                std::lock_guard lock(m_parent.m_mutex);
-
-                m_parent.SetUnlocked<S>(value);
+                return;
             }
-            else
-            {
-                if (value == Get<S>())
-                {
-                    return;
-                }
 
-                m_state.template GetRef<S>() = value;
+            m_state.template GetRef<S>() = value;
 
-                m_changed.set(AS::IndexOf<S>());
-            }
+            m_changed.set(AS::IndexOf<S>());
         }
 
     private:
@@ -147,6 +142,11 @@ public:
 
         ~QueuedWriter()
         {
+            if (m_changed.none())
+            {
+                return;
+            }
+
             std::lock_guard lock(m_parent.m_mutex);
 
             (void)std::initializer_list<int> {
@@ -156,18 +156,10 @@ public:
         template <typename S>
         void Set(const auto& value)
         {
-            if constexpr (!std::disjunction_v<std::is_same<S, T>...>)
-            {
-                std::lock_guard lock(m_parent.m_mutex);
+            static_assert(std::disjunction_v<std::is_same<S, T>...>);
+            m_state.template GetRef<S>() = value;
 
-                m_parent.SetUnlocked<S>(value);
-            }
-            else
-            {
-                m_state.template GetRef<S>() = value;
-
-                m_changed.set(AS::IndexOf<S>());
-            }
+            m_changed.set(AS::IndexOf<S>());
         }
 
     private:
