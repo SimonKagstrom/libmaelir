@@ -61,7 +61,7 @@ ApplicationState::DetachListener(const ListenerImpl* impl)
 
     for (auto& listeners : m_listeners)
     {
-        std::erase_if(listeners, [impl](const auto* listener) { return listener == impl; });
+        listeners.erase(std::remove(listeners.begin(), listeners.end(), impl), listeners.end());
     }
 }
 
