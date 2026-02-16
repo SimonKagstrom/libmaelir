@@ -2,67 +2,67 @@
 
 #include <mutex>
 
+constexpr auto kInvalidListener = 0;
+
+static os::binary_semaphore g_dummy_sem {0};
+
+
 ApplicationState::ReadOnly::ReadOnly(ApplicationState& parent)
     : m_parent(parent)
 {
 }
 
-class ApplicationState::ListenerImpl : public ApplicationState::IListener
-{
-public:
-    ListenerImpl(ApplicationState& parent, os::binary_semaphore& semaphore)
-        : m_parent(parent)
-        , m_semaphore(semaphore)
-    {
-    }
-
-    ListenerImpl(const ListenerImpl&) = delete;
-    ListenerImpl& operator=(const ListenerImpl&) = delete;
-
-    ~ListenerImpl() final
-    {
-        m_parent.DetachListener(this);
-    }
-
-    void Awake()
-    {
-        m_semaphore.release();
-    }
-
-private:
-    ApplicationState& m_parent;
-    os::binary_semaphore& m_semaphore;
-};
-
 ApplicationState::ApplicationState()
 {
     m_global_state.SetupDefaultValues();
+    m_listener_semaphores.push_back(&g_dummy_sem);
 }
 
-std::unique_ptr<ApplicationState::IListener>
-ApplicationState::DoAttachListener(const etl::bitset<AS::kLastIndex + 1, uint32_t>& interested,
+std::unique_ptr<ListenerCookie>
+ApplicationState::DoAttachListener(const ParameterBitset& interested,
                                    os::binary_semaphore& semaphore)
-{
-    auto out = std::make_unique<ListenerImpl>(*this, semaphore);
-
-    for (auto index = interested.find_first(true); index != interested.npos;
-         index = interested.find_next(true, index + 1))
-    {
-        m_listeners[index].push_back(out.get());
-    }
-
-    return out;
-}
-
-void
-ApplicationState::DetachListener(const ListenerImpl* impl)
 {
     std::lock_guard lock(m_mutex);
 
-    for (auto& listeners : m_listeners)
+    if (m_reclaimed_listener_indices.empty() &&
+        m_listener_semaphores.size() > std::numeric_limits<uint8_t>::max())
     {
-        listeners.erase(std::remove(listeners.begin(), listeners.end(), impl), listeners.end());
+        return nullptr;
     }
+
+    auto index = static_cast<uint8_t>(m_listener_semaphores.size());
+
+    if (m_reclaimed_listener_indices.empty())
+    {
+        m_listener_semaphores.push_back(&semaphore);
+    }
+    else
+    {
+        index = m_reclaimed_listener_indices.back();
+        m_reclaimed_listener_indices.pop_back();
+        m_listener_semaphores[index] = &semaphore;
+    }
+
+    for (auto param_index = interested.find_first(true); param_index != interested.npos;
+         param_index = interested.find_next(true, param_index + 1))
+    {
+        m_listeners[param_index].push_back(index);
+    }
+
+
+    return std::make_unique<ListenerCookie>([this, index, interested]() {
+        std::lock_guard lock(m_mutex);
+
+        m_listener_semaphores[index] = &g_dummy_sem;
+        for (auto param_index = interested.find_first(true); param_index != interested.npos;
+             param_index = interested.find_next(true, param_index + 1))
+        {
+            auto& listeners = m_listeners[param_index];
+            listeners.erase(std::remove(listeners.begin(), listeners.end(), index),
+                            listeners.end());
+        }
+        m_reclaimed_listener_indices.push_back(index);
+    });
 }
 
 void
@@ -75,7 +75,7 @@ ApplicationState::NotifyChange(unsigned index)
 
     for (auto listener : m_listeners[index])
     {
-        listener->Awake();
+        m_listener_semaphores[listener]->release();
     }
 }
 

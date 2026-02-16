@@ -1,6 +1,7 @@
 #pragma once
 
 #include "generated_application_state.hh"
+#include "listener_cookie.hh"
 #include "semaphore.hh"
 
 #include <array>
@@ -34,13 +35,6 @@ struct partial_state : public T...
 class ApplicationState
 {
 public:
-    class IListener
-    {
-    public:
-        virtual ~IListener() = default;
-    };
-
-
     class ReadOnly
     {
     public:
@@ -183,7 +177,7 @@ public:
 
 
     template <class... T>
-    std::unique_ptr<IListener> AttachListener(os::binary_semaphore& semaphore)
+    std::unique_ptr<ListenerCookie> AttachListener(os::binary_semaphore& semaphore)
     {
         ParameterBitset interested;
 
@@ -267,14 +261,15 @@ private:
         NotifyChange(AS::IndexOf<T>());
     }
 
-    std::unique_ptr<IListener> DoAttachListener(const ParameterBitset& interested,
-                                                os::binary_semaphore& semaphore);
-    void DetachListener(const ListenerImpl* impl);
+    std::unique_ptr<ListenerCookie> DoAttachListener(const ParameterBitset& interested,
+                                                     os::binary_semaphore& semaphore);
     void NotifyChange(unsigned index);
 
     AS::storage::state m_global_state;
 
     etl::mutex m_mutex;
 
-    std::array<std::vector<ListenerImpl*>, AS::kLastIndex + 1> m_listeners;
+    std::array<std::vector<uint8_t>, AS::kLastIndex + 1> m_listeners;
+    std::vector<os::binary_semaphore*> m_listener_semaphores;
+    std::vector<uint8_t> m_reclaimed_listener_indices;
 };
