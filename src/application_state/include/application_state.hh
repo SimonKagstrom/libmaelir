@@ -61,7 +61,7 @@ public:
         void Set(const auto& value)
         {
             std::lock_guard lock(m_parent.m_mutex);
-            m_parent.SetUnlocked<T>(value);
+            m_parent.SetNoLock<T>(value);
         }
 
     private:
@@ -85,7 +85,7 @@ public:
             std::lock_guard lock(m_parent.m_mutex);
 
             (void)std::initializer_list<int> {
-                (m_changed.test(AS::IndexOf<T>()) ? (m_parent.SetUnlocked<T>(Get<T>()), 0) : 0)...};
+                (m_changed.test(AS::IndexOf<T>()) ? (m_parent.SetNoLock<T>(Get<T>()), 0) : 0)...};
         }
 
         template <typename S>
@@ -111,6 +111,9 @@ public:
         explicit PartialSnapshot(ApplicationState& parent)
             : m_parent(parent)
         {
+            // Hold the lock since the GetValue might refer to a shared_ptr
+            std::lock_guard lock(m_parent.m_mutex);
+
             (void)std::initializer_list<int> {
                 (m_state.template GetRef<T>() = m_parent.GetValue<T>(), 0)...};
         }
@@ -138,7 +141,7 @@ public:
             std::lock_guard lock(m_parent.m_mutex);
 
             (void)std::initializer_list<int> {
-                (m_changed.test(AS::IndexOf<T>()) ? (m_parent.SetUnlocked<T>(Get<T>()), 0) : 0)...};
+                (m_changed.test(AS::IndexOf<T>()) ? (m_parent.SetNoLock<T>(Get<T>()), 0) : 0)...};
         }
 
         template <typename S>
@@ -186,17 +189,50 @@ public:
         return DoAttachListener(interested, semaphore);
     }
 
-    // Checkout a local copy of the global state. Rewritten when the unique ptr is released
-    ReadWrite CheckoutReadWrite();
-
+    /**
+     * @brief Checkout a reader-only of the entire global state.
+     *
+     * Reads return the global state, so can change at any time.
+     *
+     * @return A reader
+     */
     ReadOnly CheckoutReadonly();
 
+    /**
+     * @brief Checkout a reader-writer of the entire global state.
+     *
+     * Reads return the global state, so can change at any time. Writes are
+     * done immediately.
+     *
+     * @return A reader-writer.
+     */
+    ReadWrite CheckoutReadWrite();
 
+
+    /**
+     * @brief Checkout a snapshot of a subset of the global state
+     *
+     * The snapshot is cached, so global writes do not affect it. Writes are
+     * written back on destruction. Reads/writes can only be done of the subset.
+     *
+     * @tparam T a list of members of the global state
+     * @return the partial snapshot
+     */
     template <class... T>
     auto CheckoutPartialSnapshot()
     {
         return PartialSnapshot<T...>(*this);
     }
+
+    /**
+     * @brief Checkout a queued writer of a subset of the global state
+     *
+     * This is write-only, and can only write the subset. Writes are written back
+     * on destruction.
+     *
+     * @tparam T a list of members of the global state
+     * @return the queued writer
+     */
 
     template <class... T>
     auto CheckoutQueuedWriter()
@@ -217,6 +253,13 @@ private:
         }
         else
         {
+            /* Thread-safe: The temporary local copy of shared_ptr ensures the object
+             * can't be freed even if another thread updates global state.
+             * auto & would be unsafe.
+             *
+             * On return, the shared_ptr to const ensures the value stays alive even if
+             * it's written, until the reader is done with it.
+             */
             auto ptr = m_global_state.GetRef<T>();
 
             using element_type = typename decltype(ptr)::element_type;
@@ -239,7 +282,7 @@ private:
 
 
     template <typename T>
-    void SetUnlocked(const auto& value)
+    void SetNoLock(const auto& value)
     {
         if (value == GetValue<T>())
         {
