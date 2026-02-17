@@ -13,9 +13,20 @@ type_size_mapping = {
     "int8_t": 1,
     "int16_t": 2,
     "int32_t": 4,
-    "std::string": 32,  # Variable
 }
 
+def is_number(str):
+    try:
+        float(str)
+    except ValueError:
+        if str.startswith("0x"):
+            try:
+                int(str, 16)
+            except ValueError:
+                return False
+        return False
+    else:  # Succeeded
+        return True
 
 class Parameter:
     "A parameter"
@@ -23,7 +34,7 @@ class Parameter:
     def __init__(self, name, type):
         self.name = name
         self.type = type
-        self.is_atomic = type not in ["std::string"]
+        self.is_atomic = type in type_size_mapping.keys()
 
     def __dict__(self):
         return {"name": self.name, "type": self.type, "is_atomic": self.is_atomic}
@@ -42,7 +53,7 @@ class ApplicationStateParameter:
             self.default_value = "true" if self.default_value else "false"
 
         if not self.parameter.is_atomic:
-            escape = '"' if self.parameter.type == "std::string" else ""
+            escape = '"' if not is_number(self.default_value) else ""
             self.default_value = f"{escape}{self.default_value}{escape}"
 
         if parameter.type == "std::string" and not isinstance(default_value, str):
@@ -166,7 +177,13 @@ if __name__ == "__main__":
 
     # Sort the application state by alignment (smallest first)
     application_state.sort(
-        key=lambda asp: type_size_mapping[asp.parameter.type], reverse=False
+        key=lambda asp: (
+            type_size_mapping[asp.parameter.type]
+            if asp.parameter.type in type_size_mapping
+            # Variable/unknown size parameters are placed at the end
+            else 32
+        ),
+        reverse=False,
     )
 
     for i, asp in enumerate(application_state):
