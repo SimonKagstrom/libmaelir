@@ -40,7 +40,7 @@ auto DefaultValue();
 template<>
 consteval auto DefaultValue<struct {{ asp.parameter.name }}>()
 {
-    return {{ asp.default_value }};
+    return {{ asp.parameter.return_type }} {% for item in asp.default_value %}{{ item }}{{ ',' if not loop.last else '' }} {% endfor %};
 };
 {% endfor %}
 

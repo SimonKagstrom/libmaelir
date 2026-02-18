@@ -15,6 +15,7 @@ type_size_mapping = {
     "int32_t": 4,
 }
 
+
 def is_number(str):
     try:
         float(str)
@@ -28,16 +29,27 @@ def is_number(str):
     else:  # Succeeded
         return True
 
+
 class Parameter:
     "A parameter"
 
     def __init__(self, name, type):
         self.name = name
         self.type = type
+        self.return_type = ""
         self.is_atomic = type in type_size_mapping.keys()
 
+        if self.type.startswith("struct"):
+            self.type = self.type[len("struct") :].trim()
+            self.return_type = self.type
+
     def __dict__(self):
-        return {"name": self.name, "type": self.type, "is_atomic": self.is_atomic}
+        return {
+            "name": self.name,
+            "type": self.type,
+            "return_type": self.return_type,
+            "is_atomic": self.is_atomic,
+        }
 
 
 class ApplicationStateParameter:
@@ -49,12 +61,17 @@ class ApplicationStateParameter:
         self.parameter = parameter
         self.default_value = default_value
 
-        if isinstance(self.default_value, bool):
-            self.default_value = "true" if self.default_value else "false"
+        if not isinstance(self.default_value, list):
+            self.default_value = [self.default_value]
 
-        if not self.parameter.is_atomic:
-            escape = '"' if not is_number(self.default_value) else ""
-            self.default_value = f"{escape}{self.default_value}{escape}"
+        for i, v in enumerate(self.default_value):
+            if isinstance(v, bool):
+                v = "true" if v else "false"
+
+            if not self.parameter.is_atomic:
+                escape = '"' if not is_number(v) else ""
+                v = f"{escape}{v}{escape}"
+            self.default_value[i] = v
 
         if parameter.type == "std::string" and not isinstance(default_value, str):
             raise ValueError(f"Default value for {name} must be a string")
