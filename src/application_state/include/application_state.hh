@@ -27,7 +27,32 @@ struct partial_state : public T...
         return static_cast<S&>(*this).template GetRef<S>();
     }
 
-    // In the future, maybe provide a IndexOfPartial here, for local indicies (bitmask)
+    // Might be used in the future, if the number of global indicies are > 32
+    template <typename S>
+    static consteval auto PartialIndexOf()
+    {
+        static_assert((std::is_same_v<S, T> || ...), "Type is not part of this partial_state");
+
+        constexpr std::array<bool, sizeof...(T)> matches {std::is_same_v<S, T>...};
+        for (size_t index = 0; index < matches.size(); ++index)
+        {
+            if (matches[index])
+            {
+                return index;
+            }
+        }
+
+        return size_t {0};
+    }
+
+    template <typename S>
+    static consteval auto PartialToGlobalIndex(auto partial_index)
+    {
+        static_assert((std::is_same_v<S, T> || ...), "Type is not part of this partial_state");
+
+        constexpr std::array<unsigned, sizeof...(T)> global_indices {AS::IndexOf<T>()...};
+        return global_indices[partial_index];
+    }
 };
 
 } // namespace AS::storage
