@@ -278,17 +278,15 @@ private:
         }
         else
         {
-            /* Thread-safe: The temporary local copy of shared_ptr ensures the object
-             * can't be freed even if another thread updates global state.
-             * auto & would be unsafe.
-             *
-             * On return, the shared_ptr to const ensures the value stays alive even if
+            /* On return, the shared_ptr to const ensures the value stays alive even if
              * it's written, until the reader is done with it.
              */
-            auto ptr = m_global_state.GetRef<T>();
+            using pointer_type = std::remove_reference_t<decltype(m_global_state.GetRef<T>())>;
+            using element_type = typename pointer_type::element_type;
 
-            using element_type = typename decltype(ptr)::element_type;
-            return std::make_shared<const element_type>(*ptr);
+            std::shared_ptr<const element_type> out = m_global_state.GetRef<T>();
+
+            return out;
         }
     }
 
