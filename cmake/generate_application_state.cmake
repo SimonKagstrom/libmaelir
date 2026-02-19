@@ -32,8 +32,4 @@ function(generate_application_state DEST_LIBRARY INPUT_FILE_LIST)
     PUBLIC
         ${OUTPUT_DIRECTORY}
     )
-    target_link_libraries(${DEST_LIBRARY}
-    PUBLIC
-        lvgl
-    )
 endfunction()

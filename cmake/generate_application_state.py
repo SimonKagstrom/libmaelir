@@ -40,7 +40,7 @@ class Parameter:
         self.is_atomic = type in type_size_mapping.keys()
 
         if self.type.startswith("struct"):
-            self.type = self.type[len("struct") :].trim()
+            self.type = self.type[len("struct") :].strip()
             self.return_type = self.type
 
     def __dict__(self):
@@ -68,7 +68,7 @@ class ApplicationStateParameter:
             if isinstance(v, bool):
                 v = "true" if v else "false"
 
-            if not self.parameter.is_atomic:
+            if not self.parameter.is_atomic and isinstance(v, str):
                 escape = '"' if not is_number(v) else ""
                 v = f"{escape}{v}{escape}"
             self.default_value[i] = v
@@ -94,6 +94,7 @@ def generate_output(
     parameters,
     application_state_parameters,
     orphans,
+    cpp_includes,
 ):
     assert (
         len(application_state_parameters) > 0
@@ -117,6 +118,7 @@ def generate_output(
         application_state_parameters=context["application_state_parameters"],
         max_index=context["max_index"],
         orphans=context["orphans"],
+        cpp_includes=cpp_includes,
     )
     with open(
         os.path.join(output_directory, "generated_application_state.hh"), "w"
@@ -149,6 +151,7 @@ if __name__ == "__main__":
     os.makedirs(output_directory, exist_ok=True)
 
     parameters = {}
+    cpp_includes = []
     application_state_raw = []
 
     for input_file in input_files:
@@ -165,6 +168,10 @@ if __name__ == "__main__":
                     print(f"Invalid parameter setup in {input_file}: {name}")
                     sys.exit(1)
                 parameters[name] = Parameter(name, param["type"])
+
+        if "cpp_includes" in data:
+            for include in data["cpp_includes"]:
+                cpp_includes.append(include)
 
         if "application_state" in data:
             if not isinstance(data["application_state"], dict):
@@ -207,5 +214,10 @@ if __name__ == "__main__":
         asp.set_index(i)
 
     generate_output(
-        template_directory, output_directory, parameters, application_state, orphans
+        template_directory,
+        output_directory,
+        parameters,
+        application_state,
+        orphans,
+        cpp_includes,
     )

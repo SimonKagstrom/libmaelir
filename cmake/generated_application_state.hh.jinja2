@@ -4,6 +4,10 @@
 #include <memory>
 #include <string>
 
+{% for header_include in cpp_includes %}
+#include "{{ header_include }}"
+{% endfor %}
+
 namespace AS
 {
 
