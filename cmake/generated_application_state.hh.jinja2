@@ -6,7 +6,7 @@
 
 {% for header_include in cpp_includes %}
 #include "{{ header_include }}"
-{% endfor %}
+{%- endfor %}
 
 namespace AS
 {
@@ -44,8 +44,8 @@ auto DefaultValue();
 template<>
 consteval auto DefaultValue<struct {{ asp.parameter.name }}>()
 {
-    return {{ asp.parameter.return_type }} {% for item in asp.default_value %}{{ item }}{{ ',' if not loop.last else '' }} {% endfor %};
-};
+    return {{ asp.parameter.return_type }} {% for item in asp.default_value %}{{ item }}{{ ',' if not loop.last else '' }}{% endfor %};
+}
 {% endfor %}
 
 
