@@ -11,8 +11,6 @@
 #include <etl/vector.h>
 #include <string_view>
 
-constexpr auto kInvalidIconHash = 0;
-
 using ParameterBitset = etl::bitset<AS::kLastIndex + 1, uint32_t>;
 
 namespace AS::storage
