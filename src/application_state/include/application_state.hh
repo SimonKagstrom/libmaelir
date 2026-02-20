@@ -113,15 +113,23 @@ public:
                 (m_changed.test(AS::IndexOf<T>()) ? (m_parent.SetNoLock<T>(Get<T>()), 0) : 0)...};
         }
 
+        /// Return a reference to the local value
+        template <typename S>
+        auto &GetWritableReference()
+        {
+            // Assume it being changed when a reference is used (the actual check will be during writeback)
+            m_changed.set(AS::IndexOf<S>());
+
+            return GetReference<S>();
+        }
+
+        /// Return the value of the local storage
         template <typename S>
         auto Get()
         {
-            // Require that S is in T...
-            static_assert(std::disjunction_v<std::is_same<S, T>...>);
-
-            // Never a shared_ptr
-            return m_state.template GetRef<S>();
+            return GetReference<S>();
         }
+
 
         template <typename S>
         void Set(const auto& value)
@@ -141,6 +149,15 @@ public:
 
             (void)std::initializer_list<int> {
                 (m_state.template GetRef<T>() = m_parent.GetValue<T>(), 0)...};
+        }
+
+        template <typename S>
+        auto &GetReference()
+        {
+            // Require that S is in T...
+            static_assert(std::disjunction_v<std::is_same<S, T>...>);
+
+            return m_state.template GetRef<S>();
         }
 
         ApplicationState& m_parent;
