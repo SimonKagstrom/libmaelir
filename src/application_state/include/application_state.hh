@@ -113,7 +113,7 @@ public:
 
         /// Return a reference to the local value
         template <typename S>
-        auto &GetWritableReference()
+        auto& GetWritableReference()
         {
             // Assume it being changed when a reference is used (the actual check will be during writeback)
             m_changed.set(AS::IndexOf<S>());
@@ -150,7 +150,7 @@ public:
         }
 
         template <typename S>
-        auto &GetReference()
+        auto& GetReference()
         {
             // Require that S is in T...
             static_assert(std::disjunction_v<std::is_same<S, T>...>);
@@ -222,6 +222,7 @@ public:
     template <class... T>
     std::unique_ptr<ListenerCookie> AttachListener(os::binary_semaphore& semaphore)
     {
+        static_assert((sizeof...(T) > 0) && "AttachListener requires at least one parameter");
         ParameterBitset interested;
 
         (void)std::initializer_list<int> {(interested.set<AS::IndexOf<T>()>(), 0)...};
