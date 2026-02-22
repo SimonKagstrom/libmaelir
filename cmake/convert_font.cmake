@@ -1,7 +1,7 @@
 # Find the lv_font_conv executable
 find_program(LV_FONT_CONV_EXECUTABLE NAMES lv_font_conv REQUIRED)
 
-function(convert_font BASE_NAME TTF SIZE_PIXELS EXTRA_SYMBOLS)
+function(convert_font BASE_NAME TTF SIZE_PIXELS RANGE EXTRA_SYMBOLS)
     set(DEST_LIBRARY ${BASE_NAME}_library)
     set(OUTPUT_DIR ${CMAKE_BINARY_DIR}/generated/${BASE_NAME}/)
     set(out_c ${OUTPUT_DIR}/${BASE_NAME}.c)
@@ -14,7 +14,7 @@ function(convert_font BASE_NAME TTF SIZE_PIXELS EXTRA_SYMBOLS)
         COMMAND
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../external/lvgl/scripts/built_in_font/built_in_font_gen.py
             --bpp 4
-            --range 0x20-0x7f
+            --range ${RANGE}
             --symbols ${EXTRA_SYMBOLS}
             --size ${SIZE_PIXELS}
             -o ${out_c}
