@@ -25,7 +25,7 @@ ApplicationState::DoAttachListener(const ParameterBitset& interested,
     std::lock_guard lock(m_mutex);
 
     if (m_reclaimed_listener_indices.empty() &&
-        m_listener_semaphores.size() > std::numeric_limits<uint8_t>::max())
+        m_listener_semaphores.size() > kMaxApplicationStateListeners)
     {
         return nullptr;
     }

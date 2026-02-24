@@ -13,6 +13,9 @@
 
 using ParameterBitset = etl::bitset<AS::kLastIndex + 1, uint32_t>;
 
+// Fit in an uint32_t
+constexpr auto kMaxApplicationStateListeners = 32;
+
 namespace AS::storage
 {
 
