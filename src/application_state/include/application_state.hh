@@ -355,6 +355,6 @@ private:
     etl::mutex m_mutex;
 
     std::array<std::vector<uint8_t>, AS::kLastIndex + 1> m_listeners;
-    std::vector<os::binary_semaphore*> m_listener_semaphores;
+    std::vector<os::binary_semaphore*> m_listener_semaphores_by_index;
     std::vector<uint8_t> m_reclaimed_listener_indices;
 };

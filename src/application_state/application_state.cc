@@ -15,7 +15,7 @@ ApplicationState::ReadOnly::ReadOnly(ApplicationState& parent)
 ApplicationState::ApplicationState()
 {
     m_global_state.SetupDefaultValues();
-    m_listener_semaphores.push_back(&g_dummy_sem);
+    m_listener_semaphores_by_index.push_back(&g_dummy_sem);
 }
 
 std::unique_ptr<ListenerCookie>
@@ -25,22 +25,22 @@ ApplicationState::DoAttachListener(const ParameterBitset& interested,
     std::lock_guard lock(m_mutex);
 
     if (m_reclaimed_listener_indices.empty() &&
-        m_listener_semaphores.size() > kMaxApplicationStateListeners)
+        m_listener_semaphores_by_index.size() > kMaxApplicationStateListeners)
     {
         return nullptr;
     }
 
-    auto index = static_cast<uint8_t>(m_listener_semaphores.size());
+    auto index = static_cast<uint8_t>(m_listener_semaphores_by_index.size());
 
     if (m_reclaimed_listener_indices.empty())
     {
-        m_listener_semaphores.push_back(&semaphore);
+        m_listener_semaphores_by_index.push_back(&semaphore);
     }
     else
     {
         index = m_reclaimed_listener_indices.back();
         m_reclaimed_listener_indices.pop_back();
-        m_listener_semaphores[index] = &semaphore;
+        m_listener_semaphores_by_index[index] = &semaphore;
     }
 
     for (auto param_index = interested.find_first(true); param_index != interested.npos;
@@ -53,7 +53,7 @@ ApplicationState::DoAttachListener(const ParameterBitset& interested,
     return std::make_unique<ListenerCookie>([this, index, interested]() {
         std::lock_guard lock(m_mutex);
 
-        m_listener_semaphores[index] = &g_dummy_sem;
+        m_listener_semaphores_by_index[index] = &g_dummy_sem;
         for (auto param_index = interested.find_first(true); param_index != interested.npos;
              param_index = interested.find_next(true, param_index + 1))
         {
@@ -66,16 +66,16 @@ ApplicationState::DoAttachListener(const ParameterBitset& interested,
 }
 
 void
-ApplicationState::NotifyChange(unsigned index)
+ApplicationState::NotifyChange(unsigned parameter_index)
 {
-    if (index >= m_listeners.size())
+    if (parameter_index >= m_listeners.size())
     {
         return;
     }
 
-    for (auto listener : m_listeners[index])
+    for (auto listener_index : m_listeners[parameter_index])
     {
-        m_listener_semaphores[listener]->release();
+        m_listener_semaphores_by_index[listener_index]->release();
     }
 }
 
