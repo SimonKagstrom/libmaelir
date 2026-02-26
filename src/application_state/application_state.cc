@@ -79,6 +79,29 @@ ApplicationState::NotifyChange(unsigned parameter_index)
     }
 }
 
+void
+ApplicationState::NotifyMultipleChanges(const ParameterBitset& changed)
+{
+    etl::bitset<kMaxApplicationStateListeners, uint32_t> notified_listeners;
+
+    // Collect the listeners to notify (avoid notifying the same listener multiple times)
+    for (auto param_index = changed.find_first(true); param_index != changed.npos;
+         param_index = changed.find_next(true, param_index + 1))
+    {
+        for (auto listener_index : m_listeners[param_index])
+        {
+            notified_listeners.set(listener_index);
+        }
+    }
+
+    // Notify the changed listeners
+    for (size_t listener_index = notified_listeners.find_first(true); listener_index != notified_listeners.npos;
+         listener_index = notified_listeners.find_next(true, listener_index + 1))
+    {
+        m_listener_semaphores_by_index[listener_index]->release();
+    }
+}
+
 
 ApplicationState::ReadWrite
 ApplicationState::CheckoutReadWrite()

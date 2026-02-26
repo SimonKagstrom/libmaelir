@@ -1,4 +1,4 @@
-add_library(stepper_motor_esp32
+add_library(stepper_motor_esp32 EXCLUDE_FROM_ALL
     stepper_motor_esp32.cc
 )
 

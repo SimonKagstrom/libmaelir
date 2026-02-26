@@ -108,10 +108,16 @@ public:
                 return;
             }
 
+            ParameterBitset global_changed;
+
             std::lock_guard lock(m_parent.m_mutex);
 
             (void)std::initializer_list<int> {
-                (m_changed.test(AS::IndexOf<T>()) ? (m_parent.SetNoLock<T>(Get<T>()), 0) : 0)...};
+                (m_changed.test(AS::IndexOf<T>())
+                     ? (m_parent.SetNoLockCollectChanged<T>(Get<T>(), global_changed), 0)
+                     : 0)...};
+
+            m_parent.NotifyMultipleChanges(global_changed);
         }
 
         /// Return a reference to the local value
@@ -180,11 +186,16 @@ public:
             {
                 return;
             }
+            ParameterBitset global_changed;
 
             std::lock_guard lock(m_parent.m_mutex);
 
             (void)std::initializer_list<int> {
-                (m_changed.test(AS::IndexOf<T>()) ? (m_parent.SetNoLock<T>(Get<T>()), 0) : 0)...};
+                (m_changed.test(AS::IndexOf<T>())
+                     ? (m_parent.SetNoLockCollectChanged<T>(Get<T>(), global_changed), 0)
+                     : 0)...};
+
+            m_parent.NotifyMultipleChanges(global_changed);
         }
 
         template <typename S>
@@ -324,14 +335,8 @@ private:
 
 
     template <typename T>
-    void SetNoLock(const auto& value)
+    void DoSetValue(const auto& value)
     {
-        if (value == GetValue<T>())
-        {
-            return;
-        }
-
-
         if constexpr (T::IsAtomic())
         {
             m_global_state.GetRef<T>() = value;
@@ -342,13 +347,39 @@ private:
 
             m_global_state.GetRef<T>() = std::make_shared<std::decay_t<decltype(*ref)>>(value);
         }
+    }
+
+    template <typename T>
+    void SetNoLock(const auto& value)
+    {
+        if (value == GetValue<T>())
+        {
+            return;
+        }
+
+        DoSetValue<T>(value);
 
         NotifyChange(AS::IndexOf<T>());
+    }
+
+    template <typename T>
+    void SetNoLockCollectChanged(const auto& value, ParameterBitset& changed)
+    {
+        if (value == GetValue<T>())
+        {
+            return;
+        }
+
+        DoSetValue<T>(value);
+
+        changed.set(AS::IndexOf<T>());
     }
 
     std::unique_ptr<ListenerCookie> DoAttachListener(const ParameterBitset& interested,
                                                      os::binary_semaphore& semaphore);
     void NotifyChange(unsigned index);
+
+    void NotifyMultipleChanges(const ParameterBitset& changed);
 
     AS::storage::state m_global_state;
 
