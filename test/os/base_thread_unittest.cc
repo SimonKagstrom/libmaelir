@@ -14,6 +14,7 @@ BaseThread::~BaseThread()
 void
 BaseThread::Start(const char*, ThreadCore, ThreadPriority, uint32_t)
 {
+    OnStartup();
 }
 
 void

@@ -16,7 +16,7 @@ public:
     void Start();
 
 private:
-    void Step(Direction direction, unsigned count) override;
+    void Step(int delta) override;
 
     hal::IGpio& m_en_gpio;
     hal::IGpio& m_dir_gpio;

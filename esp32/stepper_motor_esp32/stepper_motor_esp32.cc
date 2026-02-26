@@ -134,10 +134,9 @@ StepperMotorEsp32::Start()
 }
 
 void
-StepperMotorEsp32::Step(Direction direction, unsigned count)
+StepperMotorEsp32::Step(int delta)
 {
-    m_dir_gpio.SetState(direction == Direction::kClockwise ? kClockwiseLevel
-                                                           : kCounterClockwiseLevel);
+    m_dir_gpio.SetState(delta > 0 ? kClockwiseLevel : kCounterClockwiseLevel);
 
     rmt_transmit_config_t tx_config = {
         .loop_count = 0,
@@ -145,7 +144,7 @@ StepperMotorEsp32::Step(Direction direction, unsigned count)
 
     const static uint32_t uniform_speed_hz = 1500;
 
-    tx_config.loop_count = count;
+    tx_config.loop_count = std::abs(delta);
     ESP_ERROR_CHECK(rmt_transmit(m_motor_chan,
                                  m_uniform_motor_encoder,
                                  &uniform_speed_hz,
