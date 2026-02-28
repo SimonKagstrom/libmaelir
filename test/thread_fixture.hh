@@ -17,6 +17,12 @@ public:
     {
         REQUIRE(m_thread);
 
+        auto now = os::GetTimeStamp();
+        if (m_next_wakeup_absolute && now >= *m_next_wakeup_absolute)
+        {
+            m_thread->m_semaphore.release();
+        }
+
         // The thread is not ready
         if (!m_thread->m_semaphore.try_acquire())
         {
@@ -24,6 +30,14 @@ public:
         }
 
         m_next_wakeup_time = m_thread->RunLoop();
+        if (m_next_wakeup_time)
+        {
+            m_next_wakeup_absolute = now + *m_next_wakeup_time;
+        }
+        else
+        {
+            m_next_wakeup_absolute = std::nullopt;
+        }
 
         return true;
     }
@@ -38,4 +52,6 @@ private:
     os::BaseThread* m_thread {nullptr};
 
     std::optional<milliseconds> m_next_wakeup_time;
+
+    std::optional<milliseconds> m_next_wakeup_absolute;
 };
