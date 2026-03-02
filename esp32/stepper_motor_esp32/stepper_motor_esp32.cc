@@ -103,20 +103,20 @@ constexpr auto kCounterClockwiseLevel = !kClockwiseLevel;
 constexpr auto kStepMotorResolutionHz = 1000000; // 1MHz resolution
 
 
-StepperMotorEsp32::StepperMotorEsp32(hal::IGpio& en_gpio,
+StepperMotorEsp32::StepperMotorEsp32(hal::IGpio& sleep_gpio,
                                      hal::IGpio& dir_gpio,
                                      gpio_num_t step_gpio_num)
-    : m_en_gpio(en_gpio)
+    : m_sleep_gpio(sleep_gpio)
     , m_dir_gpio(dir_gpio)
 {
-    m_en_gpio.SetState(false);
+    m_sleep_gpio.SetState(true);
     m_dir_gpio.SetState(kClockwiseLevel);
 
     m_tx_channel_config = {
         .gpio_num = step_gpio_num,
         .clk_src = RMT_CLK_SRC_DEFAULT, // select clock source
         .resolution_hz = kStepMotorResolutionHz,
-        .mem_block_symbols = 64,
+        .mem_block_symbols = 256,
         .trans_queue_depth =
             10, // set the number of transactions that can be pending in the background
     };
@@ -129,13 +129,13 @@ StepperMotorEsp32::StepperMotorEsp32(hal::IGpio& en_gpio,
 void
 StepperMotorEsp32::Start()
 {
-    m_en_gpio.SetState(true);
     ESP_ERROR_CHECK(rmt_enable(m_motor_chan));
 }
 
 void
 StepperMotorEsp32::Step(int delta)
 {
+    m_sleep_gpio.SetState(true);
     m_dir_gpio.SetState(delta > 0 ? kClockwiseLevel : kCounterClockwiseLevel);
 
     rmt_transmit_config_t tx_config = {
@@ -152,4 +152,5 @@ StepperMotorEsp32::Step(int delta)
                                  &tx_config));
 
     ESP_ERROR_CHECK(rmt_tx_wait_all_done(m_motor_chan, -1));
+    m_sleep_gpio.SetState(false);
 }
