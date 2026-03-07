@@ -1,5 +1,7 @@
 #include "stepper_motor_esp32.hh"
 
+#include "time.hh"
+
 #include <esp_check.h>
 
 // From https://github.com/espressif/esp-idf/blob/release/v5.5/examples/peripherals/rmt/stepper_motor/
@@ -138,11 +140,10 @@ StepperMotorEsp32::Step(int delta)
     m_sleep_gpio.SetState(true);
     m_dir_gpio.SetState(delta > 0 ? kClockwiseLevel : kCounterClockwiseLevel);
 
-    rmt_transmit_config_t tx_config = {
-        .loop_count = 0,
-    };
+    rmt_transmit_config_t tx_config = {};
+    tx_config.loop_count = 0;
 
-    const static uint32_t uniform_speed_hz = 1500;
+    const static uint32_t uniform_speed_hz = 1000;
 
     tx_config.loop_count = std::abs(delta);
     ESP_ERROR_CHECK(rmt_transmit(m_motor_chan,
