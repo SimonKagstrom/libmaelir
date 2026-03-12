@@ -199,7 +199,7 @@ if __name__ == "__main__":
         if param not in [asp.parameter for asp in application_state]
     ]
 
-    # Sort the application state by alignment (smallest first)
+    # Sort the application state by alignment (largest first)
     application_state.sort(
         key=lambda asp: (
             type_size_mapping[asp.parameter.type]
@@ -207,7 +207,7 @@ if __name__ == "__main__":
             # Variable/unknown size parameters are placed at the end
             else 32
         ),
-        reverse=False,
+        reverse=True,
     )
 
     for i, asp in enumerate(application_state):
