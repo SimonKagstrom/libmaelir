@@ -143,7 +143,7 @@ StepperMotorEsp32::Step(int delta)
     rmt_transmit_config_t tx_config = {};
     tx_config.loop_count = 0;
 
-    const static uint32_t uniform_speed_hz = 1000;
+    const static uint32_t uniform_speed_hz = 250;
 
     tx_config.loop_count = std::abs(delta);
     ESP_ERROR_CHECK(rmt_transmit(m_motor_chan,
