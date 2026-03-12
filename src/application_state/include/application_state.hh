@@ -83,10 +83,10 @@ public:
     public:
         friend class ApplicationState;
 
-        ReadWrite(const ReadWrite &) = delete;
-        ReadWrite& operator=(const ReadWrite &) = delete;
-        ReadWrite(ReadWrite &&) = delete;
-        ReadWrite& operator=(ReadWrite &&) = delete;
+        ReadWrite(const ReadWrite&) = delete;
+        ReadWrite& operator=(const ReadWrite&) = delete;
+        ReadWrite(ReadWrite&&) = delete;
+        ReadWrite& operator=(ReadWrite&&) = delete;
 
 
         template <typename T>
@@ -107,10 +107,10 @@ public:
     public:
         friend class ApplicationState;
 
-        PartialSnapshot(const PartialSnapshot &) = delete;
-        PartialSnapshot& operator=(const PartialSnapshot &) = delete;
-        PartialSnapshot(PartialSnapshot &&) = delete;
-        PartialSnapshot& operator=(PartialSnapshot &&) = delete;
+        PartialSnapshot(const PartialSnapshot&) = delete;
+        PartialSnapshot& operator=(const PartialSnapshot&) = delete;
+        PartialSnapshot(PartialSnapshot&&) = delete;
+        PartialSnapshot& operator=(PartialSnapshot&&) = delete;
 
 
         ~PartialSnapshot()
@@ -192,10 +192,10 @@ public:
     public:
         friend class ApplicationState;
 
-        QueuedWriter(const QueuedWriter &) = delete;
-        QueuedWriter& operator=(const QueuedWriter &) = delete;
-        QueuedWriter(QueuedWriter &&) = delete;
-        QueuedWriter& operator=(QueuedWriter &&) = delete;
+        QueuedWriter(const QueuedWriter&) = delete;
+        QueuedWriter& operator=(const QueuedWriter&) = delete;
+        QueuedWriter(QueuedWriter&&) = delete;
+        QueuedWriter& operator=(QueuedWriter&&) = delete;
 
         ~QueuedWriter()
         {
@@ -321,7 +321,7 @@ private:
     {
         if constexpr (T::IsAtomic())
         {
-            return m_global_state.GetRef<T>();
+            return m_global_state.GetRef<T>().load();
         }
         else
         {
@@ -342,7 +342,7 @@ private:
     {
         if constexpr (T::IsAtomic())
         {
-            return m_global_state.GetRef<T>();
+            return m_global_state.GetRef<T>().load();
         }
         else
         {
