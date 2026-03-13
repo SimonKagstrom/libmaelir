@@ -138,55 +138,68 @@ public:
         explicit PartialReadOnlyCache(ApplicationState& parent)
             : m_parent(parent)
         {
-            // Hold the lock since the GetValue might refer to a shared_ptr
-            std::lock_guard lock(m_parent.m_mutex);
+            // Lock context
+            {
+                // Hold the lock since the GetValue might refer to a shared_ptr
+                std::lock_guard lock(m_parent.m_mutex);
 
-            (void)std::initializer_list<int> {
-                (m_state.template GetRef<T>() = m_parent.GetValue<T>(), 0)...};
+                (void)std::initializer_list<int> {
+                    (m_state[0].template GetRef<T>() = m_parent.GetValue<T>(), 0)...};
+            }
+            m_state[1] = m_state[0];
         }
 
         /// Return the value of the local storage
         template <typename S>
         auto Get()
         {
-            return GetReference<S>();
+            return GetReference<S>(m_state_index);
         }
 
         Changes Sync()
         {
             m_changes.m_changed.reset();
+            const uint8_t cur = m_state_index;
+            const uint8_t next = !cur;
 
-            std::lock_guard lock(m_parent.m_mutex);
+            // Only do the sync with the lock held, the rest is local
+            {
+                std::lock_guard lock(m_parent.m_mutex);
 
-            (void)std::initializer_list<int> {(SyncAndUpdateChanges<T>(), 0)...};
+                (void)std::initializer_list<int> {
+                    (m_state[next].template GetRef<T>() = m_parent.GetValue<T>(), 0)...};
+            }
+
+            (void)std::initializer_list<int> {(UpdateChanges<T>(cur, next), 0)...};
+            m_state[cur] = m_state[next];
+            m_state_index = next;
+
             return m_changes;
         }
 
     private:
         template <typename S>
-        void SyncAndUpdateChanges()
+        void UpdateChanges(uint8_t cur, uint8_t next)
         {
-            auto new_value = m_parent.GetValue<S>();
-            auto& local_value = m_state.template GetRef<S>();
-
-            if (new_value != local_value)
+            if (GetReference<S>(cur) != GetReference<S>(next))
             {
-                local_value = new_value;
                 m_changes.m_changed.set(AS::IndexOf<S>());
             }
         }
 
         template <typename S>
-        auto& GetReference()
+        auto& GetReference(uint8_t index)
         {
             // Require that S is in T...
             static_assert(std::disjunction_v<std::is_same<S, T>...>);
 
-            return m_state.template GetRef<S>();
+            return m_state[index].template GetRef<S>();
         }
 
         ApplicationState& m_parent;
-        AS::storage::partial_state<T...> m_state;
+        std::array<AS::storage::partial_state<T...>, 2> m_state;
+        uint8_t m_state_index {0};
+
         Changes m_changes;
     };
 
