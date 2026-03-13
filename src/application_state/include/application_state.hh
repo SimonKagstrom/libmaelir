@@ -102,6 +102,96 @@ public:
 
 
     template <class... T>
+    class PartialReadOnlyCache
+    {
+    public:
+        class Changes
+        {
+        public:
+            friend class PartialReadOnlyCache;
+
+            Changes(const Changes&) = default;
+            Changes& operator=(const Changes&) = delete;
+            Changes(Changes&&) = delete;
+            Changes& operator=(Changes&&) = delete;
+
+            template <typename S>
+            bool Changed() const
+            {
+                return m_changed.test(AS::IndexOf<S>());
+            }
+
+        private:
+            Changes() = default;
+
+            // TODO:  Use local index
+            ParameterBitset m_changed;
+        };
+
+        friend class ApplicationState;
+
+        PartialReadOnlyCache(const PartialReadOnlyCache&) = delete;
+        PartialReadOnlyCache& operator=(const PartialReadOnlyCache&) = delete;
+        PartialReadOnlyCache(PartialReadOnlyCache&&) = delete;
+        PartialReadOnlyCache& operator=(PartialReadOnlyCache&&) = delete;
+
+        explicit PartialReadOnlyCache(ApplicationState& parent)
+            : m_parent(parent)
+        {
+            // Hold the lock since the GetValue might refer to a shared_ptr
+            std::lock_guard lock(m_parent.m_mutex);
+
+            (void)std::initializer_list<int> {
+                (m_state.template GetRef<T>() = m_parent.GetValue<T>(), 0)...};
+        }
+
+        /// Return the value of the local storage
+        template <typename S>
+        auto Get()
+        {
+            return GetReference<S>();
+        }
+
+        Changes Sync()
+        {
+            m_changes.m_changed.reset();
+
+            std::lock_guard lock(m_parent.m_mutex);
+
+            (void)std::initializer_list<int> {(SyncAndUpdateChanges<T>(), 0)...};
+            return m_changes;
+        }
+
+    private:
+        template <typename S>
+        void SyncAndUpdateChanges()
+        {
+            auto new_value = m_parent.GetValue<S>();
+            auto& local_value = m_state.template GetRef<S>();
+
+            if (new_value != local_value)
+            {
+                local_value = new_value;
+                m_changes.m_changed.set(AS::IndexOf<S>());
+            }
+        }
+
+        template <typename S>
+        auto& GetReference()
+        {
+            // Require that S is in T...
+            static_assert(std::disjunction_v<std::is_same<S, T>...>);
+
+            return m_state.template GetRef<S>();
+        }
+
+        ApplicationState& m_parent;
+        AS::storage::partial_state<T...> m_state;
+        Changes m_changes;
+    };
+
+
+    template <class... T>
     class PartialSnapshot
     {
     public:
