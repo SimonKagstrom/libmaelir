@@ -7,6 +7,7 @@
 #include <array>
 #include <atomic>
 #include <etl/bitset.h>
+#include <etl/delegate.h>
 #include <etl/mutex.h>
 #include <etl/vector.h>
 #include <string_view>
@@ -26,6 +27,12 @@ struct partial_state : public T...
     auto& GetRef()
     {
         return static_cast<S&>(*this).template GetRef<S>();
+    }
+
+    template <typename S>
+    const auto& GetConstRef() const
+    {
+        return static_cast<const S&>(*this).template GetConstRef<S>();
     }
 
     // Might be used in the future, if the number of global indicies are > 32
@@ -105,26 +112,99 @@ public:
     class PartialReadOnlyCache
     {
     public:
-        class Changes
+        class Checkout
         {
         public:
             friend class PartialReadOnlyCache;
 
-            Changes(const Changes&) = default;
-            Changes& operator=(const Changes&) = delete;
-            Changes(Changes&&) = delete;
-            Changes& operator=(Changes&&) = delete;
+            Checkout() = delete;
+            Checkout(const Checkout&) = delete;
+            Checkout& operator=(const Checkout&) = delete;
+            Checkout(Checkout&&) = delete;
+            Checkout& operator=(Checkout&&) = delete;
 
             template <typename S>
-            bool Changed() const
+            bool IsChanged() const
             {
                 return m_changed.test(AS::IndexOf<S>());
             }
 
+            template <typename S>
+            const Checkout& OnChanged(const auto& callback) const
+            {
+                if (IsChanged<S>())
+                {
+                    callback();
+                }
+
+                return *this;
+            }
+
+            template <typename S>
+            const Checkout& OnNewValue(const auto& callback) const
+            {
+                if (IsChanged<S>())
+                {
+                    callback(Get<S>());
+                }
+
+                return *this;
+            }
+
+            template <typename S>
+            const Checkout& OnChangedValue(const auto& callback) const
+            {
+                if (IsChanged<S>())
+                {
+                    callback(GetReference<S>(!m_state_index), GetReference<S>(m_state_index));
+                }
+
+                return *this;
+            }
+
+            /// Return the value of the local storage
+            template <typename S>
+            auto Get() const
+            {
+                return GetReference<S>(m_state_index);
+            }
+
         private:
-            Changes() = default;
+            explicit Checkout(ApplicationState& parent)
+            {
+                // Lock context
+                {
+                    // Hold the lock since the GetValue might refer to a shared_ptr
+                    std::lock_guard lock(parent.m_mutex);
+
+                    (void)std::initializer_list<int> {
+                        (m_state[0].template GetRef<T>() = parent.GetValue<T>(), 0)...};
+                }
+                m_state[1] = m_state[0];
+            }
+
+            template <typename S>
+            void UpdateChanges(uint8_t cur, uint8_t next)
+            {
+                if (GetReference<S>(cur) != GetReference<S>(next))
+                {
+                    m_changed.set(AS::IndexOf<S>());
+                }
+            }
+
+            template <typename S>
+            const auto& GetReference(uint8_t index) const
+            {
+                // Require that S is in T...
+                static_assert(std::disjunction_v<std::is_same<S, T>...>);
+
+                return m_state[index].template GetConstRef<S>();
+            }
+
 
             // TODO:  Use local index
+            std::array<AS::storage::partial_state<T...>, 2> m_state;
+            uint8_t m_state_index {0};
             ParameterBitset m_changed;
         };
 
@@ -137,29 +217,14 @@ public:
 
         explicit PartialReadOnlyCache(ApplicationState& parent)
             : m_parent(parent)
+            , m_checkout(parent)
         {
-            // Lock context
-            {
-                // Hold the lock since the GetValue might refer to a shared_ptr
-                std::lock_guard lock(m_parent.m_mutex);
-
-                (void)std::initializer_list<int> {
-                    (m_state[0].template GetRef<T>() = m_parent.GetValue<T>(), 0)...};
-            }
-            m_state[1] = m_state[0];
         }
 
-        /// Return the value of the local storage
-        template <typename S>
-        auto Get()
+        const Checkout& Pull()
         {
-            return GetReference<S>(m_state_index);
-        }
-
-        Changes Sync()
-        {
-            m_changes.m_changed.reset();
-            const uint8_t cur = m_state_index;
+            m_checkout.m_changed.reset();
+            const uint8_t cur = m_checkout.m_state_index;
             const uint8_t next = !cur;
 
             // Only do the sync with the lock held, the rest is local
@@ -167,40 +232,20 @@ public:
                 std::lock_guard lock(m_parent.m_mutex);
 
                 (void)std::initializer_list<int> {
-                    (m_state[next].template GetRef<T>() = m_parent.GetValue<T>(), 0)...};
+                    (m_checkout.m_state[next].template GetRef<T>() = m_parent.GetValue<T>(), 0)...};
             }
 
-            (void)std::initializer_list<int> {(UpdateChanges<T>(cur, next), 0)...};
-            m_state[cur] = m_state[next];
-            m_state_index = next;
+            (void)std::initializer_list<int> {
+                (m_checkout.template UpdateChanges<T>(cur, next), 0)...};
+            m_checkout.m_state_index = next;
 
-            return m_changes;
+            return m_checkout;
         }
 
     private:
-        template <typename S>
-        void UpdateChanges(uint8_t cur, uint8_t next)
-        {
-            if (GetReference<S>(cur) != GetReference<S>(next))
-            {
-                m_changes.m_changed.set(AS::IndexOf<S>());
-            }
-        }
-
-        template <typename S>
-        auto& GetReference(uint8_t index)
-        {
-            // Require that S is in T...
-            static_assert(std::disjunction_v<std::is_same<S, T>...>);
-
-            return m_state[index].template GetRef<S>();
-        }
-
         ApplicationState& m_parent;
-        std::array<AS::storage::partial_state<T...>, 2> m_state;
-        uint8_t m_state_index {0};
 
-        Changes m_changes;
+        Checkout m_checkout;
     };
 
 

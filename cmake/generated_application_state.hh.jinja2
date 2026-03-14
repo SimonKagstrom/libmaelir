@@ -22,6 +22,9 @@ struct {{ parameter.name }}
     template<typename T>
     auto &GetRef();
 
+    template<typename T>
+    const auto &GetConstRef() const;
+
     static consteval bool IsAtomic()
     {
         return {{ parameter.is_atomic|lower }};
@@ -30,6 +33,12 @@ struct {{ parameter.name }}
 
 template<>
 inline auto &{{ parameter.name }}::GetRef<struct {{ parameter.name }}>()
+{
+    return {{parameter.name}};
+}
+
+template<>
+inline const auto &{{ parameter.name }}::GetConstRef<struct {{ parameter.name }}>() const
 {
     return {{parameter.name}};
 }
