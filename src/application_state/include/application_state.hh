@@ -171,11 +171,12 @@ public:
 
         private:
             explicit Checkout(ApplicationState& parent)
+                : m_parent(parent)
             {
                 // Lock context
                 {
                     // Hold the lock since the GetValue might refer to a shared_ptr
-                    std::lock_guard lock(parent.m_mutex);
+                    auto lock = GetLock();
 
                     (void)std::initializer_list<int> {
                         (m_state[0].template GetRef<T>() = parent.GetValue<T>(), 0)...};
@@ -201,6 +202,17 @@ public:
                 return m_state[index].template GetConstRef<S>();
             }
 
+            std::unique_lock<std::mutex> GetLock() const
+            {
+                if constexpr (sizeof...(T) == 1)
+                {
+                    // No mutex needed here
+                    return std::unique_lock<std::mutex>();
+                }
+                return std::unique_lock<std::mutex>(m_parent.m_mutex);
+            }
+
+            ApplicationState& m_parent;
 
             // TODO:  Use local index
             std::array<AS::storage::partial_state<T...>, 2> m_state;
@@ -216,8 +228,7 @@ public:
         PartialReadOnlyCache& operator=(PartialReadOnlyCache&&) = delete;
 
         explicit PartialReadOnlyCache(ApplicationState& parent)
-            : m_parent(parent)
-            , m_checkout(parent)
+            : m_checkout(parent)
         {
         }
 
@@ -229,10 +240,11 @@ public:
 
             // Only do the sync with the lock held, the rest is local
             {
-                std::lock_guard lock(m_parent.m_mutex);
+                auto mutex = m_checkout.GetLock();
 
-                (void)std::initializer_list<int> {
-                    (m_checkout.m_state[next].template GetRef<T>() = m_parent.GetValue<T>(), 0)...};
+                (void)std::initializer_list<int> {(m_checkout.m_state[next].template GetRef<T>() =
+                                                       m_checkout.m_parent.template GetValue<T>(),
+                                                   0)...};
             }
 
             (void)std::initializer_list<int> {
@@ -243,8 +255,6 @@ public:
         }
 
     private:
-        ApplicationState& m_parent;
-
         Checkout m_checkout;
     };
 
