@@ -19,6 +19,7 @@ add_subdirectory(mock_httpd_client)
 
 add_library(os_unittest EXCLUDE_FROM_ALL
     os/base_thread_unittest.cc
+    os/os_implementation.cc
     os/semaphore_unittest.cc
     # Maybe move to it's own library...
     mock_time.cc
@@ -33,4 +34,7 @@ target_link_libraries(os_unittest
 target_include_directories(os_unittest
 PUBLIC
     .
+    include
 )
+
+add_library(os_implementation ALIAS os_unittest)

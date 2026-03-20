@@ -9,5 +9,5 @@ PUBLIC
 
 target_link_libraries(opportunistic_scheduler
 PUBLIC
-    libmaelir_interface
+    os
 )

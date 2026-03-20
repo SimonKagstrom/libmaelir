@@ -10,3 +10,6 @@ using Fixture = TimeFixture;
 
 } // namespace
 
+TEST_CASE_FIXTURE(Fixture, "")
+{
+}
