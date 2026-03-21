@@ -3,23 +3,25 @@
 #include "os/thread.hh"
 #include "test.hh"
 
-namespace
-{
-
-class Fixture : public TimeFixture
+class SchedulerFixture : public TimeFixture
 {
 public:
-    Fixture()
+    SchedulerFixture()
     {
         threads.push_back(std::make_unique<os::MockThread>());
         current_thread = threads.back().get();
         os::detail::SetCurrentThread(current_thread);
     }
 
+    void RunScheduler()
+    {
+        os::OpportunisticBinarySemaphore::RunScheduler();
+    }
+
     void AdvanceTimeAndSchedule(milliseconds time)
     {
         AdvanceTime(time);
-        os::OpportunisticBinarySemaphore::RunScheduler();
+        RunScheduler();
     }
 
     os::MockThread* CreateThread()
@@ -37,9 +39,7 @@ public:
     os::MockThread* current_thread;
 };
 
-} // namespace
-
-TEST_CASE_FIXTURE(Fixture, "a binary semaphore can be acquired if it is available")
+TEST_CASE_FIXTURE(SchedulerFixture, "a binary semaphore can be acquired if it is available")
 {
     os::OpportunisticBinarySemaphore sem {1};
 
@@ -53,7 +53,7 @@ TEST_CASE_FIXTURE(Fixture, "a binary semaphore can be acquired if it is availabl
     }
 }
 
-TEST_CASE_FIXTURE(Fixture, "if it's not available, the thread is suspended on acquire")
+TEST_CASE_FIXTURE(SchedulerFixture, "if it's not available, the thread is suspended on acquire")
 {
     os::OpportunisticBinarySemaphore sem {0};
 
@@ -61,7 +61,8 @@ TEST_CASE_FIXTURE(Fixture, "if it's not available, the thread is suspended on ac
     sem.acquire();
 }
 
-TEST_CASE_FIXTURE(Fixture, "try_acquire will return immediately if the semaphore can be acquired")
+TEST_CASE_FIXTURE(SchedulerFixture,
+                  "try_acquire will return immediately if the semaphore can be acquired")
 {
     os::OpportunisticBinarySemaphore sem {1};
 
@@ -74,7 +75,8 @@ TEST_CASE_FIXTURE(Fixture, "try_acquire will return immediately if the semaphore
 }
 
 
-TEST_CASE_FIXTURE(Fixture, "A suspended thread will be awoken when the semaphore is released")
+TEST_CASE_FIXTURE(SchedulerFixture,
+                  "A suspended thread will be awoken when the semaphore is released")
 {
     os::OpportunisticBinarySemaphore sem {0};
 
@@ -86,7 +88,8 @@ TEST_CASE_FIXTURE(Fixture, "A suspended thread will be awoken when the semaphore
 }
 
 
-TEST_CASE_FIXTURE(Fixture, "try_acquire_for will return once no_later_than has been reached")
+TEST_CASE_FIXTURE(SchedulerFixture,
+                  "try_acquire_for will return once no_later_than has been reached")
 {
     os::OpportunisticBinarySemaphore sem {0};
 
@@ -115,7 +118,7 @@ TEST_CASE_FIXTURE(Fixture, "try_acquire_for will return once no_later_than has b
     }
 }
 
-TEST_CASE_FIXTURE(Fixture,
+TEST_CASE_FIXTURE(SchedulerFixture,
                   "try_acquire_for will not return before no_earlier_than has been reached")
 {
     os::OpportunisticBinarySemaphore sem {0};
@@ -133,15 +136,50 @@ TEST_CASE_FIXTURE(Fixture,
         {
             REQUIRE_CALL(*current_thread, Awake());
             sem.release();
-            os::OpportunisticBinarySemaphore::RunScheduler();
+
+            RunScheduler();
         }
     }
 }
 
 
-TEST_CASE_FIXTURE(Fixture, "two threads wait on the same semaphore")
+TEST_CASE_FIXTURE(SchedulerFixture, "the second thread will have to wait for an acquired semaphore")
 {
-    os::OpportunisticBinarySemaphore sem {0};
- 
+    os::OpportunisticBinarySemaphore sem {1};
+
+    auto first_thread = current_thread;
     auto other_thread = CreateThread();
+    REQUIRE(current_thread != other_thread);
+
+    auto rv = sem.try_acquire();
+    REQUIRE(rv);
+
+    WHEN("the second thread tries to acquire the semaphore")
+    {
+        SetCurrentThread(other_thread);
+        auto r_suspended = NAMED_REQUIRE_CALL(*other_thread, Suspend());
+        sem.acquire();
+
+        THEN("it has to sleep")
+        {
+            r_suspended = nullptr;
+        }
+
+        AND_WHEN("the first thread releases the semaphore")
+        {
+            auto r_woke = NAMED_REQUIRE_CALL(*other_thread, Awake());
+            SetCurrentThread(first_thread);
+            sem.release();
+            RunScheduler();
+
+            THEN("the second thread is awoken")
+            {
+                r_woke = nullptr;
+            }
+        }
+    }
+}
+
+TEST_CASE_FIXTURE(SchedulerFixture, "")
+{
 }

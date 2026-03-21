@@ -6,6 +6,9 @@
 // TODO: Replace with safe
 #include <atomic>
 #include <deque>
+
+class SchedulerFixture;
+
 namespace os
 {
 
@@ -48,6 +51,8 @@ LatestAfter(milliseconds time)
 class OpportunisticBinarySemaphore
 {
 public:
+    friend class ::SchedulerFixture;
+
     explicit OpportunisticBinarySemaphore(uint8_t initial_value);
     ~OpportunisticBinarySemaphore();
 
@@ -61,27 +66,44 @@ public:
         try_acquire_for(OnEvent());
     }
 
+    void acquire(const WakeupConfiguration& config) noexcept
+    {
+        if (config.no_earlier_than.count() > 0)
+        {
+            os::Sleep(config.no_earlier_than);
+        }
+        acquire();
+    }
+
     bool try_acquire() noexcept;
 
     bool try_acquire_for(const WakeupConfiguration& config) noexcept;
 
-
-    static void RunScheduler();
-
-private:
+    // TODO: Privatize, but maybe available for unit tests
     struct Entry
     {
         os::ThreadHandle thread;
         WakeupConfiguration config;
     };
 
-    bool do_try_acquire_no_suspend() noexcept;
+    struct WaitEntry
+    {
+        Entry entry;
+        OpportunisticBinarySemaphore* sem;
+    };
+
+private:
+    static void RunScheduler();
+
+    void SuspendForTooEarly(const WakeupConfiguration& config);
+
+    void SuspendForNoLaterThan(const WakeupConfiguration& config);
+
+    bool DoTryAcquireNoSuspend() noexcept;
 
     std::atomic<uint8_t> m_value;
     std::deque<Entry> m_waiting_threads;
     std::vector<OpportunisticBinarySemaphore::Entry> m_pending_wakeups;
-
-    static std::vector<OpportunisticBinarySemaphore*> g_waiting_semaphores;
 };
 
 } // namespace os
