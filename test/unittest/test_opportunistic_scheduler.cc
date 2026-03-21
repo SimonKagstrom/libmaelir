@@ -11,7 +11,9 @@ class Fixture : public TimeFixture
 public:
     Fixture()
     {
-        os::detail::SetCurrentThread(&init_thread);
+        threads.push_back(std::make_unique<os::MockThread>());
+        current_thread = threads.back().get();
+        os::detail::SetCurrentThread(current_thread);
     }
 
     void AdvanceTimeAndSchedule(milliseconds time)
@@ -20,8 +22,19 @@ public:
         os::OpportunisticBinarySemaphore::RunScheduler();
     }
 
-    os::MockThread init_thread;
-    os::MockThread* current_thread {&init_thread};
+    os::MockThread* CreateThread()
+    {
+        threads.push_back(std::make_unique<os::MockThread>());
+        return threads.back().get();
+    }
+
+    void SetCurrentThread(os::MockThread* thread)
+    {
+        os::detail::SetCurrentThread(thread);
+    }
+
+    std::vector<std::unique_ptr<os::MockThread>> threads;
+    os::MockThread* current_thread;
 };
 
 } // namespace
@@ -81,12 +94,24 @@ TEST_CASE_FIXTURE(Fixture, "try_acquire_for will return once no_later_than has b
     auto rv = sem.try_acquire_for(os::LatestAfter(200ms));
     r_suspended = nullptr;
 
-    AdvanceTimeAndSchedule(199ms);
-    AND_THEN("the thread will be awoken after no_later_than")
+    AND_THEN("the thread will be awoken after no_later_than (with no semaphore)")
     {
+        AdvanceTimeAndSchedule(199ms);
         REQUIRE_CALL(*current_thread, Awake());
         AdvanceTimeAndSchedule(1ms);
         REQUIRE(rv == false);
+    }
+
+    AND_WHEN("the semaphore is released before no_later_than")
+    {
+        auto r_woke = NAMED_REQUIRE_CALL(*current_thread, Awake());
+        AdvanceTimeAndSchedule(100ms);
+        sem.release();
+        AdvanceTimeAndSchedule(1ms);
+        THEN("it's only awoken directly")
+        {
+            r_woke = nullptr;
+        }
     }
 }
 
@@ -96,29 +121,27 @@ TEST_CASE_FIXTURE(Fixture,
     os::OpportunisticBinarySemaphore sem {0};
 
     auto r_suspended = NAMED_REQUIRE_CALL(*current_thread, Suspend());
+    auto now = os::GetTimeStamp();
     // The return value really doesn't work here
-    sem.try_acquire_for(os::EarliestAfter(10ms).NoLaterThan(20ms));
+    sem.try_acquire_for(os::EarliestAfter(10ms));
     r_suspended = nullptr;
 
-    WHEN("time is earlier than no_earlier_than")
+    THEN("it will wait until no_earlier_than has been reached")
     {
-        auto r_no_awake = NAMED_FORBID_CALL(*current_thread, Awake());
-        AdvanceTimeAndSchedule(9ms);
-        sem.release();
-        THEN("the thread is not awoken")
+        REQUIRE(os::GetTimeStamp() - now == 10ms);
+        AND_THEN("the thread can be awoken")
         {
-            r_no_awake = nullptr;
-        }
-
-        AND_WHEN("the earliest deadline has passed")
-        {
-            auto r_awake = NAMED_REQUIRE_CALL(*current_thread, Awake());
-            AdvanceTimeAndSchedule(1ms);
-
-            THEN("the thread is awoken")
-            {
-                r_awake = nullptr;
-            }
+            REQUIRE_CALL(*current_thread, Awake());
+            sem.release();
+            os::OpportunisticBinarySemaphore::RunScheduler();
         }
     }
+}
+
+
+TEST_CASE_FIXTURE(Fixture, "two threads wait on the same semaphore")
+{
+    os::OpportunisticBinarySemaphore sem {0};
+ 
+    auto other_thread = CreateThread();
 }

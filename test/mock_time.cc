@@ -37,3 +37,12 @@ os::GetTimeStamp()
     assert(p);
     return p->Now();
 }
+
+void
+os::Sleep(milliseconds delay)
+{
+    auto p = g_mock_time.lock();
+
+    assert(p);
+    p->AdvanceTime(delay);
+}

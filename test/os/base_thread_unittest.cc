@@ -16,8 +16,3 @@ BaseThread::Start(const char*, ThreadCore, ThreadPriority, uint32_t)
 {
     OnStartup();
 }
-
-void
-os::Sleep(milliseconds delay)
-{
-}

@@ -29,6 +29,7 @@ OpportunisticBinarySemaphore::release() noexcept
         if (entry.config.no_earlier_than.count() - now.count() > 0)
         {
             // Not yet time to wake up this thread
+            m_pending_wakeups.push_back(entry);
             break;
         }
         m_waiting_threads.pop_front();
@@ -50,19 +51,19 @@ OpportunisticBinarySemaphore::release_from_isr() noexcept
 bool
 OpportunisticBinarySemaphore::try_acquire() noexcept
 {
-    if (std::atomic_exchange_explicit(&m_value, 0, std::memory_order_acquire) == 1)
-    {
-        return true;
-    }
-
-    return false;
+    return do_try_acquire_no_suspend();
 }
 
 
 bool
 OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config) noexcept
 {
-    if (std::atomic_exchange_explicit(&m_value, 0, std::memory_order_acquire) == 1)
+    if (config.no_earlier_than.count() > 0)
+    {
+        os::Sleep(config.no_earlier_than);
+    }
+
+    if (do_try_acquire_no_suspend())
     {
         return true;
     }
@@ -81,6 +82,17 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
 
     g_waiting_semaphores.push_back(this);
     os::SuspendThread(self);
+
+    return false;
+}
+
+
+bool OpportunisticBinarySemaphore::do_try_acquire_no_suspend() noexcept
+{
+    if (std::atomic_exchange_explicit(&m_value, 0, std::memory_order_acquire) == 1)
+    {
+        return true;
+    }
 
     return false;
 }
@@ -105,5 +117,14 @@ OpportunisticBinarySemaphore::RunScheduler()
             sem->m_waiting_threads.pop_front();
             os::AwakeThread(entry.thread);
         }
+    }
+
+    for (auto sem : g_waiting_semaphores)
+    {
+        for (auto& entry : sem->m_pending_wakeups)
+        {
+            os::AwakeThread(entry.thread);
+        }
+        sem->m_pending_wakeups.clear();
     }
 }

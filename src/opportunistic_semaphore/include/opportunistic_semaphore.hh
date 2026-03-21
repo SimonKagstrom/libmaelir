@@ -75,8 +75,11 @@ private:
         WakeupConfiguration config;
     };
 
+    bool do_try_acquire_no_suspend() noexcept;
+
     std::atomic<uint8_t> m_value;
     std::deque<Entry> m_waiting_threads;
+    std::vector<OpportunisticBinarySemaphore::Entry> m_pending_wakeups;
 
     static std::vector<OpportunisticBinarySemaphore*> g_waiting_semaphores;
 };
