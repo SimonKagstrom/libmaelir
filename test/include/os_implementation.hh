@@ -16,6 +16,14 @@ public:
     MAKE_MOCK0(Suspend, void());
 };
 
+class MockKernel
+{
+public:
+    std::shared_ptr<MockKernel> Create();
+
+    MAKE_MOCK1(TriggerWakeup, void(milliseconds));
+};
+
 using ThreadHandle = MockThread*;
 
 namespace detail

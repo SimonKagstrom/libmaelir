@@ -4,8 +4,22 @@
 
 namespace
 {
+
 os::ThreadHandle g_current_thread;
+std::weak_ptr<os::MockKernel> g_kernel;
+
+} // namespace
+
+std::shared_ptr<os::MockKernel>
+os::MockKernel::Create()
+{
+    auto out = std::make_shared<os::MockKernel>();
+
+    g_kernel = out;
+
+    return out;
 }
+
 
 os::ThreadHandle
 os::detail::GetCurrentThread()
@@ -42,6 +56,10 @@ os::detail::SuspendThread(os::ThreadHandle thread)
 void
 os::detail::TriggerWakeup(milliseconds time_from_now)
 {
+    auto kernel = g_kernel.lock();
+    assert(kernel);
+
+    kernel->TriggerWakeup(time_from_now);
 }
 
 

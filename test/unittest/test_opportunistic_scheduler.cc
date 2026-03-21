@@ -3,11 +3,35 @@
 #include "os/thread.hh"
 #include "test.hh"
 
+class UnittestOpportunisticSemaphore : public os::OpportunisticBinarySemaphore
+{
+public:
+    using os::OpportunisticBinarySemaphore::OpportunisticBinarySemaphore;
+
+    void DoSuspendForTooEarly(const os::WakeupConfiguration& config) noexcept
+    {
+        SuspendForTooEarly(config);
+    }
+
+    void DoSuspendForNoLaterThan(const os::WakeupConfiguration& config) noexcept
+    {
+        SuspendForNoLaterThan(config);
+    }
+
+    bool DoTryAcquireNoSuspend() noexcept
+    {
+        return TryAcquireNoSuspend();
+    }
+};
+
 class SchedulerFixture : public TimeFixture
 {
 public:
     SchedulerFixture()
     {
+        m_expectations.push_back(
+            NAMED_ALLOW_CALL(*kernel, TriggerWakeup(_)).SIDE_EFFECT(next_wakeup_time = _1));
+
         threads.push_back(std::make_unique<os::MockThread>());
         current_thread = threads.back().get();
         os::detail::SetCurrentThread(current_thread);
@@ -15,7 +39,7 @@ public:
 
     void RunScheduler()
     {
-        os::OpportunisticBinarySemaphore::RunScheduler();
+        UnittestOpportunisticSemaphore::RunScheduler();
     }
 
     void AdvanceTimeAndSchedule(milliseconds time)
@@ -30,18 +54,31 @@ public:
         return threads.back().get();
     }
 
+    os::MockThread* CreateAndActivateThread()
+    {
+        auto out = CreateThread();
+        SetCurrentThread(out);
+        return out;
+    }
+
     void SetCurrentThread(os::MockThread* thread)
     {
         os::detail::SetCurrentThread(thread);
     }
 
+    milliseconds next_wakeup_time {0ms};
+
+    std::shared_ptr<os::MockKernel> kernel {os::MockKernel().Create()};
     std::vector<std::unique_ptr<os::MockThread>> threads;
     os::MockThread* current_thread;
+
+private:
+    std::vector<std::unique_ptr<trompeloeil::expectation>> m_expectations;
 };
 
 TEST_CASE_FIXTURE(SchedulerFixture, "a binary semaphore can be acquired if it is available")
 {
-    os::OpportunisticBinarySemaphore sem {1};
+    UnittestOpportunisticSemaphore sem {1};
 
     // No unexpected mock calls
     sem.acquire();
@@ -55,7 +92,7 @@ TEST_CASE_FIXTURE(SchedulerFixture, "a binary semaphore can be acquired if it is
 
 TEST_CASE_FIXTURE(SchedulerFixture, "if it's not available, the thread is suspended on acquire")
 {
-    os::OpportunisticBinarySemaphore sem {0};
+    UnittestOpportunisticSemaphore sem {0};
 
     REQUIRE_CALL(*current_thread, Suspend());
     sem.acquire();
@@ -64,7 +101,7 @@ TEST_CASE_FIXTURE(SchedulerFixture, "if it's not available, the thread is suspen
 TEST_CASE_FIXTURE(SchedulerFixture,
                   "try_acquire will return immediately if the semaphore can be acquired")
 {
-    os::OpportunisticBinarySemaphore sem {1};
+    UnittestOpportunisticSemaphore sem {1};
 
     REQUIRE(sem.try_acquire() == true);
 
@@ -78,7 +115,7 @@ TEST_CASE_FIXTURE(SchedulerFixture,
 TEST_CASE_FIXTURE(SchedulerFixture,
                   "A suspended thread will be awoken when the semaphore is released")
 {
-    os::OpportunisticBinarySemaphore sem {0};
+    UnittestOpportunisticSemaphore sem {0};
 
     REQUIRE_CALL(*current_thread, Suspend());
     sem.acquire();
@@ -87,11 +124,58 @@ TEST_CASE_FIXTURE(SchedulerFixture,
     sem.release();
 }
 
+TEST_CASE_FIXTURE(SchedulerFixture, "TooEarlySuspend will trigger a wakeup at no_later_than")
+{
+    UnittestOpportunisticSemaphore sem {0};
+
+    auto now = os::GetTimeStamp();
+
+    WHEN("a thread is suspended with a no_earlier_than time")
+    {
+        auto r_suspended = NAMED_REQUIRE_CALL(*current_thread, Suspend());
+        sem.DoSuspendForTooEarly(os::EarliestAfter(100ms).NoLaterThan(200ms));
+
+        THEN("the thread is suspended")
+        {
+            r_suspended = nullptr;
+        }
+        AND_THEN("the next trigger time is no_later_than")
+        {
+            REQUIRE(next_wakeup_time == now + 200ms);
+        }
+
+        auto other_thread = CreateAndActivateThread();
+        AND_WHEN("another thread is suspended with a no_earlier_than time, with no_later before "
+                 "the current")
+        {
+            REQUIRE_CALL(*other_thread, Suspend());
+            sem.DoSuspendForTooEarly(os::EarliestAfter(50ms).NoLaterThan(150ms));
+
+            THEN("the next trigger is shortened")
+            {
+                REQUIRE(next_wakeup_time == now + 150ms);
+            }
+        }
+
+        AND_WHEN("another thread is suspended with a no_earlier_than time, with no_later after the "
+                 "current")
+        {
+            REQUIRE_CALL(*other_thread, Suspend());
+            sem.DoSuspendForTooEarly(os::EarliestAfter(50ms).NoLaterThan(250ms));
+
+            THEN("the first trigger  time is kept")
+            {
+                REQUIRE(next_wakeup_time == now + 200ms);
+            }
+        }
+    }
+}
+
 
 TEST_CASE_FIXTURE(SchedulerFixture,
                   "try_acquire_for will return once no_later_than has been reached")
 {
-    os::OpportunisticBinarySemaphore sem {0};
+    UnittestOpportunisticSemaphore sem {0};
 
     auto r_suspended = NAMED_REQUIRE_CALL(*current_thread, Suspend());
     auto rv = sem.try_acquire_for(os::LatestAfter(200ms));
@@ -121,19 +205,21 @@ TEST_CASE_FIXTURE(SchedulerFixture,
 TEST_CASE_FIXTURE(SchedulerFixture,
                   "try_acquire_for will not return before no_earlier_than has been reached")
 {
-    os::OpportunisticBinarySemaphore sem {0};
+    UnittestOpportunisticSemaphore sem {0};
 
-    auto r_suspended = NAMED_REQUIRE_CALL(*current_thread, Suspend());
     auto now = os::GetTimeStamp();
+    auto r_suspended = NAMED_REQUIRE_CALL(*current_thread, Suspend());
     // The return value really doesn't work here
     sem.try_acquire_for(os::EarliestAfter(10ms));
     r_suspended = nullptr;
 
     THEN("it will wait until no_earlier_than has been reached")
     {
-        REQUIRE(os::GetTimeStamp() - now == 10ms);
-        AND_THEN("the thread can be awoken")
+        REQUIRE(next_wakeup_time == now + 10ms);
+        AdvanceTimeAndSchedule(9ms);
+        AND_THEN("the thread can be awoken after the no_earlier_than time has passed")
         {
+            AdvanceTimeAndSchedule(1ms);
             REQUIRE_CALL(*current_thread, Awake());
             sem.release();
 
@@ -145,7 +231,7 @@ TEST_CASE_FIXTURE(SchedulerFixture,
 
 TEST_CASE_FIXTURE(SchedulerFixture, "the second thread will have to wait for an acquired semaphore")
 {
-    os::OpportunisticBinarySemaphore sem {1};
+    UnittestOpportunisticSemaphore sem {1};
 
     auto first_thread = current_thread;
     auto other_thread = CreateThread();

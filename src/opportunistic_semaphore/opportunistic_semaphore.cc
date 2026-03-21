@@ -13,6 +13,8 @@ std::vector<OpportunisticBinarySemaphore*> g_waiting_semaphores;
 std::vector<OpportunisticBinarySemaphore::WaitEntry> g_pending_too_early;
 std::vector<OpportunisticBinarySemaphore::WaitEntry> g_pending_try_wakeups;
 
+milliseconds g_next_wakeup_time {0xffffffffms};
+
 } // namespace
 
 OpportunisticBinarySemaphore::OpportunisticBinarySemaphore(uint8_t initial_value)
@@ -22,7 +24,9 @@ OpportunisticBinarySemaphore::OpportunisticBinarySemaphore(uint8_t initial_value
 
 OpportunisticBinarySemaphore::~OpportunisticBinarySemaphore()
 {
+    // TODO FIXME!
     std::erase(g_waiting_semaphores, this);
+    g_next_wakeup_time = {0xffffffffms};
 }
 
 void
@@ -60,7 +64,7 @@ OpportunisticBinarySemaphore::release_from_isr() noexcept
 bool
 OpportunisticBinarySemaphore::try_acquire() noexcept
 {
-    return DoTryAcquireNoSuspend();
+    return TryAcquireNoSuspend();
 }
 
 
@@ -72,21 +76,21 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
         SuspendForTooEarly(config);
 
         // Back after wakeup (at the latest after no_later_than)
-        return DoTryAcquireNoSuspend();
+        return TryAcquireNoSuspend();
     }
 
-    if (DoTryAcquireNoSuspend())
+    if (TryAcquireNoSuspend())
     {
         return true;
     }
     SuspendForNoLaterThan(config);
 
-    return DoTryAcquireNoSuspend();
+    return TryAcquireNoSuspend();
 }
 
 
 void
-OpportunisticBinarySemaphore::SuspendForTooEarly(const WakeupConfiguration& config)
+OpportunisticBinarySemaphore::SuspendForTooEarly(const WakeupConfiguration& config) noexcept
 {
     debug_assert(config.no_earlier_than > 0ms);
     debug_assert(config.no_later_than >= config.no_earlier_than);
@@ -96,12 +100,19 @@ OpportunisticBinarySemaphore::SuspendForTooEarly(const WakeupConfiguration& conf
     g_pending_too_early.push_back(
         {{os::GetCurrentThread(), {config.no_earlier_than + now, config.no_later_than + now}},
          this});
-    os::TriggerWakeup(config.no_later_than);
+
+    auto next_wakeup = config.no_later_than + now;
+    if (g_next_wakeup_time > next_wakeup)
+    {
+        g_next_wakeup_time = next_wakeup;
+        os::TriggerWakeup(next_wakeup);
+    }
+
     os::SuspendThread(os::GetCurrentThread());
 }
 
 void
-OpportunisticBinarySemaphore::SuspendForNoLaterThan(const WakeupConfiguration& config)
+OpportunisticBinarySemaphore::SuspendForNoLaterThan(const WakeupConfiguration& config) noexcept
 {
     auto self = os::GetCurrentThread();
 
@@ -120,7 +131,7 @@ OpportunisticBinarySemaphore::SuspendForNoLaterThan(const WakeupConfiguration& c
 }
 
 bool
-OpportunisticBinarySemaphore::DoTryAcquireNoSuspend() noexcept
+OpportunisticBinarySemaphore::TryAcquireNoSuspend() noexcept
 {
     if (std::atomic_exchange_explicit(&m_value, 0, std::memory_order_acquire) == 1)
     {

@@ -92,14 +92,15 @@ public:
         OpportunisticBinarySemaphore* sem;
     };
 
+protected:
+    // Protected for unit tests
+    void SuspendForTooEarly(const WakeupConfiguration& config) noexcept;
+    void SuspendForNoLaterThan(const WakeupConfiguration& config) noexcept;
+
+    bool TryAcquireNoSuspend() noexcept;
+
 private:
     static void RunScheduler();
-
-    void SuspendForTooEarly(const WakeupConfiguration& config);
-
-    void SuspendForNoLaterThan(const WakeupConfiguration& config);
-
-    bool DoTryAcquireNoSuspend() noexcept;
 
     std::atomic<uint8_t> m_value;
     std::deque<Entry> m_waiting_threads;
