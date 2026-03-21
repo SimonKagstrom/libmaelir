@@ -2,13 +2,13 @@
 
 #include <cassert>
 
-namespace os::detail
+namespace
 {
+os::ThreadHandle g_current_thread;
+}
 
-ThreadHandle g_current_thread;
-
-ThreadHandle
-GetCurrentThread()
+os::ThreadHandle
+os::detail::GetCurrentThread()
 {
     assert(g_current_thread);
 
@@ -16,7 +16,7 @@ GetCurrentThread()
 }
 
 uint8_t
-GetThreadId(ThreadHandle thread)
+os::detail::GetThreadId(os::ThreadHandle thread)
 {
     assert(thread);
 
@@ -24,7 +24,7 @@ GetThreadId(ThreadHandle thread)
 }
 
 void
-AwakeThread(ThreadHandle thread)
+os::detail::AwakeThread(os::ThreadHandle thread)
 {
     assert(thread);
 
@@ -32,13 +32,21 @@ AwakeThread(ThreadHandle thread)
 }
 
 void
-SuspendThread(ThreadHandle thread)
+os::detail::SuspendThread(os::ThreadHandle thread)
 {
     assert(thread);
 
     thread->Suspend();
 }
 
-} // namespace os::detail
+void
+os::detail::TriggerWakeup(milliseconds time_from_now)
+{
+}
 
-using namespace os::detail;
+
+void
+os::detail::SetCurrentThread(os::ThreadHandle thread)
+{
+    g_current_thread = thread;
+}

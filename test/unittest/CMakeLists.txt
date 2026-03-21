@@ -26,6 +26,7 @@ add_executable(unittest_libmaelir
 target_link_libraries(unittest_libmaelir
     os_unittest
     opportunistic_scheduler
+    opportunistic_semaphore
     nmea_parser
     timer_manager
     doctest::doctest

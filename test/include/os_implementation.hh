@@ -21,8 +21,6 @@ using ThreadHandle = MockThread*;
 namespace detail
 {
 
-extern ThreadHandle g_current_thread;
-
 ThreadHandle GetCurrentThread();
 
 uint8_t GetThreadId(ThreadHandle thread);
@@ -32,6 +30,10 @@ void AwakeThread(ThreadHandle thread);
 void SuspendThread(ThreadHandle thread);
 
 void TriggerWakeup(milliseconds time_from_now);
+
+
+// Unit test only
+void SetCurrentThread(ThreadHandle thread);
 
 } // namespace detail
 
