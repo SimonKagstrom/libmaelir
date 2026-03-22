@@ -8,12 +8,10 @@ using namespace os;
 namespace
 {
 
+OpportunisticScheduler* g_scheduler;
+
+
 std::vector<OpportunisticBinarySemaphore*> g_waiting_semaphores;
-
-std::vector<OpportunisticBinarySemaphore::WaitEntry> g_pending_too_early;
-std::vector<OpportunisticBinarySemaphore::WaitEntry> g_pending_try_wakeups;
-
-milliseconds g_next_wakeup_time {0xffffffffms};
 
 } // namespace
 
@@ -26,12 +24,12 @@ OpportunisticBinarySemaphore::~OpportunisticBinarySemaphore()
 {
     // TODO FIXME!
     std::erase(g_waiting_semaphores, this);
-    g_next_wakeup_time = {0xffffffffms};
 }
 
 void
 OpportunisticBinarySemaphore::release() noexcept
 {
+    debug_assert(g_scheduler);
     m_value.store(1, std::memory_order_release);
 
     auto now = os::GetTimeStamp();
@@ -39,14 +37,10 @@ OpportunisticBinarySemaphore::release() noexcept
     {
         auto& entry = m_waiting_threads.front();
 
-        if (entry.config.no_earlier_than.count() - now.count() > 0)
-        {
-            // Not yet time to wake up this thread
-            m_pending_wakeups.push_back(entry);
-            break;
-        }
         m_waiting_threads.pop_front();
         os::AwakeThread(entry.thread);
+
+        g_scheduler->Schedule();
     }
 }
 
@@ -71,6 +65,33 @@ OpportunisticBinarySemaphore::try_acquire() noexcept
 bool
 OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config) noexcept
 {
+    /*
+     * m_semaphore is a os::binary_semaphore
+     *
+     * - acquire will just call m_semaphore.acquire()
+     * - try_acquire will just call m_semaphore.try_acquire()
+     * - try_acquire_for:
+     *   - if no_earlier_than == 0 && wakeup_interval == [X, X]
+     *       return m_semaphore.try_acquire_for(X)
+     *   - if no_earlier_than == 0 && wakeup_interval == [X, Y]
+     *      - return m_semaphore.try_acquire_for(Y)
+     *
+     *   - if no_earlier_than > 0:
+     *      - m_scheduler.AddSuspendedThread(thread, config)
+     *      - Mark as pending too early
+     *      - Suspend
+     *      - return try_acquire()
+     *
+     *
+     * release:
+     *   - if not pending too early:
+     *     - m_semaphore.release()
+     *   - else:
+     *     - Remove mark pending too early
+     *     - m_scheduler.ReleasePendingThreads()
+     *     - m_semaphore.release()
+     */
+
     if (config.no_earlier_than > 0ms)
     {
         SuspendForTooEarly(config);
@@ -92,21 +113,9 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
 void
 OpportunisticBinarySemaphore::SuspendForTooEarly(const WakeupConfiguration& config) noexcept
 {
-    debug_assert(config.no_earlier_than > 0ms);
-    debug_assert(config.no_later_than >= config.no_earlier_than);
+    debug_assert(g_scheduler);
 
-    auto now = os::GetTimeStamp();
-
-    g_pending_too_early.push_back(
-        {{os::GetCurrentThread(), {config.no_earlier_than + now, config.no_later_than + now}},
-         this});
-
-    auto next_wakeup = config.no_later_than + now;
-    if (g_next_wakeup_time > next_wakeup)
-    {
-        g_next_wakeup_time = next_wakeup;
-        os::TriggerWakeup(next_wakeup);
-    }
+    g_scheduler->AddSuspendedThread(os::GetCurrentThread(), config);
 
     os::SuspendThread(os::GetCurrentThread());
 }
@@ -162,13 +171,41 @@ OpportunisticBinarySemaphore::RunScheduler()
             os::AwakeThread(entry.thread);
         }
     }
+}
 
-    for (auto sem : g_waiting_semaphores)
+
+OpportunisticScheduler::OpportunisticScheduler()
+{
+    g_scheduler = this;
+}
+
+OpportunisticScheduler::~OpportunisticScheduler()
+{
+    g_scheduler = nullptr;
+}
+
+void
+OpportunisticScheduler::Schedule() noexcept
+{
+    auto now = os::GetTimeStamp();
+}
+
+void
+OpportunisticScheduler::AddSuspendedThread(ThreadHandle thread, const WakeupConfiguration& config)
+{
+    auto now = os::GetTimeStamp();
+
+    if (config.no_earlier_than > 0ms)
     {
-        for (auto& entry : sem->m_pending_wakeups)
-        {
-            os::AwakeThread(entry.thread);
-        }
-        sem->m_pending_wakeups.clear();
+        debug_assert(config.no_later_than >= config.no_earlier_than);
+
+        m_pending_too_early.push_back(
+            {thread, {config.no_earlier_than + now, config.no_later_than + now}});
+    }
+    auto next_wakeup = config.no_later_than + now;
+    if (m_next_wakeup_time > next_wakeup)
+    {
+        m_next_wakeup_time = next_wakeup;
+        os::TriggerWakeup(next_wakeup);
     }
 }

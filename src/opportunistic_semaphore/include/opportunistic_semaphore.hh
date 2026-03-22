@@ -48,10 +48,13 @@ LatestAfter(milliseconds time)
     return {0ms, time};
 }
 
+class OpportunisticScheduler;
+
 class OpportunisticBinarySemaphore
 {
 public:
     friend class ::SchedulerFixture;
+    friend class OpportunisticScheduler;
 
     explicit OpportunisticBinarySemaphore(uint8_t initial_value);
     ~OpportunisticBinarySemaphore();
@@ -104,7 +107,29 @@ private:
 
     std::atomic<uint8_t> m_value;
     std::deque<Entry> m_waiting_threads;
-    std::vector<OpportunisticBinarySemaphore::Entry> m_pending_wakeups;
+};
+
+
+class OpportunisticScheduler
+{
+public:
+    friend class ::SchedulerFixture;
+    friend class OpportunisticBinarySemaphore;
+
+    OpportunisticScheduler();
+    ~OpportunisticScheduler();
+
+    void Schedule() noexcept;
+
+private:
+    void AddSuspendedThread(ThreadHandle thread, const WakeupConfiguration& config);
+    void AddPendingWaiter(const OpportunisticBinarySemaphore::WaitEntry &entry);
+
+    std::vector<OpportunisticBinarySemaphore::Entry> m_pending_too_early;
+    std::vector<OpportunisticBinarySemaphore*> m_waiting_semaphores;
+
+    std::vector<OpportunisticBinarySemaphore::WaitEntry> m_ready_for_wakeup;
+    milliseconds m_next_wakeup_time {0xffffffffms};
 };
 
 } // namespace os

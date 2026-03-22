@@ -66,6 +66,7 @@ public:
         os::detail::SetCurrentThread(thread);
     }
 
+    os::OpportunisticScheduler scheduler;
     milliseconds next_wakeup_time {0ms};
 
     std::shared_ptr<os::MockKernel> kernel {os::MockKernel().Create()};
@@ -169,6 +170,16 @@ TEST_CASE_FIXTURE(SchedulerFixture, "TooEarlySuspend will trigger a wakeup at no
             }
         }
     }
+}
+
+TEST_CASE_FIXTURE(SchedulerFixture, "the scheduler can wakeup suspended threads")
+{
+    UnittestOpportunisticSemaphore sem {0};
+}
+
+TEST_CASE_FIXTURE(SchedulerFixture, "the scheduler can opportunistically wakeup threads that are ready")
+{
+    UnittestOpportunisticSemaphore sem {0};
 }
 
 
