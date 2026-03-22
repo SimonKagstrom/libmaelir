@@ -1,5 +1,7 @@
 #include "semaphore.hh"
 
+#include "os/thread.hh"
+
 using namespace os;
 
 namespace os
@@ -71,7 +73,16 @@ template <ptrdiff_t least_max_value>
 bool
 counting_semaphore<least_max_value>::try_acquire_for_ms(const milliseconds time)
 {
-    return try_acquire();
+    auto got = try_acquire();
+    if (got)
+    {
+        return true;
+    }
+
+    auto self = os::GetCurrentThread();
+    os::SuspendThread(self);
+
+    return false;
 }
 
 namespace os

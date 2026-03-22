@@ -15,17 +15,23 @@ namespace os
 struct WakeupConfiguration
 {
     milliseconds no_earlier_than {0ms};
-    milliseconds no_later_than {0ms};
+
+    struct
+    {
+        milliseconds earliest;
+        milliseconds latest;
+    } wakeup_interval {0ms, 0ms};
 
     WakeupConfiguration& NoLaterThan(milliseconds time)
     {
-        no_later_than = time;
+        wakeup_interval.latest = time;
         return *this;
     }
 
     WakeupConfiguration& NoEarlierThan(milliseconds time)
     {
         no_earlier_than = time;
+        wakeup_interval.earliest = time;
         return *this;
     }
 };
@@ -33,19 +39,20 @@ struct WakeupConfiguration
 static inline WakeupConfiguration
 OnEvent()
 {
-    return {0ms, 0ms};
+    // Default
+    return {};
 }
 
 static inline WakeupConfiguration
 EarliestAfter(milliseconds time)
 {
-    return {time, time};
+    return {time, {time, time}};
 }
 
 static inline WakeupConfiguration
 LatestAfter(milliseconds time)
 {
-    return {0ms, time};
+    return {0ms, {0ms, time}};
 }
 
 class OpportunisticScheduler;
@@ -59,17 +66,17 @@ public:
     explicit OpportunisticBinarySemaphore(uint8_t initial_value);
     ~OpportunisticBinarySemaphore();
 
-    void release() noexcept;
+    void release();
 
     // Return true if a higher prio task was awoken
-    bool release_from_isr() noexcept;
+    bool release_from_isr();
 
-    void acquire() noexcept
+    void acquire()
     {
-        try_acquire_for(OnEvent());
+        m_semaphore.acquire();
     }
 
-    void acquire(const WakeupConfiguration& config) noexcept
+    void acquire(const WakeupConfiguration& config)
     {
         if (config.no_earlier_than.count() > 0)
         {
@@ -78,9 +85,12 @@ public:
         acquire();
     }
 
-    bool try_acquire() noexcept;
+    bool try_acquire()
+    {
+        return m_semaphore.try_acquire();
+    }
 
-    bool try_acquire_for(const WakeupConfiguration& config) noexcept;
+    bool try_acquire_for(const WakeupConfiguration& config);
 
     // TODO: Privatize, but maybe available for unit tests
     struct Entry
@@ -92,19 +102,19 @@ public:
     struct WaitEntry
     {
         Entry entry;
-        OpportunisticBinarySemaphore* sem;
+        uint8_t sem_index;
     };
 
 protected:
     // Protected for unit tests
-    void SuspendForTooEarly(const WakeupConfiguration& config) noexcept;
-    void SuspendForNoLaterThan(const WakeupConfiguration& config) noexcept;
+    void SuspendForTooEarly(const WakeupConfiguration& config);
+    void SuspendForNoLaterThan(const WakeupConfiguration& config);
 
-    bool TryAcquireNoSuspend() noexcept;
+    bool TryAcquireNoSuspend();
 
 private:
-    static void RunScheduler();
-
+    const uint8_t m_semaphore_index;
+    os::binary_semaphore m_semaphore;
     std::atomic<uint8_t> m_value;
     std::deque<Entry> m_waiting_threads;
 };
@@ -116,20 +126,39 @@ public:
     friend class ::SchedulerFixture;
     friend class OpportunisticBinarySemaphore;
 
-    OpportunisticScheduler();
+    OpportunisticScheduler(os::binary_semaphore &semaphore);
     ~OpportunisticScheduler();
 
-    void Schedule() noexcept;
+    uint8_t AddSemaphore(OpportunisticBinarySemaphore* sem)
+    {
+        m_semaphores.push_back(sem);
+        // TODO: Wrong when something gets removed...
+        return m_semaphores.size() - 1;
+    }
+
+    void RemoveSemaphore(OpportunisticBinarySemaphore* sem)
+    {
+        m_semaphores.erase(std::remove(m_semaphores.begin(), m_semaphores.end(), sem),
+                           m_semaphores.end());
+    }
+
+    void
+    AddPendingWakeup(ThreadHandle thread, uint8_t sem_index, const WakeupConfiguration& config);
+    void
+    AddPendingTooEarly(ThreadHandle thread, uint8_t sem_index, const WakeupConfiguration& config);
+
+    // Return the next wakeup time
+    std::optional<milliseconds> Schedule();
 
 private:
     void AddSuspendedThread(ThreadHandle thread, const WakeupConfiguration& config);
-    void AddPendingWaiter(const OpportunisticBinarySemaphore::WaitEntry &entry);
+    void AddPendingWaiter(const OpportunisticBinarySemaphore::Entry& entry);
 
-    std::vector<OpportunisticBinarySemaphore::Entry> m_pending_too_early;
-    std::vector<OpportunisticBinarySemaphore*> m_waiting_semaphores;
+    os::binary_semaphore &m_semaphore;
+    std::vector<OpportunisticBinarySemaphore*> m_semaphores;
 
-    std::vector<OpportunisticBinarySemaphore::WaitEntry> m_ready_for_wakeup;
-    milliseconds m_next_wakeup_time {0xffffffffms};
+    std::array<std::deque<OpportunisticBinarySemaphore::Entry>, 32> m_pending_wakeup;
+    std::array<std::deque<OpportunisticBinarySemaphore::Entry>, 32> m_pending_too_early;
 };
 
 } // namespace os

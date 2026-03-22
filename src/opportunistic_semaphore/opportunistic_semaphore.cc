@@ -10,26 +10,24 @@ namespace
 
 OpportunisticScheduler* g_scheduler;
 
-
-std::vector<OpportunisticBinarySemaphore*> g_waiting_semaphores;
-
 } // namespace
 
 OpportunisticBinarySemaphore::OpportunisticBinarySemaphore(uint8_t initial_value)
-    : m_value(initial_value)
+    : m_semaphore_index(g_scheduler->AddSemaphore(this))
+    , m_semaphore(initial_value)
+    , m_value(initial_value)
 {
+    g_scheduler->AddSemaphore(this);
 }
 
 OpportunisticBinarySemaphore::~OpportunisticBinarySemaphore()
 {
-    // TODO FIXME!
-    std::erase(g_waiting_semaphores, this);
+    g_scheduler->RemoveSemaphore(this);
 }
 
 void
-OpportunisticBinarySemaphore::release() noexcept
+OpportunisticBinarySemaphore::release()
 {
-    debug_assert(g_scheduler);
     m_value.store(1, std::memory_order_release);
 
     auto now = os::GetTimeStamp();
@@ -46,7 +44,7 @@ OpportunisticBinarySemaphore::release() noexcept
 
 // Return true if a higher prio task was awoken
 bool
-OpportunisticBinarySemaphore::release_from_isr() noexcept
+OpportunisticBinarySemaphore::release_from_isr()
 {
     //    m_value.store(1, std::memory_order_release);
 
@@ -56,14 +54,7 @@ OpportunisticBinarySemaphore::release_from_isr() noexcept
 }
 
 bool
-OpportunisticBinarySemaphore::try_acquire() noexcept
-{
-    return TryAcquireNoSuspend();
-}
-
-
-bool
-OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config) noexcept
+OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
 {
     /*
      * m_semaphore is a os::binary_semaphore
@@ -74,7 +65,9 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
      *   - if no_earlier_than == 0 && wakeup_interval == [X, X]
      *       return m_semaphore.try_acquire_for(X)
      *   - if no_earlier_than == 0 && wakeup_interval == [X, Y]
-     *      - return m_semaphore.try_acquire_for(Y)
+     *      - m_scheduler.AddPendingWaiter({thread, config})
+     *      - Suspend
+     *      - return m_semaphore.try_acquire()
      *
      *   - if no_earlier_than > 0:
      *      - m_scheduler.AddSuspendedThread(thread, config)
@@ -90,57 +83,37 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
      *     - Remove mark pending too early
      *     - m_scheduler.ReleasePendingThreads()
      *     - m_semaphore.release()
+     *
+     *
+     * scheduler:
+     *   - Thread with the highest prio
+     *   - Has it's own semaphore, at startup waits on events
      */
-
-    if (config.no_earlier_than > 0ms)
-    {
-        SuspendForTooEarly(config);
-
-        // Back after wakeup (at the latest after no_later_than)
-        return TryAcquireNoSuspend();
-    }
-
-    if (TryAcquireNoSuspend())
-    {
-        return true;
-    }
-    SuspendForNoLaterThan(config);
-
-    return TryAcquireNoSuspend();
-}
-
-
-void
-OpportunisticBinarySemaphore::SuspendForTooEarly(const WakeupConfiguration& config) noexcept
-{
-    debug_assert(g_scheduler);
-
-    g_scheduler->AddSuspendedThread(os::GetCurrentThread(), config);
-
-    os::SuspendThread(os::GetCurrentThread());
-}
-
-void
-OpportunisticBinarySemaphore::SuspendForNoLaterThan(const WakeupConfiguration& config) noexcept
-{
     auto self = os::GetCurrentThread();
-
-    auto now = os::GetTimeStamp();
-    m_waiting_threads.push_back({self, {config.no_earlier_than + now, config.no_later_than + now}});
-    std::ranges::sort(
-        m_waiting_threads, {}, [](const auto& entry) { return entry.config.no_later_than; });
-
-    if (config.no_later_than.count() > 0)
+    if (config.no_earlier_than == 0ms)
     {
-        os::TriggerWakeup(config.no_later_than);
+        if (config.wakeup_interval.earliest == 0ms)
+        {
+            return m_semaphore.try_acquire_for_ms(config.wakeup_interval.latest);
+        }
+        else
+        {
+            g_scheduler->AddPendingWakeup(self, m_semaphore_index, config);
+            os::SuspendThread(os::GetCurrentThread());
+            return m_semaphore.try_acquire();
+        }
     }
-
-    g_waiting_semaphores.push_back(this);
-    os::SuspendThread(self);
+    else
+    {
+        // Should wait until no_earlier_than
+        // TODO
+        return m_semaphore.try_acquire();
+    }
 }
+
 
 bool
-OpportunisticBinarySemaphore::TryAcquireNoSuspend() noexcept
+OpportunisticBinarySemaphore::TryAcquireNoSuspend()
 {
     if (std::atomic_exchange_explicit(&m_value, 0, std::memory_order_acquire) == 1)
     {
@@ -151,30 +124,8 @@ OpportunisticBinarySemaphore::TryAcquireNoSuspend() noexcept
 }
 
 
-void
-OpportunisticBinarySemaphore::RunScheduler()
-{
-    auto now = os::GetTimeStamp();
-
-    for (auto sem : g_waiting_semaphores)
-    {
-        while (!sem->m_waiting_threads.empty())
-        {
-            auto& entry = sem->m_waiting_threads.front();
-
-            if (entry.config.no_later_than.count() - now.count() > 0)
-            {
-                // Not yet time to wake up this thread
-                break;
-            }
-            sem->m_waiting_threads.pop_front();
-            os::AwakeThread(entry.thread);
-        }
-    }
-}
-
-
-OpportunisticScheduler::OpportunisticScheduler()
+OpportunisticScheduler::OpportunisticScheduler(os::binary_semaphore& semaphore)
+    : m_semaphore(semaphore)
 {
     g_scheduler = this;
 }
@@ -185,27 +136,71 @@ OpportunisticScheduler::~OpportunisticScheduler()
 }
 
 void
-OpportunisticScheduler::Schedule() noexcept
+OpportunisticScheduler::AddPendingWakeup(ThreadHandle thread,
+                                         uint8_t sem_index,
+                                         const WakeupConfiguration& config)
 {
     auto now = os::GetTimeStamp();
+    WakeupConfiguration adjusted_config = config;
+
+    adjusted_config.no_earlier_than += now;
+    adjusted_config.wakeup_interval.earliest += now;
+    adjusted_config.wakeup_interval.latest += now;
+
+    m_pending_wakeup[sem_index].push_back({thread, adjusted_config});
+
+    std::ranges::sort(m_pending_wakeup[sem_index], {}, [](const auto& entry) {
+        return entry.config.wakeup_interval.latest;
+    });
+
+    m_semaphore.release();
 }
 
 void
-OpportunisticScheduler::AddSuspendedThread(ThreadHandle thread, const WakeupConfiguration& config)
+OpportunisticScheduler::AddPendingTooEarly(ThreadHandle thread,
+                                           uint8_t sem_index,
+                                           const WakeupConfiguration& config)
+{
+}
+
+std::optional<milliseconds>
+OpportunisticScheduler::Schedule()
 {
     auto now = os::GetTimeStamp();
 
-    if (config.no_earlier_than > 0ms)
+    for (auto i = 0; i < m_pending_wakeup.size(); i++)
     {
-        debug_assert(config.no_later_than >= config.no_earlier_than);
+        auto& pending = m_pending_wakeup[i];
+        while (!pending.empty())
+        {
+            auto& entry = pending.front();
+            if (entry.config.wakeup_interval.latest >= now)
+            {
+                pending.pop_front();
+                os::AwakeThread(entry.thread);
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+    auto lowest = 0xffffffffms;
+    std::optional<milliseconds> out = std::nullopt;
 
-        m_pending_too_early.push_back(
-            {thread, {config.no_earlier_than + now, config.no_later_than + now}});
-    }
-    auto next_wakeup = config.no_later_than + now;
-    if (m_next_wakeup_time > next_wakeup)
+    for (auto i = 0; i < m_pending_wakeup.size(); i++)
     {
-        m_next_wakeup_time = next_wakeup;
-        os::TriggerWakeup(next_wakeup);
+        auto& pending = m_pending_wakeup[i];
+        if (!pending.empty())
+        {
+            auto& entry = pending.front();
+            if (entry.config.wakeup_interval.latest < lowest)
+            {
+                lowest = entry.config.wakeup_interval.latest;
+                out = lowest - now;
+            }
+        }
     }
+
+    return out;
 }

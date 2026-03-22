@@ -17,9 +17,23 @@ add_subdirectory(../ libmaelir)
 add_subdirectory(mock_filesystem)
 add_subdirectory(mock_httpd_client)
 
+add_library(os_implementation_unittest EXCLUDE_FROM_ALL
+  os/os_implementation.cc
+)
+
+target_link_libraries(os_implementation_unittest
+PUBLIC
+  trompeloeil::trompeloeil
+  libmaelir_interface
+)
+
+target_include_directories(os_implementation_unittest
+PUBLIC
+    include
+)
+
 add_library(os_unittest EXCLUDE_FROM_ALL
     os/base_thread_unittest.cc
-    os/os_implementation.cc
     os/semaphore_unittest.cc
     # Maybe move to it's own library...
     mock_time.cc
@@ -27,6 +41,8 @@ add_library(os_unittest EXCLUDE_FROM_ALL
 
 target_link_libraries(os_unittest
     base_thread
+    os
+    os_implementation_unittest
     doctest::doctest
     trompeloeil::trompeloeil
 )
@@ -37,4 +53,4 @@ PUBLIC
     include
 )
 
-add_library(os_implementation ALIAS os_unittest)
+add_library(os_implementation ALIAS os_implementation_unittest)
