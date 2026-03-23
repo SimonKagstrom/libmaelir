@@ -119,7 +119,7 @@ public:
 
 protected:
     // Protected for unit tests
-    void SuspendForTooEarly(const WakeupConfiguration& config);
+    void SuspendForTzooEarly(const WakeupConfiguration& config);
     void SuspendForNoLaterThan(const WakeupConfiguration& config);
 
     bool TryAcquireNoSuspend();

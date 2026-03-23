@@ -28,18 +28,10 @@ OpportunisticBinarySemaphore::~OpportunisticBinarySemaphore()
 void
 OpportunisticBinarySemaphore::release()
 {
-    m_value.store(1, std::memory_order_release);
+    m_semaphore.release();
 
-    auto now = os::GetTimeStamp();
-    while (!m_waiting_threads.empty())
-    {
-        auto& entry = m_waiting_threads.front();
-
-        m_waiting_threads.pop_front();
-        os::AwakeThread(entry.thread);
-
-        g_scheduler->Schedule();
-    }
+    // TODO: If there are waiters, mark something for g_scheduler that this thread pending should be woken up
+    g_scheduler->Schedule();
 }
 
 // Return true if a higher prio task was awoken
@@ -188,6 +180,29 @@ OpportunisticScheduler::Schedule()
     std::optional<milliseconds> out;
     auto now = os::GetTimeStamp();
 
+    while (!m_too_early.empty())
+    {
+        auto& entry = m_too_early.front();
+
+        if (entry.config.no_earlier_than > now)
+        {
+            m_too_early.pop_front();
+
+            if (now > entry.config.wakeup_interval.latest)
+            {
+                os::AwakeThread(entry.thread);
+            }
+            else
+            {
+                m_pending.push_back(entry);
+                // TODO: Not good
+                std::ranges::sort(m_pending, {}, [](const auto& entry) {
+                    return entry.config.wakeup_interval.latest;
+                });
+            }
+        }
+    }
+
     while (!m_pending.empty())
     {
         if (now < m_pending.front().config.wakeup_interval.earliest)
@@ -199,7 +214,7 @@ OpportunisticScheduler::Schedule()
         m_ready_for_wakeup.push_back(entry);
     }
 
-    for (auto &entry : m_ready_for_wakeup)
+    for (auto& entry : m_ready_for_wakeup)
     {
         os::AwakeThread(entry.thread);
     }

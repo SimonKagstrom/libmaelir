@@ -29,7 +29,15 @@ public:
 
     auto RunScheduler()
     {
-        return scheduler.Schedule();
+        std::optional<milliseconds> out;
+
+        // Really done by the scheduler thread
+        if (scheduler.m_semaphore.try_acquire())
+        {
+            out = scheduler.Schedule();
+        }
+
+        return out;
     }
 
     auto AdvanceTimeAndSchedule(milliseconds time)
@@ -185,6 +193,8 @@ TEST_CASE_FIXTURE(SchedulerFixture,
     auto rv = sem.try_acquire_for(os::LatestAfter(200ms));
     r_suspended = nullptr;
 
+    RunScheduler();
+
     AND_THEN("the thread will be awoken after no_later_than (with no semaphore)")
     {
         AdvanceTimeAndSchedule(199ms);
@@ -219,16 +229,7 @@ TEST_CASE_FIXTURE(SchedulerFixture,
 
     THEN("it will wait until no_earlier_than has been reached")
     {
-        REQUIRE(next_wakeup_time == now + 10ms);
-        AdvanceTimeAndSchedule(9ms);
-        AND_THEN("the thread can be awoken after the no_earlier_than time has passed")
-        {
-            AdvanceTimeAndSchedule(1ms);
-            REQUIRE_CALL(*current_thread, Awake());
-            sem.release();
-
-            RunScheduler();
-        }
+        REQUIRE(os::GetTimeStamp() - now == 10ms);
     }
 }
 

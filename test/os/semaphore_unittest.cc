@@ -1,6 +1,8 @@
 #include "os/thread.hh"
 #include "semaphore.hh"
 
+#include <vector>
+
 using namespace os;
 
 namespace os
@@ -13,6 +15,7 @@ struct Impl
     }
 
     int value;
+    std::vector<ThreadHandle> waiting_threads;
 };
 
 } // namespace os
@@ -34,6 +37,12 @@ void
 counting_semaphore<least_max_value>::release(ptrdiff_t update) noexcept
 {
     m_impl->value += update;
+
+    for (auto &thread : m_impl->waiting_threads)
+    {
+        os::AwakeThread(thread);
+    }
+    m_impl->waiting_threads.clear();
 }
 
 template <ptrdiff_t least_max_value>
@@ -51,7 +60,9 @@ counting_semaphore<least_max_value>::acquire() noexcept
 {
     if (m_impl->value == 0)
     {
-        os::SuspendThread(os::GetCurrentThread());
+        auto thread = os::GetCurrentThread();
+        os::SuspendThread(thread);
+        m_impl->waiting_threads.push_back(thread);
         return;
     }
     m_impl->value--;
