@@ -36,6 +36,18 @@ struct WakeupConfiguration
     }
 };
 
+WakeupConfiguration
+inline operator+(const WakeupConfiguration& config, milliseconds time)
+{
+    WakeupConfiguration out = config;
+
+    out.no_earlier_than += time;
+    out.wakeup_interval.earliest += time;
+    out.wakeup_interval.latest += time;
+
+    return out;
+}
+
 static inline WakeupConfiguration
 OnEvent()
 {
@@ -52,7 +64,7 @@ EarliestAfter(milliseconds time)
 static inline WakeupConfiguration
 LatestAfter(milliseconds time)
 {
-    return {0ms, {0ms, time}};
+    return {0ms, {1ms, time}};
 }
 
 class OpportunisticScheduler;
@@ -126,7 +138,7 @@ public:
     friend class ::SchedulerFixture;
     friend class OpportunisticBinarySemaphore;
 
-    OpportunisticScheduler(os::binary_semaphore &semaphore);
+    OpportunisticScheduler(os::binary_semaphore& semaphore);
     ~OpportunisticScheduler();
 
     uint8_t AddSemaphore(OpportunisticBinarySemaphore* sem)
@@ -142,10 +154,9 @@ public:
                            m_semaphores.end());
     }
 
-    void
-    AddPendingWakeup(ThreadHandle thread, uint8_t sem_index, const WakeupConfiguration& config);
-    void
-    AddPendingTooEarly(ThreadHandle thread, uint8_t sem_index, const WakeupConfiguration& config);
+    void AddPendingEntry(ThreadHandle thread, uint8_t sem_index, const WakeupConfiguration& config);
+
+    void AddEarlyEntry(ThreadHandle thread, uint8_t sem_index, const WakeupConfiguration& config);
 
     // Return the next wakeup time
     std::optional<milliseconds> Schedule();
@@ -154,11 +165,16 @@ private:
     void AddSuspendedThread(ThreadHandle thread, const WakeupConfiguration& config);
     void AddPendingWaiter(const OpportunisticBinarySemaphore::Entry& entry);
 
-    os::binary_semaphore &m_semaphore;
+    os::binary_semaphore& m_semaphore;
     std::vector<OpportunisticBinarySemaphore*> m_semaphores;
 
-    std::array<std::deque<OpportunisticBinarySemaphore::Entry>, 32> m_pending_wakeup;
-    std::array<std::deque<OpportunisticBinarySemaphore::Entry>, 32> m_pending_too_early;
+
+    // Threads which will be opportunistically woken up when the scheduler runs
+    std::deque<OpportunisticBinarySemaphore::Entry> m_ready_for_wakeup;
+    // Threads where the low interval has not yet been reached
+    std::deque<OpportunisticBinarySemaphore::Entry> m_pending;
+    // Threads which have not yet reached the allowed earliest time
+    std::deque<OpportunisticBinarySemaphore::Entry> m_too_early;
 };
 
 } // namespace os

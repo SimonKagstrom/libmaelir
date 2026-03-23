@@ -1,6 +1,5 @@
-#include "semaphore.hh"
-
 #include "os/thread.hh"
+#include "semaphore.hh"
 
 using namespace os;
 
@@ -52,6 +51,7 @@ counting_semaphore<least_max_value>::acquire() noexcept
 {
     if (m_impl->value == 0)
     {
+        os::SuspendThread(os::GetCurrentThread());
         return;
     }
     m_impl->value--;
@@ -79,8 +79,7 @@ counting_semaphore<least_max_value>::try_acquire_for_ms(const milliseconds time)
         return true;
     }
 
-    auto self = os::GetCurrentThread();
-    os::SuspendThread(self);
+    os::SuspendThread(os::GetCurrentThread());
 
     return false;
 }

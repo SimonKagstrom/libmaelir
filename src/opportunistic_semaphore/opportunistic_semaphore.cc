@@ -89,25 +89,41 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
      *   - Thread with the highest prio
      *   - Has it's own semaphore, at startup waits on events
      */
+    debug_assert(config.wakeup_interval.earliest <= config.wakeup_interval.latest);
+    debug_assert(config.wakeup_interval.earliest > 0ms);
+
     auto self = os::GetCurrentThread();
     if (config.no_earlier_than == 0ms)
     {
-        if (config.wakeup_interval.earliest == 0ms)
+        if (config.wakeup_interval.earliest == config.wakeup_interval.latest)
         {
+            // Wait for a precise time - regular semaphore behavior
             return m_semaphore.try_acquire_for_ms(config.wakeup_interval.latest);
         }
         else
         {
-            g_scheduler->AddPendingWakeup(self, m_semaphore_index, config);
+            // Pending opportunistic wakeup
+            g_scheduler->AddPendingEntry(self, m_semaphore_index, config);
             os::SuspendThread(os::GetCurrentThread());
             return m_semaphore.try_acquire();
         }
     }
-    else
+    else // Minimum time before trying to acquire
     {
-        // Should wait until no_earlier_than
-        // TODO
-        return m_semaphore.try_acquire();
+        debug_assert(config.no_earlier_than <= config.wakeup_interval.earliest);
+
+        if (config.wakeup_interval.earliest == config.wakeup_interval.latest)
+        {
+            // Wait for a precise time - regular semaphore behavior (after delay)
+            os::Sleep(config.no_earlier_than);
+            return m_semaphore.try_acquire_for_ms(config.wakeup_interval.latest);
+        }
+        else
+        {
+            g_scheduler->AddEarlyEntry(self, m_semaphore_index, config);
+            os::SuspendThread(os::GetCurrentThread());
+            return m_semaphore.try_acquire();
+        }
     }
 }
 
@@ -136,71 +152,58 @@ OpportunisticScheduler::~OpportunisticScheduler()
 }
 
 void
-OpportunisticScheduler::AddPendingWakeup(ThreadHandle thread,
-                                         uint8_t sem_index,
-                                         const WakeupConfiguration& config)
+OpportunisticScheduler::AddPendingEntry(ThreadHandle thread,
+                                        uint8_t sem_index,
+                                        const WakeupConfiguration& config)
 {
     auto now = os::GetTimeStamp();
-    WakeupConfiguration adjusted_config = config;
+    WakeupConfiguration adjusted_config = config + now;
 
-    adjusted_config.no_earlier_than += now;
-    adjusted_config.wakeup_interval.earliest += now;
-    adjusted_config.wakeup_interval.latest += now;
+    m_pending.push_back({thread, adjusted_config});
 
-    m_pending_wakeup[sem_index].push_back({thread, adjusted_config});
-
-    std::ranges::sort(m_pending_wakeup[sem_index], {}, [](const auto& entry) {
-        return entry.config.wakeup_interval.latest;
-    });
+    std::ranges::sort(
+        m_pending, {}, [](const auto& entry) { return entry.config.wakeup_interval.latest; });
 
     m_semaphore.release();
 }
 
+
 void
-OpportunisticScheduler::AddPendingTooEarly(ThreadHandle thread,
-                                           uint8_t sem_index,
-                                           const WakeupConfiguration& config)
+OpportunisticScheduler::AddEarlyEntry(ThreadHandle thread,
+                                      uint8_t sem_index,
+                                      const WakeupConfiguration& config)
 {
+    auto now = os::GetTimeStamp();
+    WakeupConfiguration adjusted_config = config + now;
+
+    m_too_early.push_back({thread, adjusted_config});
+
+    m_semaphore.release();
 }
+
 
 std::optional<milliseconds>
 OpportunisticScheduler::Schedule()
 {
+    std::optional<milliseconds> out;
     auto now = os::GetTimeStamp();
 
-    for (auto i = 0; i < m_pending_wakeup.size(); i++)
+    while (!m_pending.empty())
     {
-        auto& pending = m_pending_wakeup[i];
-        while (!pending.empty())
+        if (now < m_pending.front().config.wakeup_interval.earliest)
         {
-            auto& entry = pending.front();
-            if (entry.config.wakeup_interval.latest >= now)
-            {
-                pending.pop_front();
-                os::AwakeThread(entry.thread);
-            }
-            else
-            {
-                break;
-            }
+            break;
         }
+        auto& entry = m_pending.front();
+        m_pending.pop_front();
+        m_ready_for_wakeup.push_back(entry);
     }
-    auto lowest = 0xffffffffms;
-    std::optional<milliseconds> out = std::nullopt;
 
-    for (auto i = 0; i < m_pending_wakeup.size(); i++)
+    for (auto &entry : m_ready_for_wakeup)
     {
-        auto& pending = m_pending_wakeup[i];
-        if (!pending.empty())
-        {
-            auto& entry = pending.front();
-            if (entry.config.wakeup_interval.latest < lowest)
-            {
-                lowest = entry.config.wakeup_interval.latest;
-                out = lowest - now;
-            }
-        }
+        os::AwakeThread(entry.thread);
     }
+    m_ready_for_wakeup.clear();
 
     return out;
 }
