@@ -118,9 +118,6 @@ public:
     };
 
 protected:
-    // Protected for unit tests
-    void SuspendForTzooEarly(const WakeupConfiguration& config);
-    void SuspendForNoLaterThan(const WakeupConfiguration& config);
 
     bool TryAcquireNoSuspend();
 

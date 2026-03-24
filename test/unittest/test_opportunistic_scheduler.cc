@@ -44,6 +44,7 @@ public:
             else
             {
                 next_wakeup_time = *out;
+                printf("Next wakeup at %u ms\n", next_wakeup_time.count());
             }
         }
 
@@ -124,6 +125,7 @@ TEST_CASE_FIXTURE(SchedulerFixture,
 
     AND_THEN("it cannot be acquired again")
     {
+        FORBID_CALL(*current_thread, Suspend());
         REQUIRE(sem.try_acquire() == false);
     }
 }
@@ -190,16 +192,6 @@ TEST_CASE_FIXTURE(SchedulerFixture, "TooEarlySuspend will trigger a wakeup at no
 }
 #endif
 
-TEST_CASE_FIXTURE(SchedulerFixture, "the scheduler can wakeup suspended threads")
-{
-    UnittestOpportunisticSemaphore sem {0};
-}
-
-TEST_CASE_FIXTURE(SchedulerFixture, "the scheduler can opportunistically wakeup threads that are ready")
-{
-    UnittestOpportunisticSemaphore sem {0};
-}
-
 
 TEST_CASE_FIXTURE(SchedulerFixture,
                   "try_acquire_for will return once no_later_than has been reached")
@@ -250,6 +242,99 @@ TEST_CASE_FIXTURE(SchedulerFixture,
     }
 }
 
+TEST_CASE_FIXTURE(SchedulerFixture,
+                  "the scheduler can opportunistically wakeup threads that are ready")
+{
+    UnittestOpportunisticSemaphore sem_1 {0};
+    UnittestOpportunisticSemaphore sem_2 {0};
+
+    auto thread_1 = current_thread;
+
+    // Two active threads
+    REQUIRE_CALL(*thread_1, Suspend());
+    sem_1.try_acquire_for(os::LatestAfter(200ms));
+
+    auto thread_2 = CreateAndActivateThread();
+    REQUIRE_CALL(*thread_2, Suspend());
+    sem_2.try_acquire_for(os::LatestAfter(100ms));
+
+    auto now = os::GetTimeStamp();
+
+    auto next_wakeup = RunScheduler();
+    REQUIRE(next_wakeup == now + 100ms);
+
+    WHEN("the first thread is woke up due to timeout")
+    {
+        AdvanceTimeAndSchedule(99ms);
+
+        auto r_earliest = NAMED_REQUIRE_CALL(*thread_2, Awake());
+        auto r_opportunistically_woke = NAMED_REQUIRE_CALL(*thread_1, Awake());
+        AdvanceTimeAndSchedule(1ms);
+        THEN("the second one is also woke")
+        {
+            r_earliest = nullptr;
+            r_opportunistically_woke = nullptr;
+        }
+    }
+
+    WHEN("the first thread is woke up due to event (semaphore release)")
+    {
+        AdvanceTimeAndSchedule(1ms);
+
+        auto r_released = NAMED_REQUIRE_CALL(*thread_1, Awake());
+        auto r_opportunistically_woke = NAMED_REQUIRE_CALL(*thread_2, Awake());
+        sem_1.release();
+        RunScheduler();
+
+        THEN("the second one is also woke")
+        {
+            r_released = nullptr;
+            r_opportunistically_woke = nullptr;
+        }
+    }
+}
+
+TEST_CASE_FIXTURE(SchedulerFixture,
+                  "only waiters in the wakeup_interval will be opportunistically woken up")
+{
+    UnittestOpportunisticSemaphore sem_1 {0};
+    UnittestOpportunisticSemaphore sem_2 {0};
+
+    auto thread_1 = current_thread;
+
+    // Three active threads
+    REQUIRE_CALL(*thread_1, Suspend());
+    sem_1.acquire();
+
+    auto thread_2 = CreateAndActivateThread();
+    REQUIRE_CALL(*thread_2, Suspend());
+    sem_2.try_acquire_for(os::WakeupConfiguration {0ms, {1ms, 200ms}});
+
+    auto thread_3 = CreateAndActivateThread();
+    REQUIRE_CALL(*thread_3, Suspend());
+    sem_2.try_acquire_for(os::WakeupConfiguration {0ms, {10ms, 200ms}});
+
+    RunScheduler();
+
+    AdvanceTimeAndSchedule(9ms);
+    WHEN("a semaphore is released")
+    {
+        REQUIRE_CALL(*thread_1, Awake());
+        auto r_woke_2 = NAMED_REQUIRE_CALL(*thread_2, Awake());
+        auto r_no_woke_3 = NAMED_FORBID_CALL(*thread_3, Awake());
+
+        sem_1.release();
+        RunScheduler();
+        THEN("the threads in the wakeup_interval are woken")
+        {
+            r_woke_2 = nullptr;
+        }
+        AND_THEN("pending threads are not")
+        {
+            r_no_woke_3 = nullptr;
+        }
+    }
+}
 
 TEST_CASE_FIXTURE(SchedulerFixture, "the second thread will have to wait for an acquired semaphore")
 {

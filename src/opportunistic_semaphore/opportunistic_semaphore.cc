@@ -171,7 +171,8 @@ OpportunisticScheduler::AddEarlyEntry(ThreadHandle thread,
     m_semaphore.release();
 }
 
-void OpportunisticScheduler::RequestSchedule(uint8_t sem_index)
+void
+OpportunisticScheduler::RequestSchedule(uint8_t sem_index)
 {
     // TODO: Take the semaphore index into account
     m_semaphore.release();
@@ -208,10 +209,7 @@ OpportunisticScheduler::Schedule()
 
     while (!m_pending.empty())
     {
-        if (!out)
-        {
-            out = m_pending.front().config.wakeup_interval.latest;
-        }
+        out = m_pending.front().config.wakeup_interval.latest;
 
         if (now < m_pending.front().config.wakeup_interval.earliest)
         {
