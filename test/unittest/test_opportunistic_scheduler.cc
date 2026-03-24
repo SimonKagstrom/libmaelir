@@ -143,55 +143,6 @@ TEST_CASE_FIXTURE(SchedulerFixture,
     sem.release();
 }
 
-#if 0
-TEST_CASE_FIXTURE(SchedulerFixture, "TooEarlySuspend will trigger a wakeup at no_later_than")
-{
-    UnittestOpportunisticSemaphore sem {0};
-
-    auto now = os::GetTimeStamp();
-
-    WHEN("a thread is suspended with a no_earlier_than time")
-    {
-        auto r_suspended = NAMED_REQUIRE_CALL(*current_thread, Suspend());
-        sem.DoSuspendForTooEarly(os::EarliestAfter(100ms).NoLaterThan(200ms));
-
-        THEN("the thread is suspended")
-        {
-            r_suspended = nullptr;
-        }
-        AND_THEN("the next trigger time is no_later_than")
-        {
-            REQUIRE(next_wakeup_time == now + 200ms);
-        }
-
-        auto other_thread = CreateAndActivateThread();
-        AND_WHEN("another thread is suspended with a no_earlier_than time, with no_later before "
-                 "the current")
-        {
-            REQUIRE_CALL(*other_thread, Suspend());
-            sem.DoSuspendForTooEarly(os::EarliestAfter(50ms).NoLaterThan(150ms));
-
-            THEN("the next trigger is shortened")
-            {
-                REQUIRE(next_wakeup_time == now + 150ms);
-            }
-        }
-
-        AND_WHEN("another thread is suspended with a no_earlier_than time, with no_later after the "
-                 "current")
-        {
-            REQUIRE_CALL(*other_thread, Suspend());
-            sem.DoSuspendForTooEarly(os::EarliestAfter(50ms).NoLaterThan(250ms));
-
-            THEN("the first trigger  time is kept")
-            {
-                REQUIRE(next_wakeup_time == now + 200ms);
-            }
-        }
-    }
-}
-#endif
-
 
 TEST_CASE_FIXTURE(SchedulerFixture,
                   "try_acquire_for will return once no_later_than has been reached")
@@ -308,7 +259,7 @@ TEST_CASE_FIXTURE(SchedulerFixture,
 
     auto thread_2 = CreateAndActivateThread();
     REQUIRE_CALL(*thread_2, Suspend());
-    sem_2.try_acquire_for(os::WakeupConfiguration {0ms, {1ms, 200ms}});
+    sem_2.try_acquire_for(os::WakeupConfiguration {0ms, {1ms, 100ms}});
 
     auto thread_3 = CreateAndActivateThread();
     REQUIRE_CALL(*thread_3, Suspend());
@@ -332,6 +283,17 @@ TEST_CASE_FIXTURE(SchedulerFixture,
         AND_THEN("pending threads are not")
         {
             r_no_woke_3 = nullptr;
+        }
+
+        AND_WHEN("the time is advanced again to the last wakeup time")
+        {
+            auto r_woke_3 = NAMED_REQUIRE_CALL(*thread_3, Awake());
+            AdvanceTimeAndSchedule(191ms);
+
+            THEN("the other thread is also woke")
+            {
+                r_woke_3 = nullptr;
+            }
         }
     }
 }
