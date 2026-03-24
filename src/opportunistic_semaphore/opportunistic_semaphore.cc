@@ -15,7 +15,6 @@ OpportunisticScheduler* g_scheduler;
 OpportunisticBinarySemaphore::OpportunisticBinarySemaphore(uint8_t initial_value)
     : m_semaphore_index(g_scheduler->AddSemaphore(this))
     , m_semaphore(initial_value)
-    , m_value(initial_value)
 {
     g_scheduler->AddSemaphore(this);
 }
@@ -49,8 +48,6 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
     /*
      * m_semaphore is a os::binary_semaphore
      *
-     * - acquire will just call m_semaphore.acquire()
-     * - try_acquire will just call m_semaphore.try_acquire()
      * - try_acquire_for:
      *   - if no_earlier_than == 0 && wakeup_interval == [X, X]
      *       return m_semaphore.try_acquire_for(X)
@@ -117,17 +114,6 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
     }
 }
 
-
-bool
-OpportunisticBinarySemaphore::TryAcquireNoSuspend()
-{
-    if (std::atomic_exchange_explicit(&m_value, 0, std::memory_order_acquire) == 1)
-    {
-        return true;
-    }
-
-    return false;
-}
 
 
 OpportunisticScheduler::OpportunisticScheduler(os::binary_semaphore& semaphore)

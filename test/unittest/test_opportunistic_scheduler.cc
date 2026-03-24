@@ -7,11 +7,6 @@ class UnittestOpportunisticSemaphore : public os::OpportunisticBinarySemaphore
 {
 public:
     using os::OpportunisticBinarySemaphore::OpportunisticBinarySemaphore;
-
-    bool DoTryAcquireNoSuspend() noexcept
-    {
-        return TryAcquireNoSuspend();
-    }
 };
 
 class SchedulerFixture : public TimeFixture

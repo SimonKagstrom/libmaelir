@@ -117,14 +117,9 @@ public:
         uint8_t sem_index;
     };
 
-protected:
-
-    bool TryAcquireNoSuspend();
-
 private:
     const uint8_t m_semaphore_index;
     os::binary_semaphore m_semaphore;
-    std::atomic<uint8_t> m_value;
     std::deque<Entry> m_waiting_threads;
 };
 
