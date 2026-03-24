@@ -21,6 +21,12 @@ add_library(os_implementation_unittest EXCLUDE_FROM_ALL
   os/os_implementation.cc
 )
 
+# See https://github.com/rollbear/trompeloeil/issues/342
+target_compile_options(trompeloeil
+INTERFACE
+    -Wno-deprecated-this-capture
+)
+
 target_link_libraries(os_implementation_unittest
 PUBLIC
   trompeloeil::trompeloeil
