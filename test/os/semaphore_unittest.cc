@@ -36,9 +36,10 @@ template <ptrdiff_t least_max_value>
 void
 counting_semaphore<least_max_value>::release(ptrdiff_t update) noexcept
 {
-    m_impl->value += update;
+    m_impl->value =
+        std::clamp(m_impl->value + static_cast<int>(update), 0, static_cast<int>(least_max_value));
 
-    for (auto &thread : m_impl->waiting_threads)
+    for (auto& thread : m_impl->waiting_threads)
     {
         os::AwakeThread(thread);
     }
@@ -65,7 +66,7 @@ counting_semaphore<least_max_value>::acquire() noexcept
         m_impl->waiting_threads.push_back(thread);
         return;
     }
-    m_impl->value--;
+    m_impl->value = std::clamp(m_impl->value - 1, 0, static_cast<int>(least_max_value));
 }
 
 template <ptrdiff_t least_max_value>
@@ -76,7 +77,7 @@ counting_semaphore<least_max_value>::try_acquire() noexcept
     {
         return false;
     }
-    m_impl->value--;
+    m_impl->value = std::clamp(m_impl->value - 1, 0, static_cast<int>(least_max_value));
     return true;
 }
 
