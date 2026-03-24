@@ -29,9 +29,7 @@ void
 OpportunisticBinarySemaphore::release()
 {
     m_semaphore.release();
-
-    // TODO: If there are waiters, mark something for g_scheduler that this thread pending should be woken up
-    g_scheduler->Schedule();
+    g_scheduler->RequestSchedule(m_semaphore_index);
 }
 
 // Return true if a higher prio task was awoken
@@ -173,6 +171,11 @@ OpportunisticScheduler::AddEarlyEntry(ThreadHandle thread,
     m_semaphore.release();
 }
 
+void OpportunisticScheduler::RequestSchedule(uint8_t sem_index)
+{
+    // TODO: Take the semaphore index into account
+    m_semaphore.release();
+}
 
 std::optional<milliseconds>
 OpportunisticScheduler::Schedule()
@@ -205,13 +208,18 @@ OpportunisticScheduler::Schedule()
 
     while (!m_pending.empty())
     {
+        if (!out)
+        {
+            out = m_pending.front().config.wakeup_interval.latest;
+        }
+
         if (now < m_pending.front().config.wakeup_interval.earliest)
         {
             break;
         }
-        auto& entry = m_pending.front();
-        m_pending.pop_front();
+        const auto& entry = m_pending.front();
         m_ready_for_wakeup.push_back(entry);
+        m_pending.pop_front();
     }
 
     for (auto& entry : m_ready_for_wakeup)

@@ -158,6 +158,9 @@ public:
 
     void AddEarlyEntry(ThreadHandle thread, uint8_t sem_index, const WakeupConfiguration& config);
 
+
+    void RequestSchedule(uint8_t sem_index);
+
     // Return the next wakeup time
     std::optional<milliseconds> Schedule();
 

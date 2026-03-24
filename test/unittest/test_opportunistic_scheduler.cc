@@ -30,11 +30,21 @@ public:
     auto RunScheduler()
     {
         std::optional<milliseconds> out;
+        auto now = os::GetTimeStamp();
 
         // Really done by the scheduler thread
         if (scheduler.m_semaphore.try_acquire())
         {
             out = scheduler.Schedule();
+
+            if (!out)
+            {
+                next_wakeup_time = 0xffffffffms;
+            }
+            else
+            {
+                next_wakeup_time = *out;
+            }
         }
 
         return out;
@@ -43,6 +53,13 @@ public:
     auto AdvanceTimeAndSchedule(milliseconds time)
     {
         AdvanceTime(time);
+
+        auto now = os::GetTimeStamp();
+        if (now >= next_wakeup_time)
+        {
+            semaphore.release();
+        }
+
         return RunScheduler();
     }
 
@@ -66,7 +83,7 @@ public:
 
     os::binary_semaphore semaphore {0};
     os::OpportunisticScheduler scheduler {semaphore};
-    milliseconds next_wakeup_time {0ms};
+    milliseconds next_wakeup_time {0xffffffffms};
 
     std::shared_ptr<os::MockKernel> kernel {os::MockKernel().Create()};
     std::vector<std::unique_ptr<os::MockThread>> threads;
@@ -208,7 +225,7 @@ TEST_CASE_FIXTURE(SchedulerFixture,
         auto r_woke = NAMED_REQUIRE_CALL(*current_thread, Awake());
         AdvanceTimeAndSchedule(100ms);
         sem.release();
-        AdvanceTimeAndSchedule(1ms);
+        RunScheduler();
         THEN("it's only awoken directly")
         {
             r_woke = nullptr;
