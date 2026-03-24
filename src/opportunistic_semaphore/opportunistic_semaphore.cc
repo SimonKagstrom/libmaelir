@@ -176,8 +176,6 @@ OpportunisticScheduler::Schedule()
 
         if (entry.config.no_earlier_than > now)
         {
-            m_too_early.pop_front();
-
             if (now > entry.config.wakeup_interval.latest)
             {
                 os::AwakeThread(entry.thread);
@@ -190,6 +188,8 @@ OpportunisticScheduler::Schedule()
                     return entry.config.wakeup_interval.latest;
                 });
             }
+
+            m_too_early.pop_front();
         }
     }
 

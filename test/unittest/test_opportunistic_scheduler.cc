@@ -330,6 +330,60 @@ TEST_CASE_FIXTURE(SchedulerFixture, "the second thread will have to wait for an 
     }
 }
 
-TEST_CASE_FIXTURE(SchedulerFixture, "")
+TEST_CASE_FIXTURE(SchedulerFixture,
+                  "a sleeper can specify both an earliest time and a wakeup interval")
 {
+    UnittestOpportunisticSemaphore sem {0};
+    UnittestOpportunisticSemaphore other_sem {0};
+
+    auto r_suspended = NAMED_REQUIRE_CALL(*current_thread, Suspend());
+    sem.try_acquire_for(os::WakeupConfiguration {10ms, {20ms, 30ms}});
+    RunScheduler();
+
+    THEN("the thread is suspended")
+    {
+        r_suspended = nullptr;
+    }
+    AND_THEN("the next wakeup is scheduled for the latest time")
+    {
+        REQUIRE(next_wakeup_time == os::GetTimeStamp() + 30ms);
+    }
+
+    AND_WHEN("the semaphore is released before the earliest time")
+    {
+        AdvanceTimeAndSchedule(5ms);
+
+        auto r_no_woke = NAMED_FORBID_CALL(*current_thread, Awake());
+        sem.release();
+        RunScheduler();
+
+        THEN("the thread is not woke")
+        {
+            r_no_woke = nullptr;
+        }
+        AND_THEN("the next wakeup is the earliest time")
+        {
+            REQUIRE(next_wakeup_time == os::GetTimeStamp() + 5ms);
+        }
+
+        AND_THEN("the thread wakes when the earliest time is reached")
+        {
+            REQUIRE_CALL(*current_thread, Awake());
+            AdvanceTimeAndSchedule(5ms);
+        }
+    }
+
+    AND_WHEN("the last time in the interval is reached")
+    {
+        // Not yet
+        AdvanceTimeAndSchedule(29ms);
+
+        auto r_woke = NAMED_REQUIRE_CALL(*current_thread, Awake());
+
+        AdvanceTimeAndSchedule(1ms);
+        THEN("the thread is woke")
+        {
+            r_woke = nullptr;
+        }
+    }
 }
