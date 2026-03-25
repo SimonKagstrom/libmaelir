@@ -89,6 +89,28 @@ private:
     std::vector<std::unique_ptr<trompeloeil::expectation>> m_expectations;
 };
 
+TEST_CASE_FIXTURE(SchedulerFixture, "a pending wakeup can be added to the scheduler")
+{
+    // TBD
+}
+
+TEST_CASE_FIXTURE(SchedulerFixture, "pending entries are woken when the grace time is reached")
+{
+    // TBD
+}
+
+TEST_CASE_FIXTURE(SchedulerFixture, "early entries are transformed to pending and woke entries")
+{
+    // TBD
+}
+
+TEST_CASE_FIXTURE(SchedulerFixture,
+                  "the scheduler can be triggered to wake pending entries on release()")
+{
+    // TBD
+}
+
+
 TEST_CASE_FIXTURE(SchedulerFixture, "a binary semaphore can be acquired if it is available")
 {
     UnittestOpportunisticSemaphore sem {1};
