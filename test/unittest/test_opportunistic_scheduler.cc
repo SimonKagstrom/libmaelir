@@ -337,29 +337,56 @@ TEST_CASE_FIXTURE(SchedulerFixture, "two non-overlapping sleepers have been adde
     REQUIRE_CALL(*current_thread, Suspend());
     sem.try_acquire_for(os::WakeupConfiguration {0ms, {20ms, 30ms}});
 
-    auto thread_2 = CreateAndActivateThread();
-    REQUIRE_CALL(*thread_2, Suspend());
-    sem.try_acquire_for(os::WakeupConfiguration {0ms, {50ms, 50ms}});
-
-    RunScheduler();
-
-    THEN("the next wakeup is the earliest time of the first sleeper")
+    WHEN("the second sleeper has a strict interval")
     {
-        REQUIRE(next_wakeup_time == os::GetTimeStamp() + 30ms);
+        auto thread_2 = CreateAndActivateThread();
+        REQUIRE_CALL(*thread_2, Suspend());
+        sem.try_acquire_for(os::WakeupConfiguration {0ms, {50ms, 50ms}});
+
+        RunScheduler();
+
+        THEN("the next wakeup is the earliest time of the first sleeper")
+        {
+            REQUIRE(next_wakeup_time == os::GetTimeStamp() + 30ms);
+        }
+
+        AND_WHEN("the first sleeper is woke up")
+        {
+            AdvanceTimeAndSchedule(29ms);
+            auto r_woke = NAMED_REQUIRE_CALL(*current_thread, Awake());
+            AdvanceTimeAndSchedule(1ms);
+
+            THEN("the first sleeper is woke")
+            {
+                r_woke = nullptr;
+            }
+            AND_THEN("the next wakeup is at the end of the time")
+            {
+                REQUIRE(next_wakeup_time == 0xffffffffms);
+            }
+        }
     }
 
-    AND_WHEN("the first sleeper is woke up")
+    AND_WHEN("the second sleeper has a opportunistic interval")
     {
-        AdvanceTimeAndSchedule(29ms);
-        auto r_woke = NAMED_REQUIRE_CALL(*current_thread, Awake());
-        AdvanceTimeAndSchedule(1ms);
+        auto thread_2 = CreateAndActivateThread();
+        REQUIRE_CALL(*thread_2, Suspend());
+        sem.try_acquire_for(os::WakeupConfiguration {0ms, {40ms, 50ms}});
 
-        THEN("the first sleeper is woke")
+        RunScheduler();
+
+        THEN("the next wakeup is the earliest time of the first sleeper")
         {
-            r_woke = nullptr;
+            REQUIRE(next_wakeup_time == os::GetTimeStamp() + 30ms);
         }
-        AND_THEN("the next wakeup is the earliest time of the second sleeper")
+
+        AND_THEN(
+            "wakeup of the first sleeper and next wakeup time is handled like the strict variant")
         {
+            AdvanceTimeAndSchedule(29ms);
+            REQUIRE_CALL(*current_thread, Awake());
+
+            AdvanceTimeAndSchedule(1ms);
             REQUIRE(next_wakeup_time == os::GetTimeStamp() + 20ms);
         }
     }
@@ -369,7 +396,6 @@ TEST_CASE_FIXTURE(SchedulerFixture,
                   "a sleeper can specify both an earliest time and a wakeup interval")
 {
     UnittestOpportunisticSemaphore sem {0};
-    UnittestOpportunisticSemaphore other_sem {0};
 
     auto r_suspended = NAMED_REQUIRE_CALL(*current_thread, Suspend());
     sem.try_acquire_for(os::WakeupConfiguration {10ms, {20ms, 30ms}});

@@ -85,7 +85,10 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
         if (config.wakeup_interval.earliest == config.wakeup_interval.latest)
         {
             // Wait for a precise time - regular semaphore behavior
-            return m_semaphore.try_acquire_for_ms(config.wakeup_interval.latest);
+            auto out = m_semaphore.try_acquire_for_ms(config.wakeup_interval.latest);
+            // Opportunistically wakeup
+            g_scheduler->RequestSchedule(m_semaphore_index);
+            return out;
         }
         else
         {
@@ -174,7 +177,7 @@ OpportunisticScheduler::Schedule()
     {
         auto& entry = m_too_early.front();
 
-        if (entry.config.no_earlier_than > now)
+        if (entry.config.no_earlier_than <= now)
         {
             if (now > entry.config.wakeup_interval.latest)
             {
@@ -190,6 +193,11 @@ OpportunisticScheduler::Schedule()
             }
 
             m_too_early.pop_front();
+        }
+        else
+        {
+            out = entry.config.wakeup_interval.latest;
+            break;
         }
     }
 
@@ -211,6 +219,11 @@ OpportunisticScheduler::Schedule()
         os::AwakeThread(entry.thread);
     }
     m_ready_for_wakeup.clear();
+
+    if (m_pending.empty())
+    {
+        out = std::nullopt;
+    }
 
     return out;
 }
