@@ -330,6 +330,41 @@ TEST_CASE_FIXTURE(SchedulerFixture, "the second thread will have to wait for an 
     }
 }
 
+TEST_CASE_FIXTURE(SchedulerFixture, "two non-overlapping sleepers have been added")
+{
+    UnittestOpportunisticSemaphore sem {0};
+
+    REQUIRE_CALL(*current_thread, Suspend());
+    sem.try_acquire_for(os::WakeupConfiguration {0ms, {20ms, 30ms}});
+
+    auto thread_2 = CreateAndActivateThread();
+    REQUIRE_CALL(*thread_2, Suspend());
+    sem.try_acquire_for(os::WakeupConfiguration {0ms, {50ms, 50ms}});
+
+    RunScheduler();
+
+    THEN("the next wakeup is the earliest time of the first sleeper")
+    {
+        REQUIRE(next_wakeup_time == os::GetTimeStamp() + 30ms);
+    }
+
+    AND_WHEN("the first sleeper is woke up")
+    {
+        AdvanceTimeAndSchedule(29ms);
+        auto r_woke = NAMED_REQUIRE_CALL(*current_thread, Awake());
+        AdvanceTimeAndSchedule(1ms);
+
+        THEN("the first sleeper is woke")
+        {
+            r_woke = nullptr;
+        }
+        AND_THEN("the next wakeup is the earliest time of the second sleeper")
+        {
+            REQUIRE(next_wakeup_time == os::GetTimeStamp() + 20ms);
+        }
+    }
+}
+
 TEST_CASE_FIXTURE(SchedulerFixture,
                   "a sleeper can specify both an earliest time and a wakeup interval")
 {
