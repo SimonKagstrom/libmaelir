@@ -135,6 +135,10 @@ OpportunisticScheduler::AddPendingEntry(ThreadHandle thread,
                                         uint8_t sem_index,
                                         const WakeupConfiguration& config)
 {
+    // Otherwise this should not be used
+    debug_assert(config.no_earlier_than == 0ms);
+    debug_assert(config.wakeup_interval.earliest < config.wakeup_interval.latest);
+
     auto now = os::GetTimeStamp();
     WakeupConfiguration adjusted_config = config + now;
 

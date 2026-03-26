@@ -89,9 +89,50 @@ private:
     std::vector<std::unique_ptr<trompeloeil::expectation>> m_expectations;
 };
 
+TEST_CASE_FIXTURE(SchedulerFixture, "scheduling without waiters is a nop")
+{
+    FORBID_CALL(*current_thread, Suspend());
+    FORBID_CALL(*current_thread, Awake());
+
+    REQUIRE(scheduler.Schedule() == std::nullopt);
+}
+
 TEST_CASE_FIXTURE(SchedulerFixture, "a pending wakeup can be added to the scheduler")
 {
-    // TBD
+    WHEN("an entry in the 10..20ms interval is added")
+    {
+        auto t1 = CreateThread();
+
+        scheduler.AddPendingEntry(t1, 0, {0ms, {10ms, 20ms}});
+        THEN("scheduling directly will not wake the thread")
+        {
+            FORBID_CALL(*t1, Awake());
+            auto wakeup = scheduler.Schedule();
+
+            AND_THEN("the next wakeup time is the latest time")
+            {
+                REQUIRE(wakeup == os::GetTimeStamp() + 20ms);
+            }
+
+            AND_THEN("also not after 9ms")
+            {
+                AdvanceTime(9ms);
+                wakeup = scheduler.Schedule();
+                REQUIRE(wakeup == os::GetTimeStamp() + 11ms);
+            }
+        }
+        AND_THEN("the thread wakes up at the latest time")
+        {
+            REQUIRE_CALL(*t1, Awake());
+            AdvanceTime(20ms);
+            auto wakeup = scheduler.Schedule();
+
+            AND_THEN("the next wakeup is forever")
+            {
+                REQUIRE(wakeup == std::nullopt);
+            }
+        }
+    }
 }
 
 TEST_CASE_FIXTURE(SchedulerFixture, "pending entries are woken when the grace time is reached")
