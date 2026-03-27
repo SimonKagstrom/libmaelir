@@ -156,6 +156,8 @@ OpportunisticScheduler::AddEarlyEntry(ThreadHandle thread,
                                       uint8_t sem_index,
                                       const WakeupConfiguration& config)
 {
+    debug_assert(config.no_earlier_than > 0ms);
+
     auto now = os::GetTimeStamp();
     WakeupConfiguration adjusted_config = config + now;
 
@@ -224,7 +226,7 @@ OpportunisticScheduler::Schedule()
     }
     m_ready_for_wakeup.clear();
 
-    if (m_pending.empty())
+    if (m_pending.empty() && m_too_early.empty())
     {
         out = std::nullopt;
     }

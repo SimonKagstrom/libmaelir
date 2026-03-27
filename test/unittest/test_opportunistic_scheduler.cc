@@ -188,7 +188,68 @@ TEST_CASE_FIXTURE(SchedulerFixture, "a pending wakeup can be added to the schedu
 
 TEST_CASE_FIXTURE(SchedulerFixture, "early entries are transformed to pending and woke entries")
 {
-    // TBD
+    WHEN("an event entry which should not wake earlier than in 10 ms is added")
+    {
+        scheduler.AddEarlyEntry(current_thread, 0, os::WakeupConfiguration {10ms, {10ms, 1s}});
+
+        auto wakeup = scheduler.Schedule();
+        THEN("the next wakeup is at the latest point")
+        {
+            REQUIRE(wakeup == os::GetTimeStamp() + 1s);
+        }
+
+        AND_WHEN("time moves a bit")
+        {
+            AdvanceTime(9ms);
+            wakeup = scheduler.Schedule();
+
+            THEN("the next wakeup also moves")
+            {
+                REQUIRE(wakeup == os::GetTimeStamp() + 991ms);
+            }
+        }
+
+        AND_WHEN("the scheduler is triggered during the wake interval")
+        {
+            auto r_woke = NAMED_REQUIRE_CALL(*current_thread, Awake());
+            AdvanceTime(10ms);
+            auto wakeup = scheduler.Schedule();
+
+            THEN("the thread is woke")
+            {
+                r_woke = nullptr;
+            }
+            AND_THEN("the next wakeup is forever")
+            {
+                REQUIRE(wakeup == std::nullopt);
+            }
+        }
+
+        WHEN("another entry is added with a later wake deadline than the first, but an earlier "
+             "earliest")
+        {
+            auto t2 = CreateThread();
+            scheduler.AddEarlyEntry(t2, 0, os::WakeupConfiguration {5ms, {20ms, 2s}});
+
+            auto wakeup = scheduler.Schedule();
+            THEN("the next wakeup is from the current thread")
+            {
+                REQUIRE(wakeup == os::GetTimeStamp() + 1s);
+            }
+        }
+
+        WHEN("another entry is added with an earlier wake deadline than the first")
+        {
+            auto t2 = CreateThread();
+            scheduler.AddEarlyEntry(t2, 0, os::WakeupConfiguration {5ms, {20ms, 500ms}});
+
+            auto wakeup = scheduler.Schedule();
+            THEN("the next wakeup is from the new thread")
+            {
+                REQUIRE(wakeup == os::GetTimeStamp() + 500ms);
+            }
+        }
+    }
 }
 
 TEST_CASE_FIXTURE(SchedulerFixture,
