@@ -160,7 +160,7 @@ OpportunisticScheduler::AddEarlyEntry(ThreadHandle thread,
     auto now = os::GetTimeStamp();
     WakeupConfiguration adjusted_config = config + now;
 
-    m_too_early.push_back({thread, adjusted_config, sem_index});
+    m_too_early[sem_index].push_back({thread, adjusted_config, sem_index});
 
     m_semaphore.release();
 }
@@ -175,46 +175,60 @@ OpportunisticScheduler::RequestSchedule(uint8_t sem_index)
 std::optional<milliseconds>
 OpportunisticScheduler::Schedule()
 {
-    std::optional<milliseconds> out;
+    milliseconds out = 0xffffffffms;
     auto now = os::GetTimeStamp();
 
-    while (!m_too_early.empty())
+    for (auto i = 0; i < m_too_early.size(); i++)
     {
-        auto& entry = m_too_early.front();
-
-        if (m_released_semaphores.contains(entry.sem_index))
+        if (m_released_semaphores.contains(i))
         {
-            out = entry.config.no_earlier_than;
-            entry.config.wakeup_interval.earliest = entry.config.no_earlier_than;
-            entry.config.wakeup_interval.latest = entry.config.no_earlier_than;
-            m_pending.push_back(entry);
-            m_too_early.pop_front();
-        }
-        else if (entry.config.no_earlier_than <= now)
-        {
-            if (now > entry.config.wakeup_interval.latest)
+            for (auto& entry : m_too_early[i])
             {
-                os::AwakeThread(entry.thread);
-            }
-            else
-            {
+                out = entry.config.no_earlier_than;
+                entry.config.wakeup_interval.earliest = entry.config.no_earlier_than;
+                entry.config.wakeup_interval.latest = entry.config.no_earlier_than;
                 m_pending.push_back(entry);
-                // TODO: Not good
-                std::ranges::sort(m_pending, {}, [](const auto& entry) {
-                    return entry.config.wakeup_interval.latest;
-                });
             }
-
-            m_too_early.pop_front();
+            m_too_early[i].clear();
         }
         else
         {
-            out = entry.config.wakeup_interval.latest;
-            break;
+            auto& too_early = m_too_early[i];
+
+            while (!too_early.empty())
+            {
+                auto& entry = too_early.front();
+
+                if (entry.config.no_earlier_than <= now)
+                {
+                    if (now > entry.config.wakeup_interval.latest)
+                    {
+                        os::AwakeThread(entry.thread);
+                    }
+                    else
+                    {
+                        m_pending.push_back(entry);
+                    }
+
+                    too_early.pop_front();
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            for (auto& entry : too_early)
+            {
+                out = std::min(out, entry.config.wakeup_interval.latest);
+            }
         }
     }
 
     m_released_semaphores.clear();
+    // TODO: Not good
+    std::ranges::sort(
+        m_pending, {}, [](const auto& entry) { return entry.config.wakeup_interval.latest; });
 
 
     while (!m_pending.empty())
@@ -236,9 +250,15 @@ OpportunisticScheduler::Schedule()
     }
     m_ready_for_wakeup.clear();
 
-    if (m_pending.empty() && m_too_early.empty())
+    if (m_pending.empty() &&
+        std::ranges::all_of(m_too_early, [](const auto& queue) { return queue.empty(); }))
     {
-        out = std::nullopt;
+        return std::nullopt;
+    }
+
+    if (out == 0xffffffffms)
+    {
+        return std::nullopt;
     }
 
     return out;
