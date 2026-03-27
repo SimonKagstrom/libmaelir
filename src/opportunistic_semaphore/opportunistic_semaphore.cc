@@ -160,7 +160,8 @@ OpportunisticScheduler::AddEarlyEntry(ThreadHandle thread,
     auto now = os::GetTimeStamp();
     WakeupConfiguration adjusted_config = config + now;
 
-    m_too_early[sem_index].push_back({thread, adjusted_config, sem_index});
+    m_too_early.push_back({thread, adjusted_config, sem_index});
+    m_too_early_per_semaphore[sem_index].push_back({thread, adjusted_config, sem_index});
 
     m_semaphore.release();
 }
@@ -178,51 +179,49 @@ OpportunisticScheduler::Schedule()
     milliseconds out = 0xffffffffms;
     auto now = os::GetTimeStamp();
 
-    for (auto i = 0; i < m_too_early.size(); i++)
+    for (auto released : m_released_semaphores)
     {
-        if (m_released_semaphores.contains(i))
+        for (auto& entry : m_too_early_per_semaphore[released])
         {
-            for (auto& entry : m_too_early[i])
+            out = entry.config.no_earlier_than;
+            entry.config.wakeup_interval.earliest = entry.config.no_earlier_than;
+            entry.config.wakeup_interval.latest = entry.config.no_earlier_than;
+
+            m_pending.push_back(entry);
+        }
+        auto it = std::ranges::remove_if(m_too_early,
+                                         [&](const auto& e) { return e.sem_index == released; });
+        m_too_early.erase(it.begin(), it.end());
+        m_too_early_per_semaphore[released].clear();
+    }
+    m_released_semaphores.clear();
+
+    while (!m_too_early.empty())
+    {
+        auto& entry = m_too_early.front();
+
+        if (entry.config.no_earlier_than <= now)
+        {
+            if (now > entry.config.wakeup_interval.latest)
             {
-                out = entry.config.no_earlier_than;
-                entry.config.wakeup_interval.earliest = entry.config.no_earlier_than;
-                entry.config.wakeup_interval.latest = entry.config.no_earlier_than;
+                os::AwakeThread(entry.thread);
+            }
+            else
+            {
                 m_pending.push_back(entry);
             }
-            m_too_early[i].clear();
+
+            m_too_early.pop_front();
         }
         else
         {
-            auto& too_early = m_too_early[i];
-
-            while (!too_early.empty())
-            {
-                auto& entry = too_early.front();
-
-                if (entry.config.no_earlier_than <= now)
-                {
-                    if (now > entry.config.wakeup_interval.latest)
-                    {
-                        os::AwakeThread(entry.thread);
-                    }
-                    else
-                    {
-                        m_pending.push_back(entry);
-                    }
-
-                    too_early.pop_front();
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            for (auto& entry : too_early)
-            {
-                out = std::min(out, entry.config.wakeup_interval.latest);
-            }
+            break;
         }
+    }
+
+    for (auto& entry : m_too_early)
+    {
+        out = std::min(out, entry.config.wakeup_interval.latest);
     }
 
     m_released_semaphores.clear();
@@ -250,8 +249,7 @@ OpportunisticScheduler::Schedule()
     }
     m_ready_for_wakeup.clear();
 
-    if (m_pending.empty() &&
-        std::ranges::all_of(m_too_early, [](const auto& queue) { return queue.empty(); }))
+    if (m_pending.empty() && m_too_early.empty())
     {
         return std::nullopt;
     }

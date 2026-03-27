@@ -171,7 +171,11 @@ private:
     // Threads where the low interval has not yet been reached
     std::deque<OpportunisticBinarySemaphore::WaitEntry> m_pending;
     // Threads which have not yet reached the allowed earliest time
-    std::array<std::deque<OpportunisticBinarySemaphore::WaitEntry>, kMaxSemaphores> m_too_early;
+    std::deque<OpportunisticBinarySemaphore::WaitEntry> m_too_early;
+
+
+    std::array<std::deque<OpportunisticBinarySemaphore::WaitEntry>, kMaxSemaphores>
+        m_too_early_per_semaphore;
 };
 
 } // namespace os
