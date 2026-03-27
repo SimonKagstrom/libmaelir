@@ -132,13 +132,59 @@ TEST_CASE_FIXTURE(SchedulerFixture, "a pending wakeup can be added to the schedu
                 REQUIRE(wakeup == std::nullopt);
             }
         }
+
+        AND_WHEN("someone does schedule during the wakeup interval")
+        {
+            REQUIRE_CALL(*t1, Awake());
+            AdvanceTime(15ms);
+            auto wakeup = scheduler.Schedule();
+
+            THEN("the thread is woke up")
+            {
+                scheduler.RequestSchedule(0);
+            }
+            AND_THEN("the next wakeup is forever")
+            {
+                REQUIRE(wakeup == std::nullopt);
+            }
+        }
+
+        AND_WHEN("an entry with an earlier latest wakeup interval is added after a while")
+        {
+            AdvanceTime(5ms);
+            REQUIRE(scheduler.Schedule() == os::GetTimeStamp() + 15ms);
+
+            auto t2 = CreateThread();
+            scheduler.AddPendingEntry(t2, 0, {0ms, {7ms, 10ms}}); // 12ms..15ms from start
+
+            auto wakeup = scheduler.Schedule();
+            THEN("the next wakeup is the last time of the two entries")
+            {
+                REQUIRE(wakeup == os::GetTimeStamp() + 10ms);
+            }
+
+            AND_WHEN("the earliest thread is woke up due to the schedule request after it's "
+                     "earliest time")
+            {
+                AdvanceTime(7ms);
+                auto r_thread_2_woke = NAMED_REQUIRE_CALL(*t2, Awake());
+                auto r_thread_1_woke = NAMED_REQUIRE_CALL(*t1, Awake());
+                wakeup = scheduler.Schedule();
+
+                THEN("both threads are woken")
+                {
+                    r_thread_2_woke = nullptr;
+                    r_thread_1_woke = nullptr;
+                }
+                AND_THEN("wakeup is forever")
+                {
+                    REQUIRE(wakeup == std::nullopt);
+                }
+            }
+        }
     }
 }
 
-TEST_CASE_FIXTURE(SchedulerFixture, "pending entries are woken when the grace time is reached")
-{
-    // TBD
-}
 
 TEST_CASE_FIXTURE(SchedulerFixture, "early entries are transformed to pending and woke entries")
 {
