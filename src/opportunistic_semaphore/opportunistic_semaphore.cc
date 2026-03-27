@@ -118,7 +118,6 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
 }
 
 
-
 OpportunisticScheduler::OpportunisticScheduler(os::binary_semaphore& semaphore)
     : m_semaphore(semaphore)
 {
@@ -142,7 +141,7 @@ OpportunisticScheduler::AddPendingEntry(ThreadHandle thread,
     auto now = os::GetTimeStamp();
     WakeupConfiguration adjusted_config = config + now;
 
-    m_pending.push_back({thread, adjusted_config});
+    m_pending.push_back({thread, adjusted_config, sem_index});
 
     std::ranges::sort(
         m_pending, {}, [](const auto& entry) { return entry.config.wakeup_interval.latest; });
@@ -161,7 +160,7 @@ OpportunisticScheduler::AddEarlyEntry(ThreadHandle thread,
     auto now = os::GetTimeStamp();
     WakeupConfiguration adjusted_config = config + now;
 
-    m_too_early.push_back({thread, adjusted_config});
+    m_too_early.push_back({thread, adjusted_config, sem_index});
 
     m_semaphore.release();
 }
@@ -169,7 +168,7 @@ OpportunisticScheduler::AddEarlyEntry(ThreadHandle thread,
 void
 OpportunisticScheduler::RequestSchedule(uint8_t sem_index)
 {
-    // TODO: Take the semaphore index into account
+    m_released_semaphores.insert(sem_index);
     m_semaphore.release();
 }
 
@@ -183,7 +182,15 @@ OpportunisticScheduler::Schedule()
     {
         auto& entry = m_too_early.front();
 
-        if (entry.config.no_earlier_than <= now)
+        if (m_released_semaphores.contains(entry.sem_index))
+        {
+            out = entry.config.no_earlier_than;
+            entry.config.wakeup_interval.earliest = entry.config.no_earlier_than;
+            entry.config.wakeup_interval.latest = entry.config.no_earlier_than;
+            m_pending.push_back(entry);
+            m_too_early.pop_front();
+        }
+        else if (entry.config.no_earlier_than <= now)
         {
             if (now > entry.config.wakeup_interval.latest)
             {
@@ -206,6 +213,9 @@ OpportunisticScheduler::Schedule()
             break;
         }
     }
+
+    m_released_semaphores.clear();
+
 
     while (!m_pending.empty())
     {
