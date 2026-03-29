@@ -141,7 +141,7 @@ TEST_CASE_FIXTURE(SchedulerFixture, "a pending wakeup can be added to the schedu
 
             THEN("the thread is woke up")
             {
-                scheduler.RequestSchedule(0);
+                scheduler.RequestScheduleForSemaphore(0);
             }
             AND_THEN("the next wakeup is forever")
             {
@@ -255,7 +255,31 @@ TEST_CASE_FIXTURE(SchedulerFixture, "early entries are transformed to pending an
 TEST_CASE_FIXTURE(SchedulerFixture,
                   "the scheduler can be triggered to wake pending entries on release()")
 {
-    // TBD
+    scheduler.AddPendingEntry(current_thread, 0, os::WakeupConfiguration {0ms, {10ms, 20ms}});
+
+    WHEN("a schedule is done via release for an unrelated semaphore")
+    {
+        auto r_no_woke = NAMED_FORBID_CALL(*current_thread, Awake());
+        scheduler.RequestScheduleForSemaphore(1);
+        scheduler.Schedule();
+
+        THEN("the thread is not woken")
+        {
+            r_no_woke = nullptr;
+        }
+    }
+
+    WHEN("a schedule is done via release")
+    {
+        auto r_woke = NAMED_REQUIRE_CALL(*current_thread, Awake());
+        scheduler.RequestScheduleForSemaphore(0);
+        scheduler.Schedule();
+
+        THEN("the thread is woken")
+        {
+            r_woke = nullptr;
+        }
+    }
 }
 
 

@@ -155,7 +155,8 @@ public:
     void AddEarlyEntry(ThreadHandle thread, uint8_t sem_index, const WakeupConfiguration& config);
 
 
-    void RequestSchedule(uint8_t sem_index);
+    void RequestScheduleForSemaphore(uint8_t sem_index);
+    void RequestSchedule();
 
     // Return the next wakeup time
     std::optional<milliseconds> Schedule();
@@ -166,8 +167,6 @@ private:
 
     std::unordered_set<uint8_t> m_released_semaphores;
 
-    // Threads which will be opportunistically woken up when the scheduler runs
-    std::deque<OpportunisticBinarySemaphore::WaitEntry> m_ready_for_wakeup;
     // Threads where the low interval has not yet been reached
     std::deque<OpportunisticBinarySemaphore::WaitEntry> m_pending;
     // Threads which have not yet reached the allowed earliest time

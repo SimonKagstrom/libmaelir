@@ -28,7 +28,7 @@ void
 OpportunisticBinarySemaphore::release()
 {
     m_semaphore.release();
-    g_scheduler->RequestSchedule(m_semaphore_index);
+    g_scheduler->RequestScheduleForSemaphore(m_semaphore_index);
 }
 
 // Return true if a higher prio task was awoken
@@ -87,7 +87,7 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
             // Wait for a precise time - regular semaphore behavior
             auto out = m_semaphore.try_acquire_for_ms(config.wakeup_interval.latest);
             // Opportunistically wakeup
-            g_scheduler->RequestSchedule(m_semaphore_index);
+            g_scheduler->RequestSchedule();
             return out;
         }
         else
@@ -167,10 +167,16 @@ OpportunisticScheduler::AddEarlyEntry(ThreadHandle thread,
 }
 
 void
-OpportunisticScheduler::RequestSchedule(uint8_t sem_index)
+OpportunisticScheduler::RequestSchedule()
+{
+    m_semaphore.release();
+}
+
+void
+OpportunisticScheduler::RequestScheduleForSemaphore(uint8_t sem_index)
 {
     m_released_semaphores.insert(sem_index);
-    m_semaphore.release();
+    RequestSchedule();
 }
 
 std::optional<milliseconds>
@@ -179,8 +185,24 @@ OpportunisticScheduler::Schedule()
     milliseconds out = 0xffffffffms;
     auto now = os::GetTimeStamp();
 
+    std::vector<ThreadHandle> ready_for_wakeup;
+
     for (auto released : m_released_semaphores)
     {
+        /*
+         * Move all pending for this thread to ready-for-wakeup (before too-early has been evaluated).
+         *
+         * This might have to be reconsidered, if the semaphore is released multiple times before the
+         * too-early time has passed.
+         */
+        auto pending = std::ranges::remove_if(
+            m_pending, [&](const auto& e) { return e.sem_index == released; });
+        for (auto& entry : pending)
+        {
+            ready_for_wakeup.push_back(entry.thread);
+        }
+        m_pending.erase(pending.begin(), pending.end());
+
         for (auto& entry : m_too_early_per_semaphore[released])
         {
             out = entry.config.no_earlier_than;
@@ -229,7 +251,6 @@ OpportunisticScheduler::Schedule()
     std::ranges::sort(
         m_pending, {}, [](const auto& entry) { return entry.config.wakeup_interval.latest; });
 
-
     while (!m_pending.empty())
     {
         out = m_pending.front().config.wakeup_interval.latest;
@@ -239,15 +260,15 @@ OpportunisticScheduler::Schedule()
             break;
         }
         const auto& entry = m_pending.front();
-        m_ready_for_wakeup.push_back(entry);
+        ready_for_wakeup.push_back(entry.thread);
         m_pending.pop_front();
     }
 
-    for (auto& entry : m_ready_for_wakeup)
+    for (auto& entry : ready_for_wakeup)
     {
-        os::AwakeThread(entry.thread);
+        os::AwakeThread(entry);
     }
-    m_ready_for_wakeup.clear();
+    ready_for_wakeup.clear();
 
     if (m_pending.empty() && m_too_early.empty())
     {
