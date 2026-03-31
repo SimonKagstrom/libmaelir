@@ -6,6 +6,7 @@
 // TODO: Replace with safe
 #include <atomic>
 #include <deque>
+#include <mutex>
 #include <unordered_set>
 
 class SchedulerFixture;
@@ -175,6 +176,9 @@ private:
 
     std::array<std::deque<OpportunisticBinarySemaphore::WaitEntry>, kMaxSemaphores>
         m_too_early_per_semaphore;
+
+
+    std::mutex m_mutex;
 };
 
 } // namespace os

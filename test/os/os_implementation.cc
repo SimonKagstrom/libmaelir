@@ -29,14 +29,6 @@ os::detail::GetCurrentThread()
     return g_current_thread;
 }
 
-uint8_t
-os::detail::GetThreadId(os::ThreadHandle thread)
-{
-    assert(thread);
-
-    return thread->GetId();
-}
-
 void
 os::detail::AwakeThread(os::ThreadHandle thread)
 {
@@ -52,16 +44,6 @@ os::detail::SuspendThread(os::ThreadHandle thread)
 
     thread->Suspend();
 }
-
-void
-os::detail::TriggerWakeup(milliseconds time_from_now)
-{
-    auto kernel = g_kernel.lock();
-    assert(kernel);
-
-    kernel->TriggerWakeup(time_from_now);
-}
-
 
 void
 os::detail::SetCurrentThread(os::ThreadHandle thread)

@@ -138,6 +138,7 @@ OpportunisticScheduler::AddPendingEntry(ThreadHandle thread,
     debug_assert(config.no_earlier_than == 0ms);
     debug_assert(config.wakeup_interval.earliest < config.wakeup_interval.latest);
 
+    std::scoped_lock lock(m_mutex);
     auto now = os::GetTimeStamp();
     WakeupConfiguration adjusted_config = config + now;
 
@@ -157,6 +158,7 @@ OpportunisticScheduler::AddEarlyEntry(ThreadHandle thread,
 {
     debug_assert(config.no_earlier_than > 0ms);
 
+    std::scoped_lock lock(m_mutex);
     auto now = os::GetTimeStamp();
     WakeupConfiguration adjusted_config = config + now;
 
@@ -175,6 +177,7 @@ OpportunisticScheduler::RequestSchedule()
 void
 OpportunisticScheduler::RequestScheduleForSemaphore(uint8_t sem_index)
 {
+    std::scoped_lock lock(m_mutex);
     m_released_semaphores.insert(sem_index);
     RequestSchedule();
 }
@@ -182,6 +185,9 @@ OpportunisticScheduler::RequestScheduleForSemaphore(uint8_t sem_index)
 std::optional<milliseconds>
 OpportunisticScheduler::Schedule()
 {
+    std::scoped_lock lock(m_mutex);
+
+
     milliseconds out = 0xffffffffms;
     auto now = os::GetTimeStamp();
 
