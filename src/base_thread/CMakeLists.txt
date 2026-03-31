@@ -6,4 +6,5 @@ target_include_directories(base_thread INTERFACE
 
 target_link_libraries(base_thread INTERFACE
     timer_manager
+    opportunistic_semaphore
 )

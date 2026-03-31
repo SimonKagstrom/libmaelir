@@ -3,6 +3,9 @@
 #include "debug_assert.hh"
 #include "os/thread.hh"
 
+#include <algorithm>
+#include <ranges>
+
 using namespace os;
 
 namespace
