@@ -14,9 +14,6 @@ class SchedulerFixture : public TimeFixture
 public:
     SchedulerFixture()
     {
-        m_expectations.push_back(
-            NAMED_ALLOW_CALL(*kernel, TriggerWakeup(_)).SIDE_EFFECT(next_wakeup_time = _1));
-
         threads.push_back(std::make_unique<os::MockThread>());
         current_thread = threads.back().get();
         os::detail::SetCurrentThread(current_thread);
@@ -81,7 +78,6 @@ public:
     os::OpportunisticScheduler scheduler {semaphore};
     milliseconds next_wakeup_time {0xffffffffms};
 
-    std::shared_ptr<os::MockKernel> kernel {os::MockKernel().Create()};
     std::vector<std::unique_ptr<os::MockThread>> threads;
     os::MockThread* current_thread;
 

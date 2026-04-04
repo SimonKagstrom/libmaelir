@@ -1,5 +1,6 @@
 #pragma once
 
+#include "os/thread.hh"
 #include "semaphore.hh"
 #include "time.hh"
 #include "timer_manager.hh"
@@ -12,95 +13,25 @@ class ThreadFixture;
 namespace os
 {
 
-constexpr auto kDefaultStackSize = 2048;
-
-enum class ThreadPriority : uint8_t
-{
-    kLow = 1,
-    kNormal,
-    kHigh,
-};
-
-enum class ThreadCore : uint8_t
-{
-    kCore0 = 0,
-    kCore1,
-    // Add more if needed
-};
-
-class BaseThread
+class BaseThread : public OsThread
 {
 public:
     // For unit tests
     friend class ::ThreadFixture;
 
-    BaseThread();
+    BaseThread()
+        : m_timer_manager(m_semaphore)
+    {
+    }
 
-    virtual ~BaseThread();
+    virtual ~BaseThread() = default;
 
-    void Awake()
+    void Awake() final
     {
         m_semaphore.release();
     }
 
-    /**
-     * @brief Start the thread
-     *
-     * @param name the name of the thread
-     * @param core the core to pin the thread to
-     * @param priority the thread priority (strict)
-     * @param stack_size the stack size of the thread
-     */
-    void Start(const char* name, ThreadCore core, ThreadPriority priority, uint32_t stack_size);
-
-    // The rest are just helpers for overloaded common cases
-    void Start(const char* name)
-    {
-        Start(name, ThreadCore::kCore0, ThreadPriority::kLow, kDefaultStackSize);
-    }
-
-    void Start(const char* name, ThreadCore core)
-    {
-        Start(name, core, ThreadPriority::kLow, kDefaultStackSize);
-    }
-
-    void Start(const char* name, ThreadPriority priority)
-    {
-        Start(name, ThreadCore::kCore0, priority, kDefaultStackSize);
-    }
-
-    void Start(const char* name, ThreadPriority priority, uint32_t stack_size)
-    {
-        Start(name, ThreadCore::kCore0, priority, stack_size);
-    }
-
-    void Start(const char* name, ThreadCore core, ThreadPriority priority)
-    {
-        Start(name, core, priority, kDefaultStackSize);
-    }
-
-    void Start(const char* name, ThreadCore core, uint32_t stack_size)
-    {
-        Start(name, core, ThreadPriority::kLow, stack_size);
-    }
-
-    void Start(const char* name, uint32_t stack_size)
-    {
-        Start(name, ThreadCore::kCore0, ThreadPriority::kLow, stack_size);
-    }
-
-    void Stop()
-    {
-        m_running = false;
-        Awake();
-    }
-
 protected:
-    // The thread has just started
-    virtual void OnStartup()
-    {
-    }
-
     /// @brief the thread has been awoken
     virtual std::optional<milliseconds> OnActivation() = 0;
 
@@ -172,7 +103,7 @@ private:
         return std::nullopt;
     }
 
-    void ThreadLoop()
+    void ThreadLoop() final
     {
         OnStartup();
 

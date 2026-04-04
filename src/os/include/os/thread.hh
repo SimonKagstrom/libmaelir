@@ -1,11 +1,132 @@
 #pragma once
 
 #include "os_implementation.hh"
+#include "semaphore.hh"
+#include "thread_parameters.hh"
 
+#include <atomic>
 #include <cstdint>
+#include <optional>
 
 namespace os
 {
+
+class OsThread
+{
+public:
+    OsThread()
+    {
+        m_self = detail::CreateThread([this]() { ThreadLoop(); });
+    }
+
+    virtual ~OsThread()
+    {
+        if (m_running)
+        {
+            Stop();
+            os::detail::WaitThreadExit(m_self);
+        }
+    }
+
+    virtual void Awake()
+    {
+        m_semaphore.release();
+    }
+
+    void Stop()
+    {
+        m_running = false;
+        Awake();
+    }
+
+    /**
+     * @brief Start the thread
+     *
+     * @param name the name of the thread
+     * @param core the core to pin the thread to
+     * @param priority the thread priority (strict)
+     * @param stack_size the stack size of the thread
+     */
+    void Start(const char* name, ThreadCore core, ThreadPriority priority, uint32_t stack_size)
+    {
+        detail::StartThread(m_self, name, core, priority, stack_size);
+    }
+
+    // The rest are just helpers for overloaded common cases
+    void Start(const char* name)
+    {
+        Start(name, ThreadCore::kCore0, ThreadPriority::kLow, kDefaultStackSize);
+    }
+
+    void Start(const char* name, ThreadCore core)
+    {
+        Start(name, core, ThreadPriority::kLow, kDefaultStackSize);
+    }
+
+    void Start(const char* name, ThreadPriority priority)
+    {
+        Start(name, ThreadCore::kCore0, priority, kDefaultStackSize);
+    }
+
+    void Start(const char* name, ThreadPriority priority, uint32_t stack_size)
+    {
+        Start(name, ThreadCore::kCore0, priority, stack_size);
+    }
+
+    void Start(const char* name, ThreadCore core, ThreadPriority priority)
+    {
+        Start(name, core, priority, kDefaultStackSize);
+    }
+
+    void Start(const char* name, ThreadCore core, uint32_t stack_size)
+    {
+        Start(name, core, ThreadPriority::kLow, stack_size);
+    }
+
+    void Start(const char* name, uint32_t stack_size)
+    {
+        Start(name, ThreadCore::kCore0, ThreadPriority::kLow, stack_size);
+    }
+
+protected:
+    // The thread has just started
+    virtual void OnStartup()
+    {
+    }
+
+    /// @brief the thread has been awoken
+    virtual std::optional<milliseconds> OnWakeup()
+    {
+        return std::nullopt;
+    }
+
+    virtual void ThreadLoop()
+    {
+        OnStartup();
+
+        while (m_running)
+        {
+            auto time = OnWakeup();
+
+            if (time)
+            {
+                m_semaphore.try_acquire_for(*time);
+            }
+            else
+            {
+                m_semaphore.acquire();
+            }
+        }
+    }
+
+
+private:
+    ThreadHandle m_self;
+
+    binary_semaphore m_semaphore {0};
+    std::atomic_bool m_running {true};
+};
+
 
 static inline ThreadHandle
 GetCurrentThread()
@@ -24,5 +145,6 @@ SuspendThread(ThreadHandle thread)
 {
     detail::SuspendThread(thread);
 }
+
 
 } // namespace os

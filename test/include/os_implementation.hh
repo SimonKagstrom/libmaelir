@@ -1,5 +1,6 @@
 #pragma once
 
+#include "thread_parameters.hh"
 #include "time.hh"
 
 #include <memory>
@@ -15,14 +16,6 @@ public:
     MAKE_MOCK0(Suspend, void());
 };
 
-class MockKernel
-{
-public:
-    std::shared_ptr<MockKernel> Create();
-
-    MAKE_MOCK1(TriggerWakeup, void(milliseconds));
-};
-
 using ThreadHandle = MockThread*;
 
 namespace detail
@@ -33,6 +26,17 @@ ThreadHandle GetCurrentThread();
 void AwakeThread(ThreadHandle thread);
 
 void SuspendThread(ThreadHandle thread);
+
+ThreadHandle CreateThread(const std::function<void()>& thread_loop);
+
+void StartThread(ThreadHandle thread,
+                 const char* name,
+                 ThreadCore core,
+                 ThreadPriority priority,
+                 uint32_t stack_size);
+
+void WaitThreadExit(ThreadHandle thread);
+
 
 // Unit test only
 void SetCurrentThread(ThreadHandle thread);

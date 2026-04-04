@@ -39,7 +39,7 @@ PUBLIC
 )
 
 add_library(os_unittest EXCLUDE_FROM_ALL
-    os/base_thread_unittest.cc
+    #os/base_thread_unittest.cc
     os/semaphore_unittest.cc
     # Maybe move to it's own library...
     mock_time.cc

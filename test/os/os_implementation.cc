@@ -6,20 +6,8 @@ namespace
 {
 
 os::ThreadHandle g_current_thread;
-std::weak_ptr<os::MockKernel> g_kernel;
 
 } // namespace
-
-std::shared_ptr<os::MockKernel>
-os::MockKernel::Create()
-{
-    auto out = std::make_shared<os::MockKernel>();
-
-    g_kernel = out;
-
-    return out;
-}
-
 
 os::ThreadHandle
 os::detail::GetCurrentThread()
@@ -44,6 +32,32 @@ os::detail::SuspendThread(os::ThreadHandle thread)
 
     thread->Suspend();
 }
+
+os::ThreadHandle
+os::detail::CreateThread(const std::function<void()>& thread_loop)
+{
+    auto out = new MockThread;
+
+    return out;
+}
+
+void
+os::detail::StartThread(ThreadHandle thread,
+                        const char* name,
+                        ThreadCore core,
+                        ThreadPriority priority,
+                        uint32_t stack_size)
+{
+    g_current_thread = thread;
+}
+
+void os::detail::WaitThreadExit(ThreadHandle thread)
+{
+    assert(thread);
+
+    delete thread;
+}
+
 
 void
 os::detail::SetCurrentThread(os::ThreadHandle thread)
