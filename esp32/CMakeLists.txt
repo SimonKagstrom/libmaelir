@@ -15,3 +15,5 @@ add_subdirectory(stepper_motor_esp32)
 add_subdirectory(os)
 
 add_library(httpd_client_implementation ALIAS httpd_client_esp32)
+
+add_library(os_implementation ALIAS os_esp32)
