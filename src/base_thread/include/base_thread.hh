@@ -24,7 +24,10 @@ public:
     {
     }
 
-    virtual ~BaseThread() = default;
+    virtual ~BaseThread() override
+    {
+        Stop();
+    }
 
     void Awake() final
     {

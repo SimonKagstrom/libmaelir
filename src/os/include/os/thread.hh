@@ -14,21 +14,18 @@ namespace os
 class OsThread
 {
 public:
-    virtual ~OsThread()
-    {
-        if (m_running)
-        {
-            Stop();
-            os::detail::WaitThreadExit(m_self);
-        }
-    }
+    virtual ~OsThread() = default;
 
     virtual void Awake() = 0;
 
     void Stop()
     {
-        m_running = false;
-        Awake();
+        if (m_running)
+        {
+            m_running = false;
+            Awake();
+            os::detail::WaitThreadExit(m_self);
+        }
     }
 
     /**
