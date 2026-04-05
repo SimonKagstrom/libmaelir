@@ -6,8 +6,24 @@ namespace
 {
 
 os::ThreadHandle g_current_thread;
+std::weak_ptr<os::MockKernel> g_kernel_mock;
 
 } // namespace
+
+std::shared_ptr<os::MockKernel> os::detail::GetKernelMock()
+{
+    if (auto p = g_kernel_mock.lock())
+    {
+        return p;
+    }
+    else
+    {
+        auto new_mock = std::make_shared<MockKernel>();
+        g_kernel_mock = new_mock;
+        return new_mock;
+    }
+}
+
 
 os::ThreadHandle
 os::detail::GetCurrentThread()
@@ -42,6 +58,8 @@ os::detail::StartThread(const char* name,
 {
     auto out = new MockThread;
     g_current_thread = out;
+    GetKernelMock()->OnThreadStart(out);
+
     return out;
 }
 

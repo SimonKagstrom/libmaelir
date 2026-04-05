@@ -18,6 +18,12 @@ public:
 
 using ThreadHandle = MockThread*;
 
+class MockKernel
+{
+public:
+    MAKE_MOCK1(OnThreadStart, void(ThreadHandle));
+};
+
 namespace detail
 {
 
@@ -38,6 +44,7 @@ void WaitThreadExit(ThreadHandle thread);
 
 // Unit test only
 void SetCurrentThread(ThreadHandle thread);
+std::shared_ptr<MockKernel> GetKernelMock();
 
 } // namespace detail
 

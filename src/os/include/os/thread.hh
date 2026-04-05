@@ -8,12 +8,17 @@
 #include <cstdint>
 #include <optional>
 
+class ThreadFixture;
+
 namespace os
 {
 
 class OsThread
 {
 public:
+    // For unit tests
+    friend class ::ThreadFixture;
+
     virtual ~OsThread() = default;
 
     virtual void Awake() = 0;
@@ -87,6 +92,12 @@ protected:
     }
 
 private:
+    // For unit tests
+    ThreadHandle GetThreadHandle() const
+    {
+        return m_self;
+    }
+
     ThreadHandle m_self;
     std::atomic_bool m_running {false};
 };

@@ -11,6 +11,10 @@ public:
     void SetThread(os::BaseThread* thread)
     {
         m_thread = thread;
+
+        // TODO: Allow multiple threads
+        m_on_thread_start = NAMED_ALLOW_CALL(*kernel_mock, OnThreadStart(_))
+                                .SIDE_EFFECT(m_thread->OnStartup());
     }
 
     bool DoRunLoop()
@@ -54,4 +58,8 @@ private:
     std::optional<milliseconds> m_next_wakeup_time;
 
     std::optional<milliseconds> m_next_wakeup_absolute;
+
+    std::unique_ptr<trompeloeil::expectation> m_on_thread_start;
+
+    std::shared_ptr<os::MockKernel> kernel_mock {os::detail::GetKernelMock()};
 };

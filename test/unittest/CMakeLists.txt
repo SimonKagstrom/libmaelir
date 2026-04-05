@@ -18,9 +18,9 @@ add_subdirectory(.. libmaelir_unittest)
 
 add_executable(unittest_libmaelir
     main.cc
-#    test_nmea_parser.cc
+    test_nmea_parser.cc
     test_opportunistic_scheduler.cc
-#    test_timer_manager.cc
+    test_timer_manager.cc
 )
 
 target_link_libraries(unittest_libmaelir

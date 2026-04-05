@@ -8,8 +8,6 @@
 #include <atomic>
 #include <optional>
 
-class ThreadFixture;
-
 namespace os
 {
 
