@@ -1,5 +1,4 @@
 add_library(os_qt EXCLUDE_FROM_ALL
-    thread_qt.cc
     os_implementation_qt.cc
     semaphore_qt.cc
 )
