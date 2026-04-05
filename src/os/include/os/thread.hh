@@ -28,10 +28,7 @@ public:
         }
     }
 
-    virtual void Awake()
-    {
-        m_semaphore.release();
-    }
+    virtual void Awake() = 0;
 
     void Stop()
     {
@@ -89,41 +86,15 @@ public:
     }
 
 protected:
-    // The thread has just started
-    virtual void OnStartup()
+    virtual void ThreadLoop() = 0;
+
+    bool IsRunning() const
     {
+        return m_running;
     }
-
-    /// @brief the thread has been awoken
-    virtual std::optional<milliseconds> OnWakeup()
-    {
-        return std::nullopt;
-    }
-
-    virtual void ThreadLoop()
-    {
-        OnStartup();
-
-        while (m_running)
-        {
-            auto time = OnWakeup();
-
-            if (time)
-            {
-                m_semaphore.try_acquire_for(*time);
-            }
-            else
-            {
-                m_semaphore.acquire();
-            }
-        }
-    }
-
 
 private:
     ThreadHandle m_self;
-
-    binary_semaphore m_semaphore {0};
     std::atomic_bool m_running {true};
 };
 

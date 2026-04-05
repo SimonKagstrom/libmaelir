@@ -72,17 +72,13 @@ protected:
         return m_timer_manager;
     }
 
+    // The thread has just started
+    virtual void OnStartup()
+    {
+    }
+
 private:
     struct Impl;
-
-    // Accessible for unit tests
-    std::optional<milliseconds> RunLoop()
-    {
-        auto thread_wakeup = OnActivation();
-        auto timer_expiration = m_timer_manager.Expire();
-
-        return SelectWakeup(thread_wakeup, timer_expiration);
-    }
 
     std::optional<milliseconds> SelectWakeup(auto a, auto b) const
     {
@@ -103,11 +99,20 @@ private:
         return std::nullopt;
     }
 
+    // Accessible for unit tests
+    std::optional<milliseconds> RunLoop()
+    {
+        auto thread_wakeup = OnActivation();
+        auto timer_expiration = m_timer_manager.Expire();
+
+        return SelectWakeup(thread_wakeup, timer_expiration);
+    }
+
     void ThreadLoop() final
     {
         OnStartup();
 
-        while (m_running)
+        while (IsRunning())
         {
             auto time = RunLoop();
 
@@ -122,7 +127,6 @@ private:
         }
     }
 
-    std::atomic_bool m_running {true};
     binary_semaphore m_semaphore {0};
     Impl* m_impl {nullptr}; // Raw pointer to allow forward declaration
     TimerManager m_timer_manager;
