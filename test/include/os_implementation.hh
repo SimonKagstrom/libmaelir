@@ -27,13 +27,11 @@ void AwakeThread(ThreadHandle thread);
 
 void SuspendThread(ThreadHandle thread);
 
-ThreadHandle CreateThread(const std::function<void()>& thread_loop);
-
-void StartThread(ThreadHandle thread,
-                 const char* name,
-                 ThreadCore core,
-                 ThreadPriority priority,
-                 uint32_t stack_size);
+ThreadHandle StartThread(const char* name,
+                         ThreadCore core,
+                         ThreadPriority priority,
+                         uint32_t stack_size,
+                         const std::function<void()>& thread_loop);
 
 void WaitThreadExit(ThreadHandle thread);
 

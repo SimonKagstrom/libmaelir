@@ -5,15 +5,21 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/idf_additions.h>
 #include <freertos/task.h>
-
+#include <functional>
 
 namespace os::detail
 {
 
 struct ThreadContext
 {
+    struct Data
+    {
+        std::function<void()> m_thread_loop;
+    };
+
     TaskHandle_t m_task;
-    std::function<void()> m_thread_loop;
+
+    Data* m_private_data;
 };
 
 } // namespace os::detail
@@ -25,7 +31,7 @@ using ThreadHandle = detail::ThreadContext*;
 namespace detail
 {
 
-ThreadHandle
+inline ThreadHandle
 GetCurrentThread()
 {
     // Get the current FreeRTOS task handle
@@ -37,22 +43,20 @@ GetCurrentThread()
     return reinterpret_cast<ThreadHandle>(context_ptr);
 }
 
-ThreadHandle CreateThread(const std::function<void()>& thread_loop);
-
-void StartThread(ThreadHandle thread,
-                 const char* name,
-                 ThreadCore core,
-                 ThreadPriority priority,
-                 uint32_t stack_size);
+ThreadHandle StartThread(const char* name,
+                         ThreadCore core,
+                         ThreadPriority priority,
+                         uint32_t stack_size,
+                         const std::function<void()>& thread_loop);
 
 
-void
+inline void
 AwakeThread(ThreadHandle thread)
 {
     vTaskResume(thread->m_task);
 }
 
-void
+inline void
 SuspendThread(ThreadHandle thread)
 {
     vTaskSuspend(thread->m_task);

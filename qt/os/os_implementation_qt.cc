@@ -25,15 +25,6 @@ os::detail::GetCurrentThread()
     return &context;
 }
 
-os::ThreadHandle
-os::detail::CreateThread(const std::function<void()>& thread_loop)
-{
-    auto out = new ThreadContext;
-    out->m_thread = QThread::create([thread_loop]() { thread_loop(); });
-
-    return out;
-}
-
 void
 os::detail::WaitThreadExit(ThreadHandle thread)
 {
@@ -42,12 +33,20 @@ os::detail::WaitThreadExit(ThreadHandle thread)
     delete thread;
 }
 
-void
-os::detail::StartThread(ThreadHandle thread, const char* name, ThreadCore, ThreadPriority, uint32_t)
+ThreadHandle
+os::detail::StartThread(const char* name,
+                        ThreadCore,
+                        ThreadPriority,
+                        uint32_t,
+                        const std::function<void()>& thread_loop)
 {
-    auto qt_thread = thread->m_thread;
-    qt_thread->setObjectName(name);
-    qt_thread->start();
+    auto out = new ThreadContext;
+    out->m_thread = QThread::create([thread_loop]() { thread_loop(); });
+
+    out->m_thread->setObjectName(name);
+    out->m_thread->start();
+
+    return out;
 }
 
 

@@ -7,30 +7,21 @@
 
 using namespace os;
 
-os::ThreadHandle
-os::detail::CreateThread(const std::function<void()> &thread_loop)
-{
-    auto out = new ThreadContext;
-    out->m_task = nullptr;
-    out->m_thread_loop = thread_loop;
-
-    return out;
-}
-
 void
 os::detail::WaitThreadExit(ThreadHandle thread)
 {
     vTaskDeleteWithCaps(thread->m_task);
 
+    delete thread->m_private_data;
     delete thread;
 }
 
-void
-os::detail::StartThread(ThreadHandle thread,
-                        const char* name,
+os::ThreadHandle
+os::detail::StartThread(const char* name,
                         ThreadCore core,
                         ThreadPriority priority,
-                        uint32_t stack_size)
+                        uint32_t stack_size,
+                        const std::function<void()>& thread_loop)
 {
     auto prio = std::to_underlying(priority);
 
@@ -40,13 +31,20 @@ os::detail::StartThread(ThreadHandle thread,
     assert(prio < configMAX_PRIORITIES);
     assert(prio > 0);
 
-    xTaskCreatePinnedToCore([](void* arg) { static_cast<ThreadHandle>(arg)->m_thread_loop(); },
-                            name,
-                            stack_size,
-                            thread,
-                            prio,
-                            &thread->m_task,
-                            std::to_underlying(core));
+    auto out = new ThreadContext;
+    out->m_private_data = new ThreadContext::Data;
+    out->m_task = nullptr;
+    out->m_private_data->m_thread_loop = thread_loop;
+
+    xTaskCreatePinnedToCore(
+        [](void* arg) { static_cast<ThreadHandle>(arg)->m_private_data->m_thread_loop(); },
+        name,
+        stack_size,
+        out,
+        prio,
+        &out->m_task,
+        std::to_underlying(core));
+    return out;
 }
 
 

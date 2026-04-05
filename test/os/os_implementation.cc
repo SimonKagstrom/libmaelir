@@ -34,24 +34,19 @@ os::detail::SuspendThread(os::ThreadHandle thread)
 }
 
 os::ThreadHandle
-os::detail::CreateThread(const std::function<void()>& thread_loop)
+os::detail::StartThread(const char* name,
+                        ThreadCore core,
+                        ThreadPriority priority,
+                        uint32_t stack_size,
+                        const std::function<void()>& thread_loop)
 {
     auto out = new MockThread;
-
+    g_current_thread = out;
     return out;
 }
 
 void
-os::detail::StartThread(ThreadHandle thread,
-                        const char* name,
-                        ThreadCore core,
-                        ThreadPriority priority,
-                        uint32_t stack_size)
-{
-    g_current_thread = thread;
-}
-
-void os::detail::WaitThreadExit(ThreadHandle thread)
+os::detail::WaitThreadExit(ThreadHandle thread)
 {
     assert(thread);
 

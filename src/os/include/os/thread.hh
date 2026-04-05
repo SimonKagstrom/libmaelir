@@ -14,11 +14,6 @@ namespace os
 class OsThread
 {
 public:
-    OsThread()
-    {
-        m_self = detail::CreateThread([this]() { ThreadLoop(); });
-    }
-
     virtual ~OsThread()
     {
         if (m_running)
@@ -46,7 +41,8 @@ public:
      */
     void Start(const char* name, ThreadCore core, ThreadPriority priority, uint32_t stack_size)
     {
-        detail::StartThread(m_self, name, core, priority, stack_size);
+        m_running = true;
+        m_self = detail::StartThread(name, core, priority, stack_size, [this]() { ThreadLoop(); });
     }
 
     // The rest are just helpers for overloaded common cases
@@ -95,7 +91,7 @@ protected:
 
 private:
     ThreadHandle m_self;
-    std::atomic_bool m_running {true};
+    std::atomic_bool m_running {false};
 };
 
 
