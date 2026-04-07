@@ -19,6 +19,6 @@ PUBLIC
     idf::freertos
     idf::nvs_flash
     idf::esp-tls
-    idf::wifi_provisioning
+    idf::espressif__network_provisioning
     libmaelir_interface
 )

@@ -9,6 +9,6 @@ PUBLIC
 
 target_link_libraries(gpio_esp32
 PUBLIC
-    idf::driver
+    idf::esp_driver_gpio
     libmaelir_interface
 )
