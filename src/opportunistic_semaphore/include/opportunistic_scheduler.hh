@@ -1,6 +1,7 @@
 #pragma once
 
 #include "opportunistic_semaphore.hh"
+#include "os/thread.hh"
 
 // TODO: Replace with safe
 #include <atomic>
@@ -66,6 +67,20 @@ private:
 
 
     std::mutex m_mutex;
+};
+
+class OpportunisticSchedulerThread : public os::OsThread
+{
+public:
+private:
+    void Awake() final
+    {
+        m_semaphore.release();
+    }
+    void ThreadLoop() final;
+
+    os::binary_semaphore m_semaphore {0};
+    OpportunisticScheduler m_scheduler {m_semaphore};
 };
 
 } // namespace os

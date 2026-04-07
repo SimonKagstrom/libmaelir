@@ -183,3 +183,22 @@ OpportunisticScheduler::Schedule()
 
     return out;
 }
+
+
+void
+OpportunisticSchedulerThread::ThreadLoop()
+{
+    while (IsRunning())
+    {
+        auto time = m_scheduler.Schedule();
+
+        if (time)
+        {
+            m_semaphore.try_acquire_for(*time);
+        }
+        else
+        {
+            m_semaphore.acquire();
+        }
+    }
+}

@@ -3,6 +3,13 @@
 #include "time.hh"
 
 #include <QThread>
+#include <QVariant>
+
+
+namespace
+{
+constexpr const char* kThreadContextProperty = "maelir.threadContext";
+}
 
 
 using namespace os;
@@ -12,6 +19,7 @@ namespace os
 struct ThreadContext
 {
     QThread* m_thread;
+    os::binary_semaphore m_suspend_semaphore {0};
 };
 
 } // namespace os
@@ -20,9 +28,15 @@ struct ThreadContext
 os::ThreadHandle
 os::detail::GetCurrentThread()
 {
-    static thread_local os::ThreadContext context;
+    auto current_qt_thread = QThread::currentThread();
+    auto thread_context = current_qt_thread->property(kThreadContextProperty);
 
-    return &context;
+    if (!thread_context.isValid())
+    {
+        return nullptr;
+    }
+
+    return reinterpret_cast<ThreadHandle>(thread_context.value<quintptr>());
 }
 
 void
@@ -42,11 +56,26 @@ os::detail::StartThread(const char* name,
 {
     auto out = new ThreadContext;
     out->m_thread = QThread::create([thread_loop]() { thread_loop(); });
+    out->m_thread->setProperty(kThreadContextProperty,
+                               QVariant::fromValue<quintptr>(reinterpret_cast<quintptr>(out)));
 
     out->m_thread->setObjectName(name);
     out->m_thread->start();
 
     return out;
+}
+
+
+void
+os::detail::AwakeThread(ThreadHandle thread)
+{
+    thread->m_suspend_semaphore.release();
+}
+
+void
+os::detail::SuspendThread(ThreadHandle thread)
+{
+    thread->m_suspend_semaphore.acquire();
 }
 
 
