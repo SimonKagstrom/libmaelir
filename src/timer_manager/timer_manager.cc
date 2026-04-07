@@ -52,8 +52,8 @@ private:
 };
 
 
-TimerManager::TimerManager(os::binary_semaphore& semaphore)
-    : m_semaphore(semaphore)
+TimerManager::TimerManager(IEventNotifier& notifier)
+    : m_notifier(notifier)
     , m_last_expiery(os::GetTimeStamp())
 {
     m_free_timers.set();
@@ -187,7 +187,7 @@ TimerManager::Expire()
             auto next = timer.on_timeout();
 
             // Wake up the task if something expires
-            m_semaphore.release();
+            m_notifier.Notify();
 
             if (next)
             {

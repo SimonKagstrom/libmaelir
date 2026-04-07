@@ -1,5 +1,6 @@
 #pragma once
 
+#include "event_notifier.hh"
 #include "os/thread.hh"
 #include "semaphore.hh"
 
@@ -74,7 +75,7 @@ class OpportunisticScheduler;
 
 extern OpportunisticScheduler* g_scheduler;
 
-class OpportunisticBinarySemaphore
+class OpportunisticBinarySemaphore : public IEventNotifier
 {
 public:
     friend class ::SchedulerFixture;
@@ -108,6 +109,16 @@ public:
     }
 
     bool try_acquire_for(const WakeupConfiguration& config);
+
+    void Notify() final
+    {
+        release();
+    }
+
+    void NotifyFromIsr() final
+    {
+        release_from_isr();
+    }
 
     // TODO: Privatize, but maybe available for unit tests
     struct Entry

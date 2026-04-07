@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../listener_cookie.hh"
-#include "semaphore.hh"
+#include "event_notifier.hh"
 #include "time.hh"
 
 #include <array>
@@ -61,7 +61,7 @@ public:
 
     virtual ~ICan() = default;
 
-    [[nodiscard]] virtual std::unique_ptr<ListenerCookie> Start(os::binary_semaphore& sem) = 0;
+    [[nodiscard]] virtual std::unique_ptr<ListenerCookie> Start(IEventNotifier& sem) = 0;
     virtual void Stop() = 0;
 
     virtual bool SendFrame(uint32_t id, std::span<const uint8_t> data) = 0;

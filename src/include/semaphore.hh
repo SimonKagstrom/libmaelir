@@ -1,5 +1,6 @@
 #pragma once
 
+#include "event_notifier.hh"
 #include "time.hh"
 
 #include <memory>
@@ -11,7 +12,7 @@ struct Impl;
 
 // From std::semaphore
 template <ptrdiff_t least_max_value = INT32_MAX>
-class counting_semaphore
+class counting_semaphore : public IEventNotifier
 {
     std::unique_ptr<Impl> m_impl;
 
@@ -39,6 +40,16 @@ public:
     }
 
     bool try_acquire_for_ms(const milliseconds rtime);
+
+    void Notify() final
+    {
+        release();
+    }
+
+    void NotifyFromIsr() final
+    {
+        release_from_isr();
+    }
 };
 
 using binary_semaphore = counting_semaphore<1>;

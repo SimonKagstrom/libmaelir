@@ -1,6 +1,6 @@
 #pragma once
 
-#include "semaphore.hh"
+#include "event_notifier.hh"
 #include "time.hh"
 
 #include <array>
@@ -29,7 +29,7 @@ using TimerHandle = std::unique_ptr<ITimer>;
 class TimerManager
 {
 public:
-    TimerManager(os::binary_semaphore& semaphore);
+    explicit TimerManager(IEventNotifier& notifier);
 
     /**
      * @brief Start a timer
@@ -73,7 +73,7 @@ private:
     milliseconds m_last_expiery;
 
 
-    os::binary_semaphore& m_semaphore;
+    IEventNotifier& m_notifier;
 
     etl::bitset<kMaxTimers, uint8_t> m_pending_removals;
     etl::bitset<kMaxTimers, uint8_t> m_pending_additions;

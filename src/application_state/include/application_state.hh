@@ -1,8 +1,8 @@
 #pragma once
 
+#include "event_notifier.hh"
 #include "generated_application_state.hh"
 #include "listener_cookie.hh"
-#include "semaphore.hh"
 
 #include <array>
 #include <atomic>
@@ -409,14 +409,14 @@ public:
 
 
     template <class... T>
-    std::unique_ptr<ListenerCookie> AttachListener(os::binary_semaphore& semaphore)
+    std::unique_ptr<ListenerCookie> AttachListener(IEventNotifier& notifier)
     {
         static_assert((sizeof...(T) > 0) && "AttachListener requires at least one parameter");
         ParameterBitset interested;
 
         (void)std::initializer_list<int> {(interested.set<AS::IndexOf<T>()>(), 0)...};
 
-        return DoAttachListener(interested, semaphore);
+        return DoAttachListener(interested, notifier);
     }
 
     /**
@@ -551,7 +551,7 @@ private:
     }
 
     std::unique_ptr<ListenerCookie> DoAttachListener(const ParameterBitset& interested,
-                                                     os::binary_semaphore& semaphore);
+                                                     IEventNotifier& notifier);
     void NotifyChange(unsigned index);
 
     void NotifyMultipleChanges(const ParameterBitset& changed);
@@ -561,6 +561,6 @@ private:
     etl::mutex m_mutex;
 
     std::array<std::vector<uint8_t>, AS::kLastIndex + 1> m_listeners;
-    std::vector<os::binary_semaphore*> m_listener_semaphores_by_index;
+    std::vector<IEventNotifier*> m_listener_notifiers_by_index;
     std::vector<uint8_t> m_reclaimed_listener_indices;
 };

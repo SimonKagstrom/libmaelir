@@ -13,7 +13,7 @@ public:
     CanEsp32(gpio_num_t tx_pin, gpio_num_t rx_pin, int baud_rate_bps);
 
 private:
-    std::unique_ptr<ListenerCookie> Start(os::binary_semaphore& sem) final;
+    std::unique_ptr<ListenerCookie> Start(IEventNotifier& sem) final;
     void Stop() final;
     bool SendFrame(uint32_t id, std::span<const uint8_t> data) final;
     std::optional<Frame> ReceiveFrame() final;
@@ -24,7 +24,7 @@ private:
     bool TwaiRxCb(const twai_rx_done_event_data_t* edata);
 
     twai_node_handle_t m_node_hdl;
-    os::binary_semaphore* m_wakeup_semaphore;
+    IEventNotifier* m_wakeup_notifier;
 
     std::array<hal::ICan::Frame, kRxQueueSize> m_rx_buffers;
     etl::queue_spsc_atomic<uint8_t, kRxQueueSize> m_rx_free_buffer_indicies;

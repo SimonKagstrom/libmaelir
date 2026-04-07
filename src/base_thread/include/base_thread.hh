@@ -63,7 +63,7 @@ protected:
         return m_timer_manager.StartTimer(0ms, deferred_job);
     }
 
-    os::binary_semaphore& GetSemaphore()
+    auto& GetSemaphore()
     {
         return m_semaphore;
     }

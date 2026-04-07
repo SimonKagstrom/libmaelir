@@ -1,5 +1,7 @@
 #include "application_state.hh"
 
+#include "semaphore.hh"
+
 #include <mutex>
 
 constexpr auto kInvalidListener = 0;
@@ -16,32 +18,31 @@ ApplicationState::ReadOnly::ReadOnly(ApplicationState& parent)
 ApplicationState::ApplicationState()
 {
     m_global_state.SetupDefaultValues();
-    m_listener_semaphores_by_index.push_back(&g_dummy_sem);
+    m_listener_notifiers_by_index.push_back(&g_dummy_sem);
 }
 
 std::unique_ptr<ListenerCookie>
-ApplicationState::DoAttachListener(const ParameterBitset& interested,
-                                   os::binary_semaphore& semaphore)
+ApplicationState::DoAttachListener(const ParameterBitset& interested, IEventNotifier& notifier)
 {
     std::lock_guard lock(m_mutex);
 
     if (m_reclaimed_listener_indices.empty() &&
-        m_listener_semaphores_by_index.size() > kMaxApplicationStateListeners)
+        m_listener_notifiers_by_index.size() > kMaxApplicationStateListeners)
     {
         return nullptr;
     }
 
-    auto index = static_cast<uint8_t>(m_listener_semaphores_by_index.size());
+    auto index = static_cast<uint8_t>(m_listener_notifiers_by_index.size());
 
     if (m_reclaimed_listener_indices.empty())
     {
-        m_listener_semaphores_by_index.push_back(&semaphore);
+        m_listener_notifiers_by_index.push_back(&notifier);
     }
     else
     {
         index = m_reclaimed_listener_indices.back();
         m_reclaimed_listener_indices.pop_back();
-        m_listener_semaphores_by_index[index] = &semaphore;
+        m_listener_notifiers_by_index[index] = &notifier;
     }
 
     for (auto param_index = interested.find_first(true); param_index != interested.npos;
@@ -54,7 +55,7 @@ ApplicationState::DoAttachListener(const ParameterBitset& interested,
     return std::make_unique<ListenerCookie>([this, index, interested]() {
         std::lock_guard lock(m_mutex);
 
-        m_listener_semaphores_by_index[index] = &g_dummy_sem;
+        m_listener_notifiers_by_index[index] = &g_dummy_sem;
         for (auto param_index = interested.find_first(true); param_index != interested.npos;
              param_index = interested.find_next(true, param_index + 1))
         {
@@ -76,7 +77,7 @@ ApplicationState::NotifyChange(unsigned parameter_index)
 
     for (auto listener_index : m_listeners[parameter_index])
     {
-        m_listener_semaphores_by_index[listener_index]->release();
+        m_listener_notifiers_by_index[listener_index]->Notify();
     }
 }
 
@@ -96,10 +97,11 @@ ApplicationState::NotifyMultipleChanges(const ParameterBitset& changed)
     }
 
     // Notify the changed listeners
-    for (size_t listener_index = notified_listeners.find_first(true); listener_index != notified_listeners.npos;
+    for (size_t listener_index = notified_listeners.find_first(true);
+         listener_index != notified_listeners.npos;
          listener_index = notified_listeners.find_next(true, listener_index + 1))
     {
-        m_listener_semaphores_by_index[listener_index]->release();
+        m_listener_notifiers_by_index[listener_index]->Notify();
     }
 }
 
