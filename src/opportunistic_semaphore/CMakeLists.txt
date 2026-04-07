@@ -1,4 +1,5 @@
 add_library(opportunistic_semaphore EXCLUDE_FROM_ALL
+    opportunistic_scheduler.cc
     opportunistic_semaphore.cc
 )
 
