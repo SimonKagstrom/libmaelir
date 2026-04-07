@@ -1,12 +1,14 @@
 #include "can_esp32.hh"
 
+#include "semaphore.hh"
+
 namespace
 {
 os::binary_semaphore g_dummy_sem {0};
 }
 
 CanEsp32::CanEsp32(gpio_num_t tx_pin, gpio_num_t rx_pin, int baud_rate_bps)
-    : m_wakeup_semaphore(&g_dummy_sem)
+    : m_wakeup_notifier(&g_dummy_sem)
 {
     twai_onchip_node_config_t node_config = {};
 
@@ -102,7 +104,7 @@ CanEsp32::TwaiRxCb(const twai_rx_done_event_data_t* edata)
 
         rv = true;
     }
-    m_wakeup_semaphore->release_from_isr();
+    m_wakeup_notifier->NotifyFromIsr();
 
     m_rx_queue.push(idx);
 

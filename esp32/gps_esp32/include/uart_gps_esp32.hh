@@ -13,7 +13,7 @@ public:
     UartGps(hal::IUart &uart);
 
 private:
-    std::optional<hal::RawGpsData> WaitForData(os::binary_semaphore& semaphore) final;
+    std::optional<hal::RawGpsData> WaitForData(IEventNotifier& notifier) final;
 
     void OnLine(std::string_view line);
 

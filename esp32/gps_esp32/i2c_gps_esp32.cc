@@ -1,5 +1,7 @@
 #include "i2c_gps_esp32.hh"
 
+#include "time.hh"
+
 I2cGps::I2cGps(uint8_t scl_pin, uint8_t sda_pin)
 {
     const i2c_master_bus_config_t i2c_mst_config = {
@@ -36,7 +38,7 @@ I2cGps::I2cGps(uint8_t scl_pin, uint8_t sda_pin)
 }
 
 std::optional<hal::RawGpsData>
-I2cGps::WaitForData(os::binary_semaphore& semaphore)
+I2cGps::WaitForData(IEventNotifier& notifier)
 {
     std::optional<hal::RawGpsData> data;
 
@@ -56,7 +58,7 @@ I2cGps::WaitForData(os::binary_semaphore& semaphore)
         }
     }
     os::Sleep(100ms);
-    semaphore.release();
+    notifier.Notify();
 
     return data;
 }

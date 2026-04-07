@@ -11,7 +11,7 @@ UartGps::UartGps(hal::IUart& uart)
 }
 
 std::optional<hal::RawGpsData>
-UartGps::WaitForData(os::binary_semaphore& semaphore)
+UartGps::WaitForData(IEventNotifier& notifier)
 {
     std::optional<hal::RawGpsData> data;
 
@@ -21,7 +21,7 @@ UartGps::WaitForData(os::binary_semaphore& semaphore)
     {
         data = m_parser->PushData(std::string_view((const char*)s.data(), s.size()));
     }
-    semaphore.release();
+    notifier.Notify();
 
     return data;
 }
