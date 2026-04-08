@@ -32,12 +32,13 @@ OpportunisticScheduler::AddPendingEntry(ThreadHandle thread,
     // Otherwise this should not be used
     debug_assert(config.no_earlier_than == 0ms);
     debug_assert(config.wakeup_interval.earliest < config.wakeup_interval.latest);
+    debug_assert(sem_index < kMaxSemaphores);
 
     std::scoped_lock lock(m_mutex);
     auto now = os::GetTimeStamp();
     WakeupConfiguration adjusted_config = config + now;
 
-    m_pending.push_back({thread, adjusted_config, sem_index});
+    m_pending.emplace_back(thread, adjusted_config, sem_index);
 
     std::ranges::sort(
         m_pending, {}, [](const auto& entry) { return entry.config.wakeup_interval.latest; });
@@ -52,13 +53,18 @@ OpportunisticScheduler::AddEarlyEntry(ThreadHandle thread,
                                       const WakeupConfiguration& config)
 {
     debug_assert(config.no_earlier_than > 0ms);
+    debug_assert(sem_index < kMaxSemaphores);
 
     std::scoped_lock lock(m_mutex);
     auto now = os::GetTimeStamp();
     WakeupConfiguration adjusted_config = config + now;
 
-    m_too_early.push_back({thread, adjusted_config, sem_index});
-    m_too_early_per_semaphore[sem_index].push_back({thread, adjusted_config, sem_index});
+    m_too_early.emplace_back(thread, adjusted_config, sem_index);
+    m_too_early_per_semaphore[sem_index].emplace_back(thread, adjusted_config, sem_index);
+
+    std::ranges::sort(m_too_early, {}, [](const auto& entry) {
+        return entry.config.no_earlier_than;
+    });
 
     m_semaphore.release();
 }
@@ -142,13 +148,12 @@ OpportunisticScheduler::Schedule()
         }
     }
 
-    for (auto& entry : m_too_early)
+    for (const auto& entry : m_too_early)
     {
         out = std::min(out, entry.config.wakeup_interval.latest);
     }
 
     m_released_semaphores.clear();
-    // TODO: Not good
     std::ranges::sort(
         m_pending, {}, [](const auto& entry) { return entry.config.wakeup_interval.latest; });
 
@@ -194,7 +199,13 @@ OpportunisticSchedulerThread::ThreadLoop()
 
         if (time)
         {
-            m_semaphore.try_acquire_for(*time);
+            auto now = os::GetTimeStamp();
+            auto wait_duration = *time - now;
+            if (wait_duration < 0ms)
+            {
+                wait_duration = 0ms;
+            }
+            m_semaphore.try_acquire_for(wait_duration);
         }
         else
         {

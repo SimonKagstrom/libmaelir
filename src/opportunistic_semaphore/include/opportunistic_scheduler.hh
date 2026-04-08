@@ -2,8 +2,10 @@
 
 #include "opportunistic_semaphore.hh"
 #include "os/thread.hh"
+#include "debug_assert.hh"
 
 // TODO: Replace with safe
+#include <algorithm>
 #include <atomic>
 #include <deque>
 #include <mutex>
@@ -23,20 +25,32 @@ public:
     friend class ::SchedulerFixture;
     friend class OpportunisticBinarySemaphore;
 
-    OpportunisticScheduler(os::binary_semaphore& semaphore);
+    explicit OpportunisticScheduler(os::binary_semaphore& semaphore);
     ~OpportunisticScheduler();
 
     uint8_t AddSemaphore(OpportunisticBinarySemaphore* sem)
     {
+        for (size_t i = 0; i < m_semaphores.size(); ++i)
+        {
+            if (m_semaphores[i] == nullptr)
+            {
+                m_semaphores[i] = sem;
+                return static_cast<uint8_t>(i);
+            }
+        }
+
+        debug_assert(m_semaphores.size() < kMaxSemaphores);
         m_semaphores.push_back(sem);
-        // TODO: Wrong when something gets removed...
-        return m_semaphores.size() - 1;
+        return static_cast<uint8_t>(m_semaphores.size() - 1);
     }
 
     void RemoveSemaphore(OpportunisticBinarySemaphore* sem)
     {
-        m_semaphores.erase(std::remove(m_semaphores.begin(), m_semaphores.end(), sem),
-                           m_semaphores.end());
+        auto it = std::find(m_semaphores.begin(), m_semaphores.end(), sem);
+        if (it != m_semaphores.end())
+        {
+            *it = nullptr;
+        }
     }
 
     void AddPendingEntry(ThreadHandle thread, uint8_t sem_index, const WakeupConfiguration& config);
@@ -71,8 +85,6 @@ private:
 
 class OpportunisticSchedulerThread : public os::OsThread
 {
-public:
-private:
     void Awake() final
     {
         m_semaphore.release();

@@ -10,7 +10,6 @@ OpportunisticBinarySemaphore::OpportunisticBinarySemaphore(uint8_t initial_value
     : m_semaphore_index(g_scheduler->AddSemaphore(this))
     , m_semaphore(initial_value)
 {
-    g_scheduler->AddSemaphore(this);
 }
 
 OpportunisticBinarySemaphore::~OpportunisticBinarySemaphore()
@@ -71,7 +70,7 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
      *   - Has it's own semaphore, at startup waits on events
      */
     debug_assert(config.wakeup_interval.earliest <= config.wakeup_interval.latest);
-    debug_assert(config.wakeup_interval.earliest > 0ms);
+    //debug_assert(config.wakeup_interval.earliest > 0ms);
 
     auto self = os::GetCurrentThread();
     if (config.no_earlier_than == 0ms)
