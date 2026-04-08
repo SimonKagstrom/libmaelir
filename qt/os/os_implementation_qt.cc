@@ -3,12 +3,12 @@
 #include "time.hh"
 
 #include <QThread>
-#include <QVariant>
+#include <QThreadStorage>
 
 
 namespace
 {
-constexpr const char* kThreadContextProperty = "maelir.threadContext";
+QThreadStorage<os::ThreadHandle> g_current_thread;
 }
 
 
@@ -28,15 +28,12 @@ struct ThreadContext
 os::ThreadHandle
 os::detail::GetCurrentThread()
 {
-    auto current_qt_thread = QThread::currentThread();
-    auto thread_context = current_qt_thread->property(kThreadContextProperty);
-
-    if (!thread_context.isValid())
+    if (!g_current_thread.hasLocalData())
     {
         return nullptr;
     }
 
-    return reinterpret_cast<ThreadHandle>(thread_context.value<quintptr>());
+    return g_current_thread.localData();
 }
 
 void
@@ -55,9 +52,10 @@ os::detail::StartThread(const char* name,
                         const std::function<void()>& thread_loop)
 {
     auto out = new ThreadContext;
-    out->m_thread = QThread::create([thread_loop]() { thread_loop(); });
-    out->m_thread->setProperty(kThreadContextProperty,
-                               QVariant::fromValue<quintptr>(reinterpret_cast<quintptr>(out)));
+    out->m_thread = QThread::create([thread_loop, out]() {
+        g_current_thread.setLocalData(out);
+        thread_loop();
+    });
 
     out->m_thread->setObjectName(name);
     out->m_thread->start();
@@ -75,6 +73,9 @@ os::detail::AwakeThread(ThreadHandle thread)
 void
 os::detail::SuspendThread(ThreadHandle thread)
 {
+    auto current_thread = GetCurrentThread();
+    assert(current_thread == thread);
+
     thread->m_suspend_semaphore.acquire();
 }
 
