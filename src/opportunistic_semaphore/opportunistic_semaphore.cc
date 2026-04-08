@@ -88,7 +88,7 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
         {
             // Pending opportunistic wakeup
             g_scheduler->AddPendingEntry(self, m_semaphore_index, config);
-            os::SuspendThread(os::GetCurrentThread());
+            os::SuspendThread(self);
             return m_semaphore.try_acquire();
         }
     }
@@ -105,7 +105,7 @@ OpportunisticBinarySemaphore::try_acquire_for(const WakeupConfiguration& config)
         else
         {
             g_scheduler->AddEarlyEntry(self, m_semaphore_index, config);
-            os::SuspendThread(os::GetCurrentThread());
+            os::SuspendThread(self);
             return m_semaphore.try_acquire();
         }
     }
