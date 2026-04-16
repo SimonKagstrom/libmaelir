@@ -38,7 +38,7 @@ OpportunisticScheduler::AddPendingEntry(ThreadHandle thread,
     auto now = os::GetTimeStamp();
     WakeupConfiguration adjusted_config = config + now;
 
-    m_pending.emplace_back(thread, adjusted_config, sem_index);
+    m_pending.push_back({thread, adjusted_config, sem_index});
 
     std::ranges::sort(
         m_pending, {}, [](const auto& entry) { return entry.config.wakeup_interval.latest; });
@@ -59,8 +59,8 @@ OpportunisticScheduler::AddEarlyEntry(ThreadHandle thread,
     auto now = os::GetTimeStamp();
     WakeupConfiguration adjusted_config = config + now;
 
-    m_too_early.emplace_back(thread, adjusted_config, sem_index);
-    m_too_early_per_semaphore[sem_index].emplace_back(thread, adjusted_config, sem_index);
+    m_too_early.push_back({thread, adjusted_config, sem_index});
+    m_too_early_per_semaphore[sem_index].push_back({thread, adjusted_config, sem_index});
 
     std::ranges::sort(m_too_early, {}, [](const auto& entry) {
         return entry.config.no_earlier_than;
