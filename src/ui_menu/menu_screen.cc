@@ -46,17 +46,13 @@ MenuScreen::MenuScreen(os::TimerManager& timer_manager,
     BumpExitTimer();
 
     // Register events to keep the screen alive on input
-    m_event_listeners.push_back(LvEventListener::Create(
-        m_screen, LV_EVENT_ROTARY, [this](lv_event_t*) { BumpExitTimer(); }));
     m_event_listeners.push_back(
-        LvEventListener::Create(m_screen, LV_EVENT_KEY, [this](lv_event_t*) {
-            BumpExitTimer();
-            printf("KEY\n");
-        }));
+        LvEventListener::Create(m_menu, LV_EVENT_ROTARY, [this](lv_event_t*) { BumpExitTimer(); }));
     m_event_listeners.push_back(
-        LvEventListener::Create(m_screen, LV_EVENT_RELEASED, [this](lv_event_t* e) {
+        LvEventListener::Create(m_menu, LV_EVENT_KEY, [this](lv_event_t*) { BumpExitTimer(); }));
+    m_event_listeners.push_back(
+        LvEventListener::Create(m_menu, LV_EVENT_CLICKED, [this](lv_event_t* e) {
             BumpExitTimer();
-            printf("Kalkon\n");
             auto obj = static_cast<lv_obj_t*>(lv_event_get_target(e));
             if (lv_menu_back_button_is_root(m_menu, obj))
             {
