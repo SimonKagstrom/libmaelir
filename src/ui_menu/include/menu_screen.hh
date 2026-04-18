@@ -29,9 +29,9 @@ public:
                              bool default_value,
                              const std::function<void(lv_event_t*)>& on_click);
 
-    private:
         Page(MenuScreen& parent, lv_obj_t* parent_menu);
 
+    private:
         MenuScreen& m_parent;
         lv_obj_t* m_page;
     };
@@ -61,4 +61,5 @@ private:
     std::vector<std::unique_ptr<LvEventListener>> m_event_listeners;
 
     os::TimerHandle m_exit_timer;
+    std::unique_ptr<Page> m_main_page;
 };

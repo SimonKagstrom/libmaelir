@@ -59,6 +59,8 @@ MenuScreen::MenuScreen(os::TimerManager& timer_manager,
                 m_on_close();
             }
         }));
+
+    m_main_page = std::make_unique<Page>(*this, main_page);
 }
 
 MenuScreen::~MenuScreen()
@@ -79,6 +81,12 @@ MenuScreen::BumpExitTimer()
     });
 }
 
+MenuScreen::Page&
+MenuScreen::GetMainPage()
+{
+    return *m_main_page;
+}
+
 
 MenuScreen::Page::Page(MenuScreen& parent)
     : MenuScreen::Page(parent, parent.m_menu)
@@ -87,7 +95,7 @@ MenuScreen::Page::Page(MenuScreen& parent)
 
 MenuScreen::Page::Page(MenuScreen& parent, lv_obj_t* parent_page)
     : m_parent(parent)
-    , m_page(lv_menu_page_create(parent_page, nullptr))
+    , m_page(parent_page)
 {
 }
 
