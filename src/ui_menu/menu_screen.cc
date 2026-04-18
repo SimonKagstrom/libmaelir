@@ -3,12 +3,13 @@
 #include "hal/i_display.hh"
 
 MenuScreen::MenuScreen(os::TimerManager& timer_manager,
+                       lv_obj_t* screen,
                        lv_indev_t* lvgl_input_dev,
                        const std::function<void()>& on_close)
     : m_timer_manager(timer_manager)
+    , m_screen(screen)
     , m_lvgl_input_dev(lvgl_input_dev)
     , m_on_close(on_close)
-    , m_screen(lv_obj_create(nullptr))
 {
     // Create a style for the selected state
     m_style_selected = lv_style_t {};
@@ -26,7 +27,8 @@ MenuScreen::MenuScreen(os::TimerManager& timer_manager,
     lv_menu_set_mode_root_back_button(m_menu, LV_MENU_ROOT_BACK_BUTTON_ENABLED);
 
     auto back_button = lv_menu_get_main_header_back_button(m_menu);
-    lv_obj_set_style_bg_color(m_screen, lv_obj_get_style_bg_color(m_menu, lv_part_t::LV_PART_MAIN), 0);
+    lv_obj_set_style_bg_color(
+        m_screen, lv_obj_get_style_bg_color(m_menu, lv_part_t::LV_PART_MAIN), 0);
 
     // Apply the style to the back button when it is focused
     lv_obj_add_style(back_button, &m_style_selected, LV_STATE_FOCUSED);
@@ -47,8 +49,20 @@ MenuScreen::MenuScreen(os::TimerManager& timer_manager,
     m_event_listeners.push_back(LvEventListener::Create(
         m_screen, LV_EVENT_ROTARY, [this](lv_event_t*) { BumpExitTimer(); }));
     m_event_listeners.push_back(
-        LvEventListener::Create(m_screen, LV_EVENT_KEY, [this](lv_event_t*) { BumpExitTimer(); }));
-    lv_screen_load(m_screen);
+        LvEventListener::Create(m_screen, LV_EVENT_KEY, [this](lv_event_t*) {
+            BumpExitTimer();
+            printf("KEY\n");
+        }));
+    m_event_listeners.push_back(
+        LvEventListener::Create(m_screen, LV_EVENT_RELEASED, [this](lv_event_t* e) {
+            BumpExitTimer();
+            printf("Kalkon\n");
+            auto obj = static_cast<lv_obj_t*>(lv_event_get_target(e));
+            if (lv_menu_back_button_is_root(m_menu, obj))
+            {
+                m_on_close();
+            }
+        }));
 }
 
 MenuScreen::~MenuScreen()
@@ -111,7 +125,8 @@ MenuScreen::Page::AddBooleanEntry(const char* text,
     lv_label_set_text(label, text);
 
     auto boolean_switch = lv_switch_create(cont);
-    lv_obj_add_state(boolean_switch, default_value ? lv_state_t::LV_STATE_CHECKED : lv_state_t::LV_STATE_DEFAULT);
+    lv_obj_add_state(boolean_switch,
+                     default_value ? lv_state_t::LV_STATE_CHECKED : lv_state_t::LV_STATE_DEFAULT);
     // Highlight the label as well
     lv_obj_add_flag(boolean_switch, LV_OBJ_FLAG_EVENT_BUBBLE);
     lv_obj_set_style_bg_color(

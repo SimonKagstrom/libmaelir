@@ -38,6 +38,7 @@ public:
 
 
     MenuScreen(os::TimerManager& timer_manager,
+               lv_obj_t* screen,
                lv_indev_t* lvgl_input_dev,
                const std::function<void()>& on_close);
 
@@ -49,10 +50,9 @@ private:
     void BumpExitTimer();
 
     os::TimerManager& m_timer_manager;
+    lv_obj_t* m_screen;
     lv_indev_t* m_lvgl_input_dev;
     std::function<void()> m_on_close;
-
-    lv_obj_t* m_screen;
 
     lv_style_t m_style_selected;
     lv_obj_t* m_menu;
