@@ -114,6 +114,32 @@ MenuScreen::Page::AddEntry(const std::string& text,
     m_parent.m_event_listeners.push_back(LvEventListener::Create(cont, LV_EVENT_CLICKED, on_click));
 }
 
+MenuScreen::Page&
+MenuScreen::Page::AddSubPage(const char* text)
+{
+    auto cont = lv_menu_cont_create(m_page);
+    auto label = lv_label_create(cont);
+    auto next_indicator = lv_label_create(cont);
+
+    auto page = lv_menu_page_create(m_parent.m_menu, text);
+    auto sub_page = std::make_unique<Page>(m_parent, page);
+
+    lv_label_set_text(label, text);
+    lv_label_set_text(next_indicator, LV_SYMBOL_RIGHT);
+    lv_group_add_obj(m_parent.m_input_group, cont);
+    lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
+    lv_obj_set_flex_grow(label, 1);
+
+    lv_menu_set_load_page_event(m_parent.m_menu, cont, page);
+    m_parent.m_event_listeners.push_back(LvEventListener::Create(
+        cont, LV_EVENT_CLICKED, [group = m_parent.m_input_group](lv_event_t*) {
+            lv_group_focus_next(group);
+        }));
+
+    m_sub_pages.push_back(std::move(sub_page));
+    return *m_sub_pages.back();
+}
+
 void
 MenuScreen::Page::AddBooleanEntry(const char* text,
                                   bool default_value,

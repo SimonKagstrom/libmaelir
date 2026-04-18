@@ -21,7 +21,7 @@ public:
 
         void AddEntry(const std::string& text, const std::function<void(lv_event_t*)>& on_click);
 
-        Page AddSubPage(const char* text);
+        Page& AddSubPage(const char* text);
 
         void AddSeparator();
 
@@ -34,6 +34,8 @@ public:
     private:
         MenuScreen& m_parent;
         lv_obj_t* m_page;
+
+        std::vector<std::unique_ptr<Page>> m_sub_pages;
     };
 
 
