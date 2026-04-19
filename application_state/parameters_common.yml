@@ -1,0 +1,10 @@
+# This is the list of all possible parameters (common)
+parameters:
+  wifi_connected:
+    type: bool
+
+  bluetooth_connected:
+    type: bool
+
+  demo_mode:
+    type: bool
