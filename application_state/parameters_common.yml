@@ -1,4 +1,7 @@
 # This is the list of all possible parameters (common)
+cpp_includes:
+  - "gps_data.hh"
+
 parameters:
   wifi_connected:
     type: bool
@@ -8,3 +11,6 @@ parameters:
 
   demo_mode:
     type: bool
+
+  position:
+    type: struct GpsData
