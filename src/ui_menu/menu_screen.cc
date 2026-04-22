@@ -2,6 +2,8 @@
 
 #include "hal/i_display.hh"
 
+#include <algorithm>
+
 MenuScreen::MenuScreen(os::TimerManager& timer_manager,
                        lv_obj_t* screen,
                        lv_indev_t* lvgl_input_dev,
@@ -167,6 +169,45 @@ MenuScreen::Page::AddBooleanEntry(const char* text,
     m_parent.m_event_listeners.push_back(
         LvEventListener::Create(boolean_switch, LV_EVENT_CLICKED, on_click));
 }
+
+void
+MenuScreen::Page::AddNumericEntry(const char* text,
+                                  int low,
+                                  int high,
+                                  const std::function<void(lv_event_t*)>& on_click)
+{
+    const int min_value = std::min(low, high);
+    const int max_value = std::max(low, high);
+
+    auto cont = lv_menu_cont_create(m_page);
+    auto label = lv_label_create(cont);
+    auto roller = lv_roller_create(cont);
+
+    lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
+    lv_obj_add_style(roller, &m_parent.m_style_selected, LV_STATE_FOCUSED);
+    lv_obj_set_flex_grow(label, 1);
+    lv_label_set_text(label, text);
+
+    std::string options;
+    for (int value = min_value; value <= max_value; ++value)
+    {
+        if (!options.empty())
+        {
+            options += "\n";
+        }
+        options += std::to_string(value);
+    }
+
+    lv_roller_set_options(roller, options.c_str(), LV_ROLLER_MODE_NORMAL);
+    lv_roller_set_selected(roller, 0, LV_ANIM_OFF);
+    lv_roller_set_visible_row_count(roller, 1);
+
+    lv_group_add_obj(m_parent.m_input_group, roller);
+
+    m_parent.m_event_listeners.push_back(
+        LvEventListener::Create(roller, LV_EVENT_CLICKED, on_click));
+}
+
 
 void
 MenuScreen::Page::AddSeparator()

@@ -19,14 +19,20 @@ public:
         Page& operator=(const Page&) = delete;
         Page(Page&&) = default;
 
-        void AddEntry(const std::string& text, const std::function<void(lv_event_t*)>& on_click);
-
         Page& AddSubPage(const char* text);
+
+
+        void AddEntry(const std::string& text, const std::function<void(lv_event_t*)>& on_click);
 
         void AddSeparator();
 
         void AddBooleanEntry(const char* text,
                              bool default_value,
+                             const std::function<void(lv_event_t*)>& on_click);
+
+        void AddNumericEntry(const char* text,
+                             int low,
+                             int high,
                              const std::function<void(lv_event_t*)>& on_click);
 
         Page(MenuScreen& parent, lv_obj_t* parent_menu);
@@ -47,9 +53,9 @@ public:
     virtual ~MenuScreen();
 
     Page& GetMainPage();
+    void BumpExitTimer();
 
 private:
-    void BumpExitTimer();
 
     os::TimerManager& m_timer_manager;
     lv_obj_t* m_screen;
