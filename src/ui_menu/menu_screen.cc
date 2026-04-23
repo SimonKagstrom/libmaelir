@@ -20,6 +20,16 @@ MenuScreen::MenuScreen(os::TimerManager& timer_manager,
     lv_style_set_bg_opa(&m_style_selected, LV_OPA_COVER); // Ensure the background is fully opaque
     lv_style_set_radius(&m_style_selected, 10);
 
+    lv_style_init(&m_style_numeric_roller_main_focused);
+    lv_style_set_outline_width(&m_style_numeric_roller_main_focused, 0);
+    lv_style_set_shadow_width(&m_style_numeric_roller_main_focused, 0);
+
+    lv_style_init(&m_style_numeric_roller_selected);
+    lv_style_set_outline_width(&m_style_numeric_roller_selected, 0);
+    lv_style_set_shadow_width(&m_style_numeric_roller_selected, 0);
+    lv_style_set_border_width(&m_style_numeric_roller_selected, 0);
+    lv_style_set_radius(&m_style_numeric_roller_selected, 10);
+
     m_input_group = lv_group_create();
     m_menu = lv_menu_create(m_screen);
 
@@ -139,7 +149,7 @@ MenuScreen::Page::AddEntry(const std::string& text, const std::function<void()>&
     lv_obj_set_flex_grow(label, 1);
 
     m_parent.m_event_listeners.push_back(
-        LvEventListener::Create(cont, LV_EVENT_CLICKED, [on_click](lv_event_t* e) { on_click(); }));
+        LvEventListener::Create(cont, LV_EVENT_CLICKED, [on_click](lv_event_t*) { on_click(); }));
 }
 
 void
@@ -192,12 +202,10 @@ MenuScreen::Page::AddNumericEntry(const char* text,
     auto roller = lv_roller_create(cont);
 
     lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
-    lv_obj_set_style_outline_width(roller, 0, (int)LV_PART_MAIN | (int)LV_STATE_FOCUSED);
-    lv_obj_set_style_shadow_width(roller, 0, (int)LV_PART_MAIN | (int)LV_STATE_FOCUSED);
-    lv_obj_set_style_outline_width(roller, 0, (int)LV_PART_SELECTED | (int)LV_STATE_FOCUSED);
-    lv_obj_set_style_shadow_width(roller, 0, (int)LV_PART_SELECTED | (int)LV_STATE_FOCUSED);
-    lv_obj_set_style_border_width(roller, 0, LV_PART_SELECTED);
-    lv_obj_set_style_radius(roller, 10, LV_PART_SELECTED);
+    lv_obj_add_style(roller,
+                     &m_parent.m_style_numeric_roller_main_focused,
+                     (int)LV_PART_MAIN | (int)LV_STATE_FOCUSED);
+    lv_obj_add_style(roller, &m_parent.m_style_numeric_roller_selected, LV_PART_SELECTED);
     lv_obj_set_flex_grow(label, 1);
     lv_label_set_text(label, text);
 
@@ -219,6 +227,19 @@ MenuScreen::Page::AddNumericEntry(const char* text,
     lv_roller_set_visible_row_count(roller, 1);
 
     lv_group_add_obj(m_parent.m_input_group, roller);
+
+    // Keep the row highlighted while the roller is focused/edited.
+    m_parent.m_event_listeners.push_back(
+        LvEventListener::Create(roller, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
+            lv_obj_add_state(cont, LV_STATE_FOCUSED);
+            lv_obj_add_state(cont, LV_STATE_FOCUS_KEY);
+        }));
+
+    m_parent.m_event_listeners.push_back(
+        LvEventListener::Create(roller, LV_EVENT_DEFOCUSED, [cont](lv_event_t*) {
+            lv_obj_remove_state(cont, LV_STATE_FOCUSED);
+            lv_obj_remove_state(cont, LV_STATE_FOCUS_KEY);
+        }));
 
     m_parent.m_event_listeners.push_back(
         LvEventListener::Create(roller, LV_EVENT_CLICKED, [on_click, config](lv_event_t* e) {

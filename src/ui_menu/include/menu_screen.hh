@@ -69,6 +69,8 @@ private:
     std::function<void()> m_on_close;
 
     lv_style_t m_style_selected;
+    lv_style_t m_style_numeric_roller_main_focused;
+    lv_style_t m_style_numeric_roller_selected;
     lv_obj_t* m_menu;
     lv_group_t* m_input_group;
 
