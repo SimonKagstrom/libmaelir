@@ -10,6 +10,13 @@
 class MenuScreen
 {
 public:
+    struct NumericEntryConfig
+    {
+        int low;
+        int high;
+        int step = 1;
+    };
+
     class Page
     {
     public:
@@ -22,18 +29,18 @@ public:
         Page& AddSubPage(const char* text);
 
 
-        void AddEntry(const std::string& text, const std::function<void(lv_event_t*)>& on_click);
+        void AddEntry(const std::string& text, const std::function<void()>& on_click);
 
         void AddSeparator();
 
         void AddBooleanEntry(const char* text,
                              bool default_value,
-                             const std::function<void(lv_event_t*)>& on_click);
+                             const std::function<void(bool)>& on_click);
 
         void AddNumericEntry(const char* text,
-                             int low,
-                             int high,
-                             const std::function<void(lv_event_t*)>& on_click);
+                             NumericEntryConfig config,
+                             int default_value,
+                             const std::function<void(int value)>& on_click);
 
         Page(MenuScreen& parent, lv_obj_t* parent_menu);
 
@@ -56,7 +63,6 @@ public:
     void BumpExitTimer();
 
 private:
-
     os::TimerManager& m_timer_manager;
     lv_obj_t* m_screen;
     lv_indev_t* m_lvgl_input_dev;

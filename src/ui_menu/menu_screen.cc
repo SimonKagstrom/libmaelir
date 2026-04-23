@@ -101,21 +101,6 @@ MenuScreen::Page::Page(MenuScreen& parent, lv_obj_t* parent_page)
 {
 }
 
-void
-MenuScreen::Page::AddEntry(const std::string& text,
-                           const std::function<void(lv_event_t*)>& on_click)
-{
-    auto cont = lv_menu_cont_create(m_page);
-    auto label = lv_label_create(cont);
-
-    lv_label_set_text(label, text.c_str());
-    lv_group_add_obj(m_parent.m_input_group, cont);
-    lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
-    lv_obj_set_flex_grow(label, 1);
-
-    m_parent.m_event_listeners.push_back(LvEventListener::Create(cont, LV_EVENT_CLICKED, on_click));
-}
-
 MenuScreen::Page&
 MenuScreen::Page::AddSubPage(const char* text)
 {
@@ -143,9 +128,24 @@ MenuScreen::Page::AddSubPage(const char* text)
 }
 
 void
+MenuScreen::Page::AddEntry(const std::string& text, const std::function<void()>& on_click)
+{
+    auto cont = lv_menu_cont_create(m_page);
+    auto label = lv_label_create(cont);
+
+    lv_label_set_text(label, text.c_str());
+    lv_group_add_obj(m_parent.m_input_group, cont);
+    lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
+    lv_obj_set_flex_grow(label, 1);
+
+    m_parent.m_event_listeners.push_back(
+        LvEventListener::Create(cont, LV_EVENT_CLICKED, [on_click](lv_event_t* e) { on_click(); }));
+}
+
+void
 MenuScreen::Page::AddBooleanEntry(const char* text,
                                   bool default_value,
-                                  const std::function<void(lv_event_t*)>& on_click)
+                                  const std::function<void(bool)>& on_click)
 {
     auto selected_switch_color = lv_palette_main(LV_PALETTE_LIGHT_GREEN);
 
@@ -167,29 +167,42 @@ MenuScreen::Page::AddBooleanEntry(const char* text,
     lv_group_add_obj(m_parent.m_input_group, boolean_switch);
 
     m_parent.m_event_listeners.push_back(
-        LvEventListener::Create(boolean_switch, LV_EVENT_CLICKED, on_click));
+        LvEventListener::Create(boolean_switch, LV_EVENT_CLICKED, [on_click](lv_event_t* e) {
+            auto sw = static_cast<lv_obj_t*>(lv_event_get_target(e));
+            auto checked = lv_obj_has_state(sw, LV_STATE_CHECKED);
+            on_click(checked);
+        }));
 }
 
 void
 MenuScreen::Page::AddNumericEntry(const char* text,
-                                  int low,
-                                  int high,
-                                  const std::function<void(lv_event_t*)>& on_click)
+                                  MenuScreen::NumericEntryConfig config,
+                                  int default_value,
+                                  const std::function<void(int value)>& on_click)
 {
-    const int min_value = std::min(low, high);
-    const int max_value = std::max(low, high);
+    assert(config.step != 0);
+
+    if (config.low > config.high)
+    {
+        std::swap(config.low, config.high);
+    }
 
     auto cont = lv_menu_cont_create(m_page);
     auto label = lv_label_create(cont);
     auto roller = lv_roller_create(cont);
 
     lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
-    lv_obj_add_style(roller, &m_parent.m_style_selected, LV_STATE_FOCUSED);
+    lv_obj_set_style_outline_width(roller, 0, (int)LV_PART_MAIN | (int)LV_STATE_FOCUSED);
+    lv_obj_set_style_shadow_width(roller, 0, (int)LV_PART_MAIN | (int)LV_STATE_FOCUSED);
+    lv_obj_set_style_outline_width(roller, 0, (int)LV_PART_SELECTED | (int)LV_STATE_FOCUSED);
+    lv_obj_set_style_shadow_width(roller, 0, (int)LV_PART_SELECTED | (int)LV_STATE_FOCUSED);
+    lv_obj_set_style_border_width(roller, 0, LV_PART_SELECTED);
+    lv_obj_set_style_radius(roller, 10, LV_PART_SELECTED);
     lv_obj_set_flex_grow(label, 1);
     lv_label_set_text(label, text);
 
     std::string options;
-    for (int value = min_value; value <= max_value; ++value)
+    for (int value = config.low; value <= config.high; value += config.step)
     {
         if (!options.empty())
         {
@@ -198,14 +211,22 @@ MenuScreen::Page::AddNumericEntry(const char* text,
         options += std::to_string(value);
     }
 
+    const int clamped_default = std::clamp(default_value, config.low, config.high);
+    const int selected_index = (clamped_default - config.low) / config.step;
+
     lv_roller_set_options(roller, options.c_str(), LV_ROLLER_MODE_NORMAL);
-    lv_roller_set_selected(roller, 0, LV_ANIM_OFF);
+    lv_roller_set_selected(roller, selected_index, LV_ANIM_OFF);
     lv_roller_set_visible_row_count(roller, 1);
 
     lv_group_add_obj(m_parent.m_input_group, roller);
 
     m_parent.m_event_listeners.push_back(
-        LvEventListener::Create(roller, LV_EVENT_CLICKED, on_click));
+        LvEventListener::Create(roller, LV_EVENT_CLICKED, [on_click, config](lv_event_t* e) {
+            auto roller = static_cast<lv_obj_t*>(lv_event_get_target(e));
+            auto selected = lv_roller_get_selected(roller);
+            int value = config.low + selected * config.step;
+            on_click(value);
+        }));
 }
 
 
