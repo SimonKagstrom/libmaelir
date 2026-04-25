@@ -17,6 +17,35 @@ static_assert(std::to_underlying(hal::Rotation::k180) ==
 static_assert(std::to_underlying(hal::Rotation::k270) ==
               std::to_underlying(PPA_SRM_ROTATION_ANGLE_270));
 
+namespace
+{
+
+std::pair<uint32_t, uint32_t>
+GetDestinationFramebufferSize(hal::Rotation rotation)
+{
+    switch (rotation)
+    {
+    case hal::Rotation::k90:
+    case hal::Rotation::k270:
+        return {static_cast<uint32_t>(hal::kDisplayHeight),
+                static_cast<uint32_t>(hal::kDisplayWidth)};
+    case hal::Rotation::k0:
+    case hal::Rotation::k180:
+    default:
+        return {static_cast<uint32_t>(hal::kDisplayWidth),
+                static_cast<uint32_t>(hal::kDisplayHeight)};
+    }
+}
+
+size_t
+GetDestinationBufferSizeBytes(const hal::BlitOperation& op)
+{
+    auto [dst_pic_w, dst_pic_h] = GetDestinationFramebufferSize(op.rotation);
+    return static_cast<size_t>(dst_pic_w) * static_cast<size_t>(dst_pic_h) * sizeof(uint16_t);
+}
+
+} // namespace blitter_esp32_internal
+
 bool
 PrepareOperationForPpa(hal::BlitOperation& op)
 {
@@ -106,6 +135,7 @@ BlitterEsp32::BlitOne(const hal::BlitOperation& op, bool last)
 {
     ppa_srm_rotation_angle_t angle =
         static_cast<ppa_srm_rotation_angle_t>(std::to_underlying(op.rotation));
+    auto [dst_pic_w, dst_pic_h] = GetDestinationFramebufferSize(op.rotation);
 
     ppa_srm_oper_config_t cfg = {
         .in =
@@ -123,10 +153,9 @@ BlitterEsp32::BlitOne(const hal::BlitOperation& op, bool last)
         .out =
             {
                 .buffer = static_cast<void*>(op.dst_data),
-                .buffer_size = static_cast<uint32_t>(hal::kDisplayWidth * hal::kDisplayHeight *
-                                                     sizeof(uint16_t)),
-                .pic_w = static_cast<uint32_t>(hal::kDisplayWidth),
-                .pic_h = static_cast<uint32_t>(hal::kDisplayHeight),
+                .buffer_size = static_cast<uint32_t>(GetDestinationBufferSizeBytes(op)),
+                .pic_w = dst_pic_w,
+                .pic_h = dst_pic_h,
                 .block_offset_x = static_cast<uint32_t>(op.dst_offset_x),
                 .block_offset_y = static_cast<uint32_t>(op.dst_offset_y),
                 .srm_cm = PPA_SRM_COLOR_MODE_RGB565,
@@ -178,6 +207,7 @@ BlitterEsp32::BlitOperations(std::span<const hal::BlitOperation> operations)
         BlitOne(m_prepared_operations[i], i == m_prepared_operations.size() - 1);
     }
 
+    // For now this syncs the entire screen
     esp_cache_msync(
         frame_buffer,
         static_cast<size_t>(hal::kDisplayWidth * hal::kDisplayHeight * sizeof(uint16_t)),
