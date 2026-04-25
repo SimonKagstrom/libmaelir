@@ -1,5 +1,6 @@
 add_subdirectory(.. libmaelir)
 
+add_subdirectory(blitter_host)
 add_subdirectory(curl_httpd_client)
 add_subdirectory(display)
 add_subdirectory(gpio_host)
