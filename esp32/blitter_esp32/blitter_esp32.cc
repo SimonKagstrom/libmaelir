@@ -1,6 +1,5 @@
 #include "blitter_esp32.hh"
-
-#include "hal/i_display.hh"
+#include "debug_assert.hh"
 
 #include <cassert>
 #include <esp_cache.h>
@@ -12,11 +11,106 @@ static_assert(std::to_underlying(hal::k90) == std::to_underlying(PPA_SRM_ROTATIO
 static_assert(std::to_underlying(hal::k180) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_180));
 static_assert(std::to_underlying(hal::k270) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_270));
 
+namespace
+{
+
+bool
+PrepareOperationForPpa(hal::BlitOperation& op)
+{
+    if (op.src_data == nullptr || op.src_width <= 0 || op.src_height <= 0 || op.width <= 0 ||
+        op.height <= 0)
+    {
+        return false;
+    }
+
+    // For k0 we can clip partially visible/source-overlapping rectangles.
+    if (op.rotation == hal::k0)
+    {
+        int32_t sx = op.src_offset_x;
+        int32_t sy = op.src_offset_y;
+        int32_t dx = op.dst_offset_x;
+        int32_t dy = op.dst_offset_y;
+        int32_t w = op.width;
+        int32_t h = op.height;
+
+        if (dx < 0)
+        {
+            auto cut = -dx;
+            sx += cut;
+            w -= cut;
+            dx = 0;
+        }
+        if (dy < 0)
+        {
+            auto cut = -dy;
+            sy += cut;
+            h -= cut;
+            dy = 0;
+        }
+        if (sx < 0)
+        {
+            auto cut = -sx;
+            dx += cut;
+            w -= cut;
+            sx = 0;
+        }
+        if (sy < 0)
+        {
+            auto cut = -sy;
+            dy += cut;
+            h -= cut;
+            sy = 0;
+        }
+
+        w = std::min(w, static_cast<int32_t>(op.src_width) - sx);
+        h = std::min(h, static_cast<int32_t>(op.src_height) - sy);
+        w = std::min(w, static_cast<int32_t>(hal::kDisplayWidth) - dx);
+        h = std::min(h, static_cast<int32_t>(hal::kDisplayHeight) - dy);
+
+        if (w <= 0 || h <= 0)
+        {
+            return false;
+        }
+
+        op.src_offset_x = static_cast<int16_t>(sx);
+        op.src_offset_y = static_cast<int16_t>(sy);
+        op.dst_offset_x = static_cast<int16_t>(dx);
+        op.dst_offset_y = static_cast<int16_t>(dy);
+        op.width = static_cast<int16_t>(w);
+        op.height = static_cast<int16_t>(h);
+        return true;
+    }
+
+    // For rotated blits, keep validation strict to avoid invalid SRM geometry.
+    if (op.src_offset_x < 0 || op.src_offset_y < 0 || op.dst_offset_x < 0 || op.dst_offset_y < 0)
+    {
+        return false;
+    }
+    if (op.src_offset_x + op.width > op.src_width || op.src_offset_y + op.height > op.src_height)
+    {
+        return false;
+    }
+
+    const int32_t out_w =
+        (op.rotation == hal::k90 || op.rotation == hal::k270) ? op.height : op.width;
+    const int32_t out_h =
+        (op.rotation == hal::k90 || op.rotation == hal::k270) ? op.width : op.height;
+    if (op.dst_offset_x + out_w > hal::kDisplayWidth ||
+        op.dst_offset_y + out_h > hal::kDisplayHeight)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+} // namespace
+
 BlitterEsp32::BlitterEsp32()
 {
     ppa_client_config_t cfg {};
 
-    cfg.max_pending_trans_num = 1;
+    cfg.max_pending_trans_num = kMaxTransactions;
     cfg.oper_type = PPA_OPERATION_SRM;
     cfg.data_burst_length = PPA_DATA_BURST_LENGTH_128;
 
@@ -26,7 +120,7 @@ BlitterEsp32::BlitterEsp32()
 
 
 void
-BlitterEsp32::BlitOne(uint16_t* frame_buffer, const hal::BlitOperation& op)
+BlitterEsp32::BlitOne(uint16_t* frame_buffer, const hal::BlitOperation& op, bool last)
 {
     ppa_srm_rotation_angle_t angle =
         static_cast<ppa_srm_rotation_angle_t>(std::to_underlying(op.rotation));
@@ -64,7 +158,8 @@ BlitterEsp32::BlitOne(uint16_t* frame_buffer, const hal::BlitOperation& op)
         .byte_swap = false,
         .alpha_update_mode = PPA_ALPHA_NO_CHANGE,
         .alpha_fix_val = 0,
-        .mode = PPA_TRANS_MODE_BLOCKING,
+        // Block on the last transaction
+        .mode = last ? PPA_TRANS_MODE_BLOCKING : PPA_TRANS_MODE_NON_BLOCKING,
         .user_data = nullptr,
     };
 
@@ -75,15 +170,20 @@ BlitterEsp32::BlitOne(uint16_t* frame_buffer, const hal::BlitOperation& op)
 void
 BlitterEsp32::BlitOperations(uint16_t* frame_buffer, std::span<const hal::BlitOperation> operations)
 {
+    m_prepared_operations.clear();
     for (const auto& op : operations)
     {
-        if (op.height <= 0 || op.width <= 0 || op.dst_offset_x >= hal::kDisplayWidth ||
-            op.dst_offset_y >= hal::kDisplayHeight)
+        auto prepared = op;
+        if (!PrepareOperationForPpa(prepared))
         {
             continue;
         }
+        m_prepared_operations.push_back(prepared);
+    }
 
-        BlitOne(frame_buffer, op);
+    for (size_t i = 0; i < m_prepared_operations.size(); ++i)
+    {
+        BlitOne(frame_buffer, m_prepared_operations[i], i == m_prepared_operations.size() - 1);
     }
 
     esp_cache_msync(
@@ -91,71 +191,3 @@ BlitterEsp32::BlitOperations(uint16_t* frame_buffer, std::span<const hal::BlitOp
         static_cast<size_t>(hal::kDisplayWidth * hal::kDisplayHeight * sizeof(uint16_t)),
         ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA);
 }
-
-
-#if 0
-    for (const auto& o : operations)
-    {
-        if (o.height < 0 || o.dst_offset_x >= hal::kDisplayWidth ||
-            o.dst_offset_y >= hal::kDisplayHeight)
-        {
-            continue;
-        }
-
-        static ppa_srm_oper_config_t cfg = {
-            .in =
-                {
-                    .buffer = (void*)o.src_data,
-                    //                    .pic_w = hal::kDisplayWidth,
-                    //                    .pic_h = hal::kDisplayHeight,
-                    .pic_w = static_cast<uint32_t>(o.src_width),
-                    .pic_h = static_cast<uint32_t>(o.src_width),
-                    .block_w = static_cast<uint32_t>(o.width),
-                    .block_h = static_cast<uint32_t>(o.height),
-                    .block_offset_x = static_cast<uint32_t>(o.src_offset_x),
-                    .block_offset_y = static_cast<uint32_t>(o.src_offset_y),
-                    .srm_cm =  PPA_SRM_COLOR_MODE_RGB565,
-                },
-
-            .out =
-                {
-                    .buffer = (void*)frame_buffer,
-                    .buffer_size = hal::kDisplayWidth * hal::kDisplayHeight * 2,
-                    .pic_w = hal::kDisplayWidth,
-                    .pic_h = hal::kDisplayHeight,
-                    .block_offset_x = static_cast<uint32_t>(o.dst_offset_x),
-                    .block_offset_y = static_cast<uint32_t>(o.dst_offset_y),
-                    .srm_cm =  PPA_SRM_COLOR_MODE_RGB565,
-                },
-            .rotation_angle = PPA_SRM_ROTATION_ANGLE_0,
-            .scale_x = 1,
-            .scale_y = 1,
-            .mirror_x = false,
-            .mirror_y = false,
-            .rgb_swap = false,
-            .byte_swap = false,
-            .alpha_update_mode = PPA_ALPHA_NO_CHANGE,
-            .alpha_fix_val = 0,
-            .mode = PPA_TRANS_MODE_BLOCKING,
-            .user_data = static_cast<void*>(this),
-        };
-
-        esp_err_t ret = ppa_do_scale_rotate_mirror(m_client, &cfg);
-        if (ret != ESP_OK)
-        {
-            printf("PPA ppa_do_scale etc failed: %d", ret);
-        }
-    }
-
-#define PPA_ALIGN_UP(x, align) ((((x) + (align) - 1) / (align)) * (align))
-#define PPA_PTR_ALIGN_UP(p, align)                                                                 \
-    ((void*)(((uintptr_t)(p) + (uintptr_t)((align) - 1)) & ~(uintptr_t)((align) - 1)))
-
-#define PPA_ALIGN_DOWN(x, align) ((((x) - (align) - 1) / (align)) * (align))
-#define PPA_PTR_ALIGN_DOWN(p, align)                                                               \
-    ((void*)(((uintptr_t)(p) - (uintptr_t)((align) - 1)) & ~(uintptr_t)((align) - 1)))
-    esp_cache_msync((void*)PPA_PTR_ALIGN_DOWN(frame_buffer, CONFIG_CACHE_L1_CACHE_LINE_SIZE),
-                    PPA_ALIGN_DOWN(hal::kDisplayWidth * hal::kDisplayHeight * 2,
-                                   CONFIG_CACHE_L1_CACHE_LINE_SIZE),
-                    ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA);
-#endif
