@@ -1,10 +1,12 @@
 #pragma once
 
+#include "../include/hal/i_display_rotation.hh"
+
 namespace hal
 {
 
 constexpr auto kDisplayWidth = 800;
 constexpr auto kDisplayHeight = 800;
-constexpr auto kDisplayRotation = 0;
+constexpr auto kDisplayRotation = Rotation::k0;
 
 } // namespace hal

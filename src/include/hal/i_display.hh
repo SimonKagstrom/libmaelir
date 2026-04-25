@@ -1,21 +1,13 @@
 #pragma once
 
+#include "i_display_properties.hh"
+#include "i_display_rotation.hh"
+
 #include <cstdint>
 #include <optional>
 
-#include "i_display_properties.hh"
 namespace hal
 {
-enum class Rotation : uint8_t
-{
-    k0,
-    k90,
-    k180,
-    k270,
-
-    kValueCount,
-};
-
 class IDisplay
 {
 public:
