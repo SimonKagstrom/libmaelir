@@ -1,20 +1,12 @@
 #pragma once
 
+#include "i_display.hh"
+
 #include <cstdint>
 #include <span>
 
 namespace hal
 {
-
-enum Rotation
-{
-    k0,
-    k90,
-    k180,
-    k270,
-
-    kValueCount,
-};
 
 struct BlitOperation
 {
@@ -35,7 +27,8 @@ class IBlitter
 public:
     virtual ~IBlitter() = default;
 
-    virtual void BlitOperations(uint16_t* frame_buffer, std::span<const hal::BlitOperation> operations) = 0;
+    virtual void BlitOperations(uint16_t* frame_buffer,
+                                std::span<const hal::BlitOperation> operations) = 0;
 };
 
 } // namespace hal

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "hal/i_blitter.hh"
-#include "hal/i_display.hh"
 #include "semaphore.hh"
 
 #include <atomic>

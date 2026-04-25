@@ -1,18 +1,16 @@
 #include "blitter_esp32.hh"
 #include "debug_assert.hh"
 
+#include <algorithm>
 #include <cassert>
 #include <esp_cache.h>
 #include <utility>
 
 
-static_assert(std::to_underlying(hal::k0) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_0));
-static_assert(std::to_underlying(hal::k90) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_90));
-static_assert(std::to_underlying(hal::k180) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_180));
-static_assert(std::to_underlying(hal::k270) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_270));
-
-namespace
-{
+static_assert(std::to_underlying(hal::Rotation::k0) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_0));
+static_assert(std::to_underlying(hal::Rotation::k90) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_90));
+static_assert(std::to_underlying(hal::Rotation::k180) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_180));
+static_assert(std::to_underlying(hal::Rotation::k270) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_270));
 
 bool
 PrepareOperationForPpa(hal::BlitOperation& op)
@@ -23,88 +21,67 @@ PrepareOperationForPpa(hal::BlitOperation& op)
         return false;
     }
 
-    // For k0 we can clip partially visible/source-overlapping rectangles.
-    if (op.rotation == hal::k0)
+    // Rotation is only expected for a single full-screen transaction.
+    if (op.rotation != hal::Rotation::k0)
     {
-        int32_t sx = op.src_offset_x;
-        int32_t sy = op.src_offset_y;
-        int32_t dx = op.dst_offset_x;
-        int32_t dy = op.dst_offset_y;
-        int32_t w = op.width;
-        int32_t h = op.height;
+        debug_assert(op.src_offset_x == 0 && op.src_offset_y == 0 && op.dst_offset_x == 0 &&
+            op.dst_offset_y == 0);
+        debug_assert(op.width == hal::kDisplayWidth && op.height == hal::kDisplayHeight);
 
-        if (dx < 0)
-        {
-            auto cut = -dx;
-            sx += cut;
-            w -= cut;
-            dx = 0;
-        }
-        if (dy < 0)
-        {
-            auto cut = -dy;
-            sy += cut;
-            h -= cut;
-            dy = 0;
-        }
-        if (sx < 0)
-        {
-            auto cut = -sx;
-            dx += cut;
-            w -= cut;
-            sx = 0;
-        }
-        if (sy < 0)
-        {
-            auto cut = -sy;
-            dy += cut;
-            h -= cut;
-            sy = 0;
-        }
-
-        w = std::min(w, static_cast<int32_t>(op.src_width) - sx);
-        h = std::min(h, static_cast<int32_t>(op.src_height) - sy);
-        w = std::min(w, static_cast<int32_t>(hal::kDisplayWidth) - dx);
-        h = std::min(h, static_cast<int32_t>(hal::kDisplayHeight) - dy);
-
-        if (w <= 0 || h <= 0)
+        if (op.src_width < op.width || op.src_height < op.height)
         {
             return false;
         }
 
-        op.src_offset_x = static_cast<int16_t>(sx);
-        op.src_offset_y = static_cast<int16_t>(sy);
-        op.dst_offset_x = static_cast<int16_t>(dx);
-        op.dst_offset_y = static_cast<int16_t>(dy);
-        op.width = static_cast<int16_t>(w);
-        op.height = static_cast<int16_t>(h);
         return true;
     }
 
-    // For rotated blits, keep validation strict to avoid invalid SRM geometry.
-    if (op.src_offset_x < 0 || op.src_offset_y < 0 || op.dst_offset_x < 0 || op.dst_offset_y < 0)
-    {
-        return false;
-    }
-    if (op.src_offset_x + op.width > op.src_width || op.src_offset_y + op.height > op.src_height)
+    // k0 path: use painter-like clipping against destination and source bounds.
+    if (op.src_offset_x < 0 || op.src_offset_y < 0)
     {
         return false;
     }
 
-    const int32_t out_w =
-        (op.rotation == hal::k90 || op.rotation == hal::k270) ? op.height : op.width;
-    const int32_t out_h =
-        (op.rotation == hal::k90 || op.rotation == hal::k270) ? op.width : op.height;
-    if (op.dst_offset_x + out_w > hal::kDisplayWidth ||
-        op.dst_offset_y + out_h > hal::kDisplayHeight)
+    int32_t from_x = 0;
+    int32_t from_y = 0;
+    int32_t width = op.width;
+    int32_t height = op.height;
+
+    if (op.dst_offset_x < 0)
+    {
+        from_x += -op.dst_offset_x;
+        width += op.dst_offset_x;
+    }
+    if (op.dst_offset_y < 0)
+    {
+        from_y += -op.dst_offset_y;
+        height += op.dst_offset_y;
+    }
+
+    int32_t dst_x = std::max<int32_t>(0, op.dst_offset_x);
+    int32_t dst_y = std::max<int32_t>(0, op.dst_offset_y);
+    int32_t src_x = op.src_offset_x + from_x;
+    int32_t src_y = op.src_offset_y + from_y;
+
+    width = std::min(width, static_cast<int32_t>(op.src_width) - src_x);
+    height = std::min(height, static_cast<int32_t>(op.src_height) - src_y);
+    width = std::min(width, static_cast<int32_t>(hal::kDisplayWidth) - dst_x);
+    height = std::min(height, static_cast<int32_t>(hal::kDisplayHeight) - dst_y);
+
+    if (width <= 0 || height <= 0)
     {
         return false;
     }
+
+    op.src_offset_x = static_cast<int16_t>(src_x);
+    op.src_offset_y = static_cast<int16_t>(src_y);
+    op.dst_offset_x = static_cast<int16_t>(dst_x);
+    op.dst_offset_y = static_cast<int16_t>(dst_y);
+    op.width = static_cast<int16_t>(width);
+    op.height = static_cast<int16_t>(height);
 
     return true;
 }
-
-} // namespace
 
 BlitterEsp32::BlitterEsp32()
 {
@@ -171,6 +148,7 @@ void
 BlitterEsp32::BlitOperations(uint16_t* frame_buffer, std::span<const hal::BlitOperation> operations)
 {
     m_prepared_operations.clear();
+
     for (const auto& op : operations)
     {
         auto prepared = op;
@@ -178,6 +156,7 @@ BlitterEsp32::BlitOperations(uint16_t* frame_buffer, std::span<const hal::BlitOp
         {
             continue;
         }
+
         m_prepared_operations.push_back(prepared);
     }
 

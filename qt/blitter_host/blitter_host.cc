@@ -16,7 +16,7 @@ BlitterHost::BlitOne(uint16_t* frame_buffer, const hal::BlitOperation& op)
 {
     int32_t out_width = op.width;
     int32_t out_height = op.height;
-    if (op.rotation == hal::k90 || op.rotation == hal::k270)
+    if (op.rotation == hal::Rotation::k90 || op.rotation == hal::Rotation::k270)
     {
         std::swap(out_width, out_height);
     }
@@ -44,19 +44,19 @@ BlitterHost::BlitOne(uint16_t* frame_buffer, const hal::BlitOperation& op)
 
             switch (op.rotation)
             {
-            case hal::k90:
+            case hal::Rotation::k90:
                 src_block_x = line;
                 src_block_y = op.height - 1 - x;
                 break;
-            case hal::k180:
+            case hal::Rotation::k180:
                 src_block_x = op.width - 1 - x;
                 src_block_y = op.height - 1 - line;
                 break;
-            case hal::k270:
+            case hal::Rotation::k270:
                 src_block_x = op.width - 1 - line;
                 src_block_y = x;
                 break;
-            case hal::k0:
+            case hal::Rotation::k0:
             default:
                 src_block_x = x;
                 src_block_y = line;
