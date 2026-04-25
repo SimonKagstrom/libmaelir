@@ -11,10 +11,8 @@ namespace
 {
 
 auto
-Prepare(const auto& image, auto& to)
+Prepare(int32_t width, int32_t height, auto& to)
 {
-    int32_t height = image.Height();
-    int32_t width = image.Width();
     int32_t from_y = 0;
     int32_t from_x = 0;
 
@@ -29,7 +27,7 @@ Prepare(const auto& image, auto& to)
         height += to.y;
     }
 
-    int32_t row_length = image.Width() - from_x;
+    int32_t row_length = width - from_x;
 
     to.x = std::max(static_cast<int32_t>(0), to.x);
     to.y = std::max(static_cast<int32_t>(0), to.y);
@@ -55,22 +53,30 @@ Prepare(const auto& image, auto& to)
 namespace painter
 {
 
-void
-Blit(uint16_t* frame_buffer, const Image& image, Rect to)
-{
-    auto [height, width, from_y, from_x, row_length] = Prepare(image, to);
 
-    auto src_buffer = image.Data16().data();
-    auto image_width = image.Width();
+void
+Blit(uint16_t* frame_buffer,
+     const uint16_t* src_buffer,
+     uint32_t src_width,
+     uint32_t src_height,
+     Rect to)
+{
+    auto [height, width, from_y, from_x, row_length] = Prepare(src_width, src_height, to);
 
     for (int y = 0; y < height; ++y)
     {
         uint32_t dst_y = to.y + y;
 
         memcpy(&frame_buffer[dst_y * hal::kDisplayWidth + to.x],
-               &src_buffer[(from_y + y) * image_width + from_x],
+               &src_buffer[(from_y + y) * src_width + from_x],
                row_length * sizeof(uint16_t));
     }
+}
+
+void
+Blit(uint16_t* frame_buffer, const Image& image, Rect to)
+{
+    Blit(frame_buffer, image.Data16().data(), image.Width(), image.Height(), to);
 }
 
 void
@@ -78,7 +84,7 @@ ZoomedBlit(
     uint16_t* frame_buffer, uint32_t buffer_width, const Image& image, unsigned factor, Rect to)
 {
     // height and width are unused
-    auto [_0, _1, from_y, from_x, row_length] = Prepare(image, to);
+    auto [_0, _1, from_y, from_x, row_length] = Prepare(image.Width(), image.Height(), to);
 
     for (auto y = 0; y < image.Height(); y += factor)
     {

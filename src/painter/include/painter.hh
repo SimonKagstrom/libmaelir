@@ -13,6 +13,11 @@ struct Rect
     int32_t height;
 };
 
+void Blit(uint16_t* frame_buffer,
+          const uint16_t* src_buffer,
+          uint32_t src_width,
+          uint32_t src_height,
+          Rect to);
 
 void Blit(uint16_t* frame_buffer, const Image& image, Rect to);
 
