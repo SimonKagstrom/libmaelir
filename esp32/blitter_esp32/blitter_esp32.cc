@@ -1,4 +1,5 @@
 #include "blitter_esp32.hh"
+
 #include "debug_assert.hh"
 
 #include <algorithm>
@@ -7,10 +8,14 @@
 #include <utility>
 
 
-static_assert(std::to_underlying(hal::Rotation::k0) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_0));
-static_assert(std::to_underlying(hal::Rotation::k90) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_90));
-static_assert(std::to_underlying(hal::Rotation::k180) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_180));
-static_assert(std::to_underlying(hal::Rotation::k270) == std::to_underlying(PPA_SRM_ROTATION_ANGLE_270));
+static_assert(std::to_underlying(hal::Rotation::k0) ==
+              std::to_underlying(PPA_SRM_ROTATION_ANGLE_0));
+static_assert(std::to_underlying(hal::Rotation::k90) ==
+              std::to_underlying(PPA_SRM_ROTATION_ANGLE_90));
+static_assert(std::to_underlying(hal::Rotation::k180) ==
+              std::to_underlying(PPA_SRM_ROTATION_ANGLE_180));
+static_assert(std::to_underlying(hal::Rotation::k270) ==
+              std::to_underlying(PPA_SRM_ROTATION_ANGLE_270));
 
 bool
 PrepareOperationForPpa(hal::BlitOperation& op)
@@ -25,7 +30,7 @@ PrepareOperationForPpa(hal::BlitOperation& op)
     if (op.rotation != hal::Rotation::k0)
     {
         debug_assert(op.src_offset_x == 0 && op.src_offset_y == 0 && op.dst_offset_x == 0 &&
-            op.dst_offset_y == 0);
+                     op.dst_offset_y == 0);
         debug_assert(op.width == hal::kDisplayWidth && op.height == hal::kDisplayHeight);
 
         if (op.src_width < op.width || op.src_height < op.height)
@@ -97,7 +102,7 @@ BlitterEsp32::BlitterEsp32()
 
 
 void
-BlitterEsp32::BlitOne(uint16_t* frame_buffer, const hal::BlitOperation& op, bool last)
+BlitterEsp32::BlitOne(const hal::BlitOperation& op, bool last)
 {
     ppa_srm_rotation_angle_t angle =
         static_cast<ppa_srm_rotation_angle_t>(std::to_underlying(op.rotation));
@@ -117,7 +122,7 @@ BlitterEsp32::BlitOne(uint16_t* frame_buffer, const hal::BlitOperation& op, bool
             },
         .out =
             {
-                .buffer = static_cast<void*>(frame_buffer),
+                .buffer = static_cast<void*>(op.dst_data),
                 .buffer_size = static_cast<uint32_t>(hal::kDisplayWidth * hal::kDisplayHeight *
                                                      sizeof(uint16_t)),
                 .pic_w = static_cast<uint32_t>(hal::kDisplayWidth),
@@ -145,8 +150,10 @@ BlitterEsp32::BlitOne(uint16_t* frame_buffer, const hal::BlitOperation& op, bool
 }
 
 void
-BlitterEsp32::BlitOperations(uint16_t* frame_buffer, std::span<const hal::BlitOperation> operations)
+BlitterEsp32::BlitOperations(std::span<const hal::BlitOperation> operations)
 {
+    uint16_t* frame_buffer = nullptr;
+
     m_prepared_operations.clear();
 
     for (const auto& op : operations)
@@ -158,11 +165,17 @@ BlitterEsp32::BlitOperations(uint16_t* frame_buffer, std::span<const hal::BlitOp
         }
 
         m_prepared_operations.push_back(prepared);
+        frame_buffer = reinterpret_cast<uint16_t*>(prepared.dst_data);
+    }
+
+    if (m_prepared_operations.empty())
+    {
+        return;
     }
 
     for (size_t i = 0; i < m_prepared_operations.size(); ++i)
     {
-        BlitOne(frame_buffer, m_prepared_operations[i], i == m_prepared_operations.size() - 1);
+        BlitOne(m_prepared_operations[i], i == m_prepared_operations.size() - 1);
     }
 
     esp_cache_msync(

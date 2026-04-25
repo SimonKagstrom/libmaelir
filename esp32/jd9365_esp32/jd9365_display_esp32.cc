@@ -1,5 +1,6 @@
 #include "jd9365_display_esp32.hh"
 
+#include <esp_heap_caps.h>
 #include <esp_lcd_panel_ops.h>
 
 DisplayJd9365::DisplayJd9365(esp_lcd_panel_io_handle_t io_handle,
@@ -13,6 +14,12 @@ DisplayJd9365::DisplayJd9365(esp_lcd_panel_io_handle_t io_handle,
 
     ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(
         m_panel_handle, 2, (void**)&m_frame_buffers[0], (void**)&m_frame_buffers[1]));
+    // An extra once for the bounce buffer
+    m_frame_buffers[2] = reinterpret_cast<uint16_t*>(
+        heap_caps_aligned_calloc(64,
+                                 1,
+                                 hal::kDisplayWidth * hal::kDisplayHeight * 2,
+                                 MALLOC_CAP_SPIRAM | MALLOC_CAP_CACHE_ALIGNED));
 
     esp_lcd_dpi_panel_event_callbacks_t callbacks = {};
     callbacks.on_refresh_done =
@@ -29,7 +36,17 @@ DisplayJd9365::DisplayJd9365(esp_lcd_panel_io_handle_t io_handle,
 uint16_t*
 DisplayJd9365::GetFrameBuffer(hal::IDisplay::Owner owner)
 {
-    return m_frame_buffers[static_cast<int>(owner)];
+    if (owner == hal::IDisplay::Owner::kRotationBuffer)
+    {
+        return m_frame_buffers[2];
+    }
+    else if (owner == hal::IDisplay::Owner::kHardware)
+    {
+        return m_frame_buffers[!m_current_update_frame];
+    }
+
+    // Software owner
+    return m_frame_buffers[m_current_update_frame];
 }
 
 void

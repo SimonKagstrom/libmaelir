@@ -26,7 +26,7 @@ private:
     void OnVsync();
 
     esp_lcd_panel_handle_t m_panel_handle {nullptr};
-    uint16_t* m_frame_buffers[2] {nullptr, nullptr};
+    uint16_t* m_frame_buffers[3] {nullptr, nullptr};
     std::atomic<uint8_t> m_current_update_frame {0};
 
     std::atomic<FrameBufferOwner> m_owner {FrameBufferOwner::kDriver};

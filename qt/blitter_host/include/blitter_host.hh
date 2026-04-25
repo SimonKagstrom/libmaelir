@@ -8,8 +8,7 @@ public:
     BlitterHost();
 
 private:
-    void BlitOperations(uint16_t* frame_buffer,
-                        std::span<const hal::BlitOperation> operations) final;
+    void BlitOperations(std::span<const hal::BlitOperation> operations) final;
 
-    void BlitOne(uint16_t* frame_buffer, const hal::BlitOperation& op);
+    void BlitOne(const hal::BlitOperation& op);
 };

@@ -12,7 +12,7 @@ BlitterHost::BlitterHost()
 
 
 void
-BlitterHost::BlitOne(uint16_t* frame_buffer, const hal::BlitOperation& op)
+BlitterHost::BlitOne(const hal::BlitOperation& op)
 {
     int32_t out_width = op.width;
     int32_t out_height = op.height;
@@ -78,13 +78,13 @@ BlitterHost::BlitOne(uint16_t* frame_buffer, const hal::BlitOperation& op)
             }
 
             auto src_color = op.src_data[src_y * op.src_width + src_x];
-            frame_buffer[dst_y * hal::kDisplayWidth + dst_x] = src_color;
+            op.dst_data[dst_y * hal::kDisplayWidth + dst_x] = src_color;
         }
     }
 }
 
 void
-BlitterHost::BlitOperations(uint16_t* frame_buffer, std::span<const hal::BlitOperation> operations)
+BlitterHost::BlitOperations(std::span<const hal::BlitOperation> operations)
 {
     for (const auto& op : operations)
     {
@@ -94,6 +94,6 @@ BlitterHost::BlitOperations(uint16_t* frame_buffer, std::span<const hal::BlitOpe
             continue;
         }
 
-        BlitOne(frame_buffer, op);
+        BlitOne(op);
     }
 }

@@ -11,6 +11,7 @@ namespace hal
 struct BlitOperation
 {
     const uint16_t* src_data;
+    uint16_t* dst_data;
     int16_t src_width;
     int16_t src_height;
     int16_t src_offset_x;
@@ -27,8 +28,7 @@ class IBlitter
 public:
     virtual ~IBlitter() = default;
 
-    virtual void BlitOperations(uint16_t* frame_buffer,
-                                std::span<const hal::BlitOperation> operations) = 0;
+    virtual void BlitOperations(std::span<const hal::BlitOperation> operations) = 0;
 };
 
 } // namespace hal

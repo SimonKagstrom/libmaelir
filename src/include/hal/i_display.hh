@@ -23,6 +23,11 @@ public:
     {
         kSoftware,
         kHardware,
+
+        // For translations during blit
+        kRotationBuffer,
+
+        kValueCount,
     };
 
     virtual ~IDisplay() = default;
