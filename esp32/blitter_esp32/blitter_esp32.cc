@@ -46,77 +46,6 @@ GetDestinationBufferSizeBytes(const hal::BlitOperation& op)
 
 } // namespace blitter_esp32_internal
 
-bool
-PrepareOperationForPpa(hal::BlitOperation& op)
-{
-    if (op.src_data == nullptr || op.src_width <= 0 || op.src_height <= 0 || op.width <= 0 ||
-        op.height <= 0)
-    {
-        return false;
-    }
-
-    // Rotation is only expected for a single full-screen transaction.
-    if (op.rotation != hal::Rotation::k0)
-    {
-        debug_assert(op.src_offset_x == 0 && op.src_offset_y == 0 && op.dst_offset_x == 0 &&
-                     op.dst_offset_y == 0);
-        debug_assert(op.width == hal::kDisplayWidth && op.height == hal::kDisplayHeight);
-
-        if (op.src_width < op.width || op.src_height < op.height)
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    // k0 path: use painter-like clipping against destination and source bounds.
-    if (op.src_offset_x < 0 || op.src_offset_y < 0)
-    {
-        return false;
-    }
-
-    int32_t from_x = 0;
-    int32_t from_y = 0;
-    int32_t width = op.width;
-    int32_t height = op.height;
-
-    if (op.dst_offset_x < 0)
-    {
-        from_x += -op.dst_offset_x;
-        width += op.dst_offset_x;
-    }
-    if (op.dst_offset_y < 0)
-    {
-        from_y += -op.dst_offset_y;
-        height += op.dst_offset_y;
-    }
-
-    int32_t dst_x = std::max<int32_t>(0, op.dst_offset_x);
-    int32_t dst_y = std::max<int32_t>(0, op.dst_offset_y);
-    int32_t src_x = op.src_offset_x + from_x;
-    int32_t src_y = op.src_offset_y + from_y;
-
-    width = std::min(width, static_cast<int32_t>(op.src_width) - src_x);
-    height = std::min(height, static_cast<int32_t>(op.src_height) - src_y);
-    width = std::min(width, static_cast<int32_t>(hal::kDisplayWidth) - dst_x);
-    height = std::min(height, static_cast<int32_t>(hal::kDisplayHeight) - dst_y);
-
-    if (width <= 0 || height <= 0)
-    {
-        return false;
-    }
-
-    op.src_offset_x = static_cast<int16_t>(src_x);
-    op.src_offset_y = static_cast<int16_t>(src_y);
-    op.dst_offset_x = static_cast<int16_t>(dst_x);
-    op.dst_offset_y = static_cast<int16_t>(dst_y);
-    op.width = static_cast<int16_t>(width);
-    op.height = static_cast<int16_t>(height);
-
-    return true;
-}
-
 BlitterEsp32::BlitterEsp32()
 {
     ppa_client_config_t cfg {};
@@ -187,14 +116,8 @@ BlitterEsp32::BlitOperations(std::span<const hal::BlitOperation> operations)
 
     for (const auto& op : operations)
     {
-        auto prepared = op;
-        if (!PrepareOperationForPpa(prepared))
-        {
-            continue;
-        }
-
-        m_prepared_operations.push_back(prepared);
-        frame_buffer = reinterpret_cast<uint16_t*>(prepared.dst_data);
+        m_prepared_operations.push_back(op);
+        frame_buffer = reinterpret_cast<uint16_t*>(op.dst_data);
     }
 
     if (m_prepared_operations.empty())

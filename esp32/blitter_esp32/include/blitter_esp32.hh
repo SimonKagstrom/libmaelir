@@ -7,6 +7,7 @@
 #include <driver/ppa.h>
 #include <etl/vector.h>
 
+// Warning: This class assumes correctly clipped operations are passed to the BlitOperations
 class BlitterEsp32 : public hal::IBlitter
 {
 public:
