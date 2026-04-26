@@ -16,7 +16,7 @@ DisplayJd9365::DisplayJd9365(esp_lcd_panel_io_handle_t io_handle,
         m_panel_handle, 2, (void**)&m_frame_buffers[0], (void**)&m_frame_buffers[1]));
     // An extra once for the bounce buffer
     m_frame_buffers[2] = reinterpret_cast<uint16_t*>(
-        heap_caps_aligned_calloc(64,
+        heap_caps_aligned_calloc(CONFIG_CACHE_L2_CACHE_LINE_SIZE,
                                  1,
                                  hal::kDisplayWidth * hal::kDisplayHeight * 2,
                                  MALLOC_CAP_SPIRAM | MALLOC_CAP_CACHE_ALIGNED));
