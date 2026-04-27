@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <lvgl.h>
 #include <memory>
 #include <span>
@@ -65,7 +66,7 @@ public:
     {
     }
 
-    uint16_t *WritableData16()
+    uint16_t* WritableData16()
     {
         return reinterpret_cast<uint16_t*>(m_data.get());
     }
@@ -86,5 +87,16 @@ public:
             std::span<uint16_t>(reinterpret_cast<uint16_t*>(m_data.get()), width * height);
         std::ranges::for_each(
             rgb565_data.begin(), rgb565_data.end(), [rgb585](uint16_t& pixel) { pixel = rgb585; });
+    }
+};
+
+
+class BlankAlphaImage : public StandaloneImage
+{
+public:
+    BlankAlphaImage(uint16_t width, uint16_t height)
+        : StandaloneImage(std::make_unique<uint8_t[]>(width * height * 4), width, height, 4)
+    {
+        memset(m_data.get(), 0, width * height * 4);
     }
 };
