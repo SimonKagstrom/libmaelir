@@ -17,8 +17,11 @@ public:
     };
 
     RotaryEncoder(hal::IGpio& pin_a, hal::IGpio& pin_b);
+    virtual ~RotaryEncoder() = default;
 
-    std::unique_ptr<ListenerCookie> AttachIrqListener(std::function<void(Direction)> on_rotation);
+    // Virtual for the simulator
+    virtual std::unique_ptr<ListenerCookie>
+    AttachIrqListener(std::function<void(Direction)> on_rotation);
 
 private:
     void Process();
