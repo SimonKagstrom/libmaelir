@@ -1,7 +1,9 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <lvgl.h>
 #include <memory>
@@ -80,13 +82,27 @@ class SingleColorImage : public StandaloneImage
 {
 public:
     SingleColorImage(size_t width, size_t height, unsigned pixel_size, uint16_t rgb585)
-        : StandaloneImage(
-              std::make_unique<uint8_t[]>(width * height * pixel_size), width, height, pixel_size)
+        : StandaloneImage(AllocAlignedData(width * height * pixel_size, LV_DRAW_BUF_ALIGN),
+                          width,
+                          height,
+                          pixel_size)
     {
         auto rgb565_data =
             std::span<uint16_t>(reinterpret_cast<uint16_t*>(m_data.get()), width * height);
         std::ranges::for_each(
             rgb565_data.begin(), rgb565_data.end(), [rgb585](uint16_t& pixel) { pixel = rgb585; });
+    }
+
+private:
+    std::unique_ptr<uint8_t[]> AllocAlignedData(size_t size, unsigned alignment)
+    {
+        // Ensure the data is 4-byte aligned for ARGB8888 format
+        void* ptr = nullptr;
+        if (posix_memalign(&ptr, alignment, size) != 0)
+        {
+            assert(false && "Failed to allocate aligned memory");
+        }
+        return std::unique_ptr<uint8_t[]>(reinterpret_cast<uint8_t*>(ptr));
     }
 };
 
