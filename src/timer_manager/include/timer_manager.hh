@@ -12,7 +12,7 @@
 namespace os
 {
 
-constexpr auto kMaxTimers = 8;
+constexpr auto kMaxTimers = 32;
 
 class ITimer
 {
