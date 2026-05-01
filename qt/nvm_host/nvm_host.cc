@@ -4,8 +4,8 @@
 #include <iostream>
 #include <sstream>
 
-NvmHost::NvmHost(std::string_view file_name) :
-    m_file_name(file_name)
+NvmHost::NvmHost(std::string_view file_name)
+    : m_file_name(file_name)
 {
     // Read the file (key : value pairs) and populate m_storage_cache
     std::ifstream file(m_file_name);
@@ -37,6 +37,10 @@ NvmHost::Commit()
     if (file.is_open())
     {
         for (const auto& [key, value] : m_storage_cache)
+        {
+            file << key << ':' << value << '\n';
+        }
+        for (const auto& [key, value] : m_storage_cache_string)
         {
             file << key << ':' << value << '\n';
         }
@@ -73,4 +77,21 @@ void
 NvmHost::SetUint32_t(const char* key, uint32_t value)
 {
     m_storage_cache[key] = value;
+}
+
+std::optional<std::string>
+NvmHost::GetString(const char* key)
+{
+    if (auto it = m_storage_cache_string.find(key); it != m_storage_cache_string.end())
+    {
+        return it->second;
+    }
+
+    return std::nullopt;
+}
+
+void
+NvmHost::SetString(const char* key, const std::string_view value)
+{
+    m_storage_cache_string[key] = std::string(value);
 }

@@ -16,8 +16,11 @@ public:
 private:
     std::optional<uint32_t> GetUint32_t(const char* key) final;
     void SetUint32_t(const char* key, uint32_t value) final;
+    std::optional<std::string> GetString(const char* key) final;
+    void SetString(const char* key, const std::string_view value) final;
 
 
     const std::string m_file_name;
     std::map<std::string, uint32_t> m_storage_cache;
+    std::map<std::string, std::string> m_storage_cache_string;
 };

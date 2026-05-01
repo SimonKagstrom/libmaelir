@@ -63,3 +63,23 @@ NvmTarget::SetUint32_t(const char* key, uint32_t value)
     // Hope for the best and ignore the error
     nvs_set_u32(m_handle, key, value);
 }
+
+std::optional<std::string>
+NvmTarget::GetString(const char* key)
+{
+    size_t required_size = 0;
+    auto err = nvs_get_str(m_handle, key, nullptr, &required_size);
+    if (err == ESP_OK)
+    {
+        std::string value(required_size, '\0');
+        nvs_get_str(m_handle, key, value.data(), &required_size);
+        return value;
+    }
+    return std::nullopt;
+}
+
+void
+NvmTarget::SetString(const char* key, const std::string_view value)
+{
+    nvs_set_str(m_handle, key, value.data());
+}
