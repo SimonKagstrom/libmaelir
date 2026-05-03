@@ -44,6 +44,9 @@ public:
     void Start(const char* name, ThreadCore core, ThreadPriority priority, uint32_t stack_size)
     {
         m_running = true;
+        printf("Starting thread %s\n",
+               name
+);
         m_self = detail::StartThread(name, core, priority, stack_size, [this]() { ThreadLoop(); });
     }
 

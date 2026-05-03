@@ -74,6 +74,17 @@ public:
     }
 
 protected:
+    static std::unique_ptr<uint8_t[]> AllocAlignedData(size_t size, unsigned alignment)
+    {
+        // Ensure the data is 4-byte aligned for ARGB8888 format
+        void* ptr = nullptr;
+        if (posix_memalign(&ptr, alignment, size) != 0)
+        {
+            assert(false && "Failed to allocate aligned memory");
+        }
+        return std::unique_ptr<uint8_t[]>(reinterpret_cast<uint8_t*>(ptr));
+    }
+
     std::unique_ptr<uint8_t[]> m_data;
 };
 
@@ -92,18 +103,6 @@ public:
         std::ranges::for_each(
             rgb565_data.begin(), rgb565_data.end(), [rgb585](uint16_t& pixel) { pixel = rgb585; });
     }
-
-private:
-    std::unique_ptr<uint8_t[]> AllocAlignedData(size_t size, unsigned alignment)
-    {
-        // Ensure the data is 4-byte aligned for ARGB8888 format
-        void* ptr = nullptr;
-        if (posix_memalign(&ptr, alignment, size) != 0)
-        {
-            assert(false && "Failed to allocate aligned memory");
-        }
-        return std::unique_ptr<uint8_t[]>(reinterpret_cast<uint8_t*>(ptr));
-    }
 };
 
 
@@ -111,7 +110,7 @@ class BlankAlphaImage : public StandaloneImage
 {
 public:
     BlankAlphaImage(uint16_t width, uint16_t height)
-        : StandaloneImage(std::make_unique<uint8_t[]>(width * height * 4), width, height, 4)
+        : StandaloneImage(AllocAlignedData(width * height * 4, LV_DRAW_BUF_ALIGN), width, height, 4)
     {
         memset(m_data.get(), 0, width * height * 4);
     }
