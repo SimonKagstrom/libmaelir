@@ -8,8 +8,7 @@ future.
 Only the unit tests can be built separately:
 
 ```
-conan install -of libmaelir_conan --build=missing -s build_type=Debug conanfile.txt
-cmake -B libmaelir_unittest -GNinja -DCMAKE_PREFIX_PATH="`pwd`/libmaelir_conan/build/Debug/generators/" -DCMAKE_BUILD_TYPE=Debug test/unittest
+cmake -GNinja -B radbuzz_unittest <path-to-libmaelir>/test/unittest/
 ```
 
 ## Linking
