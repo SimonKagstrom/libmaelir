@@ -70,10 +70,8 @@ private:
     std::array<Entry, kMaxTimers> m_timers {};
     etl::vector<uint8_t, kMaxTimers> m_active_timers;
 
-    milliseconds m_last_expiery;
-
-
     IEventNotifier& m_notifier;
+    milliseconds m_last_expiery;
 
     etl::bitset<kMaxTimers, uint8_t> m_pending_removals;
     etl::bitset<kMaxTimers, uint8_t> m_pending_additions;

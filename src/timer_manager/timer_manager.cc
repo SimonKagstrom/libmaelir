@@ -14,7 +14,10 @@ public:
     {
     }
 
-    ~TimerImpl()
+    TimerImpl(const TimerImpl&) = delete;
+    TimerImpl& operator=(const TimerImpl&) = delete;
+
+    ~TimerImpl() final
     {
         if (!IsExpired())
         {
