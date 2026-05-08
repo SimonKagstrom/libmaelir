@@ -85,6 +85,8 @@ private:
     std::vector<std::unique_ptr<trompeloeil::expectation>> m_expectations;
 };
 
+TEST_SUITE_BEGIN("opportunistic_scheduler");
+
 TEST_CASE_FIXTURE(SchedulerFixture, "scheduling without waiters is a nop")
 {
     FORBID_CALL(*current_thread, Suspend());
@@ -181,7 +183,6 @@ TEST_CASE_FIXTURE(SchedulerFixture, "a pending wakeup can be added to the schedu
     }
 }
 
-
 TEST_CASE_FIXTURE(SchedulerFixture, "early entries are transformed to pending and woke entries")
 {
     WHEN("an event entry which should not wake earlier than in 10 ms is added")
@@ -247,6 +248,7 @@ TEST_CASE_FIXTURE(SchedulerFixture, "early entries are transformed to pending an
         }
     }
 }
+
 
 TEST_CASE_FIXTURE(SchedulerFixture,
                   "the scheduler can be triggered to wake pending entries on release()")
@@ -638,3 +640,5 @@ TEST_CASE_FIXTURE(SchedulerFixture,
         }
     }
 }
+
+TEST_SUITE_END();

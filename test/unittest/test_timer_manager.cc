@@ -19,6 +19,8 @@ class Fixture : public TimeFixture
 
 } // namespace
 
+TEST_SUITE_BEGIN("timer_manager");
+
 
 TEST_CASE_FIXTURE(Fixture, "the timer manager is empty by default")
 {
@@ -217,7 +219,6 @@ TEST_CASE_FIXTURE(Fixture, "a single shot timer is recreated after timeout")
     }
 }
 
-
 TEST_CASE_FIXTURE(Fixture, "a periodic timer is created")
 {
     TimerManager manager(m_sem);
@@ -265,6 +266,7 @@ TEST_CASE_FIXTURE(Fixture, "a periodic timer is created")
         }
     }
 }
+
 
 
 TEST_CASE_FIXTURE(Fixture, "multiple timers are used")
@@ -502,3 +504,5 @@ TEST_CASE_FIXTURE(Fixture, "a new timer can be started from the timer callback")
         }
     }
 }
+
+TEST_SUITE_END();

@@ -1,6 +1,8 @@
 #include "nmea_parser.hh"
 #include "test.hh"
 
+TEST_SUITE_BEGIN("nmea_parser");
+
 TEST_CASE("the NMEA parser can pass GPS data in the sunny-day case")
 {
     NmeaParser parser;
@@ -65,3 +67,6 @@ TEST_CASE("an empty NMEA message is handled")
 {
     //"$GPGGA,171029.00,,,    "
 }
+
+
+TEST_SUITE_END();
