@@ -14,7 +14,7 @@ DisplayJd9365::DisplayJd9365(esp_lcd_panel_io_handle_t io_handle,
 
     ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(
         m_panel_handle, 2, (void**)&m_frame_buffers[0], (void**)&m_frame_buffers[1]));
-    // An extra once for the bounce buffer
+    // An extra once for the rotation buffer
     m_frame_buffers[2] = reinterpret_cast<uint16_t*>(
         heap_caps_aligned_calloc(CONFIG_CACHE_L2_CACHE_LINE_SIZE,
                                  1,

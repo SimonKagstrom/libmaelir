@@ -15,21 +15,14 @@ public:
     void Flip() final;
 
 private:
-    enum class FrameBufferOwner
-    {
-        kDriver,
-        kHardware,
-    };
-
     void SetActive(bool active) final;
 
     void OnVsync();
 
     esp_lcd_panel_handle_t m_panel_handle {nullptr};
-    uint16_t* m_frame_buffers[3] {nullptr, nullptr};
+    uint16_t* m_frame_buffers[3] {nullptr, nullptr, nullptr};
     std::atomic<uint8_t> m_current_update_frame {0};
 
-    std::atomic<FrameBufferOwner> m_owner {FrameBufferOwner::kDriver};
     std::atomic_bool m_flip_requested {false};
     std::atomic_bool m_vsync_requested {false};
     std::atomic_bool m_active {true};
