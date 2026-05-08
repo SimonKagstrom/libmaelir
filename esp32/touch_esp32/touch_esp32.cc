@@ -36,7 +36,9 @@ TouchEsp32::GetActiveTouchData()
 
     for (int i = 0; i < m_tp->data.points; ++i)
     {
-        const auto& point = m_tp->data.coords[i];
+        auto point = m_tp->data.coords[i];
+
+        std::swap(point.x, point.y);
         m_touch_data_buffer.push_back(
             {.pressed = true, .was_pressed = m_was_pressed, .x = point.x, .y = point.y});
 
