@@ -1,5 +1,7 @@
 #include "touch_esp32.hh"
 
+#include "i_display_properties.hh"
+
 TouchEsp32::TouchEsp32(esp_lcd_touch_handle_t tp)
     : m_tp(tp)
 {
@@ -39,6 +41,8 @@ TouchEsp32::GetActiveTouchData()
         auto point = m_tp->data.coords[i];
 
         std::swap(point.x, point.y);
+        point.x = hal::kDisplayWidth - point.x;
+
         m_touch_data_buffer.push_back(
             {.pressed = true, .was_pressed = m_was_pressed, .x = point.x, .y = point.y});
 
