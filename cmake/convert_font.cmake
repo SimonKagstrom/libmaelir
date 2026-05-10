@@ -7,17 +7,36 @@ function(convert_font BASE_NAME TTF SIZE_PIXELS RANGE EXTRA_SYMBOLS)
     set(out_c ${OUTPUT_DIR}/${BASE_NAME}.c)
     set(out_h ${OUTPUT_DIR}/${BASE_NAME}.h)
 
+    set(FONT_CONV_CMD
+        ${LV_FONT_CONV_EXECUTABLE}
+        --no-compress
+        --no-prefilter
+        --bpp 4
+        --size ${SIZE_PIXELS}
+    )
+
+    foreach(FONT_FILE IN LISTS TTF)
+        list(APPEND FONT_CONV_CMD --font ${FONT_FILE})
+    endforeach()
+
+    if(NOT "${RANGE}" STREQUAL "")
+        list(APPEND FONT_CONV_CMD -r ${RANGE})
+    endif()
+
+    if(NOT "${EXTRA_SYMBOLS}" STREQUAL "")
+        list(APPEND FONT_CONV_CMD --symbols ${EXTRA_SYMBOLS})
+    endif()
+
+    list(APPEND FONT_CONV_CMD
+        --format lvgl
+        -o ${out_c}
+        --force-fast-kern-format
+    )
+
     add_custom_command(
         OUTPUT ${out_c} ${out_h}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../external/lvgl/scripts/built_in_font/
         COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR}
-        COMMAND
-            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../external/lvgl/scripts/built_in_font/built_in_font_gen.py
-            --bpp 4
-            --range ${RANGE}
-            --symbols ${EXTRA_SYMBOLS}
-            --size ${SIZE_PIXELS}
-            -o ${out_c}
+        COMMAND ${FONT_CONV_CMD}
 
         COMMAND ${CMAKE_COMMAND} -E echo '\#include \"lvgl.h\"' > ${out_h}
         COMMAND ${CMAKE_COMMAND} -E echo 'constexpr auto kPixelSize_${BASE_NAME} = ${SIZE_PIXELS}\;' >> ${out_h}
@@ -50,4 +69,8 @@ function(convert_font BASE_NAME TTF SIZE_PIXELS RANGE EXTRA_SYMBOLS)
         lvgl
     )
     
+endfunction()
+
+function(convert_symbols BASE_NAME SIZE_PIXELS RANGE )
+    convert_font(${BASE_NAME} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../external/lvgl/scripts/built_in_font/FontAwesome5-Solid+Brands+Regular.woff ${SIZE_PIXELS} ${RANGE} "")
 endfunction()
