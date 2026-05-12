@@ -2,10 +2,13 @@
 
 #include "thread_parameters.hh"
 
+#include <esp_heap_caps.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/idf_additions.h>
 #include <freertos/task.h>
 #include <functional>
+#include <memory>
+#include <new>
 
 namespace os::detail
 {
@@ -63,6 +66,48 @@ SuspendThread(ThreadHandle thread)
 }
 
 void WaitThreadExit(ThreadHandle thread);
+
+
+template <typename T>
+using OsMemPtr = std::unique_ptr<T, void (*)(T*)>;
+
+template <typename T>
+inline OsMemPtr<T>
+AllocEsp32Mem(auto alignment, auto flags)
+{
+    const size_t alloc_alignment = alignment > alignof(T) ? alignment : alignof(T);
+    void* raw_ptr = heap_caps_aligned_calloc(alloc_alignment, 1, sizeof(T), flags);
+    auto deleter = +[](T* ptr) {
+        if (ptr != nullptr)
+        {
+            ptr->~T();
+            heap_caps_free(ptr);
+        }
+    };
+
+    if (raw_ptr == nullptr)
+    {
+        return OsMemPtr<T>(nullptr, deleter);
+    }
+
+    auto* object = new (raw_ptr) T();
+    return OsMemPtr<T>(object, deleter);
+}
+
+
+template <typename T>
+inline OsMemPtr<T>
+AllocFastMem(unsigned alignment)
+{
+    return AllocEsp32Mem<T>(alignment, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+}
+
+template <typename T>
+inline OsMemPtr<T>
+AllocSlowMem(unsigned alignment)
+{
+    return AllocEsp32Mem<T>(alignment, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+}
 
 } // namespace detail
 
