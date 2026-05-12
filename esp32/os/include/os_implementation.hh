@@ -10,6 +10,14 @@
 #include <memory>
 #include <new>
 
+namespace os
+{
+
+template <typename T>
+using mem_unique_ptr = std::unique_ptr<T, void (*)(T*)>;
+
+}
+
 namespace os::detail
 {
 
@@ -69,10 +77,7 @@ void WaitThreadExit(ThreadHandle thread);
 
 
 template <typename T>
-using OsMemPtr = std::unique_ptr<T, void (*)(T*)>;
-
-template <typename T>
-inline OsMemPtr<T>
+inline mem_unique_ptr<T>
 AllocEsp32Mem(auto alignment, auto flags)
 {
     const size_t alloc_alignment = alignment > alignof(T) ? alignment : alignof(T);
@@ -87,23 +92,23 @@ AllocEsp32Mem(auto alignment, auto flags)
 
     if (raw_ptr == nullptr)
     {
-        return OsMemPtr<T>(nullptr, deleter);
+        return mem_unique_ptr<T>(nullptr, deleter);
     }
 
     auto* object = new (raw_ptr) T();
-    return OsMemPtr<T>(object, deleter);
+    return mem_unique_ptr<T>(object, deleter);
 }
 
 
 template <typename T>
-inline OsMemPtr<T>
+inline mem_unique_ptr<T>
 AllocFastMem(unsigned alignment)
 {
     return AllocEsp32Mem<T>(alignment, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
 }
 
 template <typename T>
-inline OsMemPtr<T>
+inline mem_unique_ptr<T>
 AllocSlowMem(unsigned alignment)
 {
     return AllocEsp32Mem<T>(alignment, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);

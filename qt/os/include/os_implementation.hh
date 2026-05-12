@@ -14,6 +14,9 @@ struct ThreadContext;
 
 using ThreadHandle = ThreadContext*;
 
+template <typename T>
+using mem_unique_ptr = std::unique_ptr<T, void (*)(T*)>;
+
 namespace detail
 {
 
@@ -33,10 +36,8 @@ void SuspendThread(ThreadHandle thread);
 void WaitThreadExit(ThreadHandle thread);
 
 template <typename T>
-using OsMemPtr = std::unique_ptr<T, void (*)(T*)>;
-
-template <typename T>
-inline OsMemPtr<T> AllocFastMem(unsigned alignment [[maybe_unused]])
+inline mem_unique_ptr<T>
+AllocFastMem(unsigned alignment [[maybe_unused]])
 {
     const size_t alloc_alignment = alignment > alignof(T) ? alignment : alignof(T);
     auto deleter = +[](T* ptr) {
@@ -50,15 +51,16 @@ inline OsMemPtr<T> AllocFastMem(unsigned alignment [[maybe_unused]])
     void* raw_ptr = nullptr;
     if (posix_memalign(&raw_ptr, alloc_alignment, sizeof(T)) != 0)
     {
-        return OsMemPtr<T>(nullptr, deleter);
+        return mem_unique_ptr<T>(nullptr, deleter);
     }
 
     auto* object = new (raw_ptr) T();
-    return OsMemPtr<T>(object, deleter);
+    return mem_unique_ptr<T>(object, deleter);
 }
 
 template <typename T>
-inline OsMemPtr<T> AllocSlowMem(unsigned alignment)
+inline mem_unique_ptr<T>
+AllocSlowMem(unsigned alignment)
 {
     // Same on Qt
     return detail::AllocFastMem<T>(alignment);
