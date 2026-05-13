@@ -18,7 +18,7 @@ private:
 
     void BlitOperations(std::span<const hal::BlitOperation> operations) final;
 
-    void BlitOne(const hal::BlitOperation& op, bool last, int16_t &min_x, int16_t &max_x, int16_t &min_y, int16_t &max_y);
+    void BlitOne(const hal::BlitOperation& op, bool last);
 
     bool OnTransactionDone();
 

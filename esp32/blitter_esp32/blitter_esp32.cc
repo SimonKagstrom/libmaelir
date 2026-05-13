@@ -72,34 +72,13 @@ BlitterEsp32::BlitterEsp32()
 
 void
 BlitterEsp32::BlitOne(const hal::BlitOperation& op,
-                      bool last,
-                      int16_t& min_x,
-                      int16_t& max_x,
-                      int16_t& min_y,
-                      int16_t& max_y)
+                      bool last)
 {
     ppa_srm_rotation_angle_t angle =
         static_cast<ppa_srm_rotation_angle_t>(std::to_underlying(op.rotation));
     auto [dst_pic_w, dst_pic_h] = GetDestinationPictureSize(op);
     const uint32_t src_pic_w =
         static_cast<uint32_t>(op.src_stride > 0 ? op.src_stride : op.src_width);
-
-    if (op.dst_offset_x < min_x)
-    {
-        min_x = op.dst_offset_x;
-    }
-    if (op.dst_offset_x + op.width > max_x)
-    {
-        max_x = op.dst_offset_x + op.width;
-    }
-    if (op.dst_offset_y < min_y)
-    {
-        min_y = op.dst_offset_y;
-    }
-    if (op.dst_offset_y + op.height > max_y)
-    {
-        max_y = op.dst_offset_y + op.height;
-    }
 
     ppa_srm_oper_config_t cfg = {
         .in =
@@ -160,10 +139,6 @@ BlitterEsp32::BlitOperations(std::span<const hal::BlitOperation> operations)
     uint16_t* dst_buffer = m_prepared_operations.front().dst_data;
     const size_t dst_buffer_bytes = GetDestinationBufferSizeBytes(m_prepared_operations.front());
 
-    // Flush CPU writes (e.g., memset) to physical memory before PPA DMA reads the destination
-    esp_cache_msync(dst_buffer,
-                    dst_buffer_bytes,
-                    ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA);
     // Flush source tile data: PNG decode writes via CPU/L2 cache, PPA DMA reads from physical memory
     for (const auto& op : m_prepared_operations)
     {
@@ -175,15 +150,9 @@ BlitterEsp32::BlitOperations(std::span<const hal::BlitOperation> operations)
                         ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA);
     }
 
-    int16_t min_x = 0, max_x = ~0, min_y = 0, max_y = ~0;
     for (size_t i = 0; i < m_prepared_operations.size(); ++i)
     {
-        BlitOne(m_prepared_operations[i],
-                i == m_prepared_operations.size() - 1,
-                min_x,
-                max_x,
-                min_y,
-                max_y);
+        BlitOne(m_prepared_operations[i], i == m_prepared_operations.size() - 1);
     }
 
     // Invalidate CPU cache so CPU sees the data PPA DMA wrote to physical memory
