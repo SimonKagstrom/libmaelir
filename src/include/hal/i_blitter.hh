@@ -14,8 +14,11 @@ struct BlitOperation
     uint16_t* dst_data;
     int16_t src_width;
     int16_t src_height;
+    int16_t src_stride;
     int16_t src_offset_x;
     int16_t src_offset_y;
+    int16_t dst_stride;
+    int16_t dst_height;
     int16_t dst_offset_x;
     int16_t dst_offset_y;
     int16_t width;

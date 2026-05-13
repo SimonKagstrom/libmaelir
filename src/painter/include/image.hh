@@ -9,6 +9,8 @@
 #include <memory>
 #include <span>
 
+#include "os/memory.hh"
+
 class Image
 {
 public:
@@ -93,7 +95,7 @@ class SingleColorImage : public StandaloneImage
 {
 public:
     SingleColorImage(size_t width, size_t height, unsigned pixel_size, uint16_t rgb585)
-        : StandaloneImage(AllocAlignedData(width * height * pixel_size, LV_DRAW_BUF_ALIGN),
+        : StandaloneImage(AllocAlignedData(width * height * pixel_size, 128),
                           width,
                           height,
                           pixel_size)
@@ -110,7 +112,7 @@ class BlankAlphaImage : public StandaloneImage
 {
 public:
     BlankAlphaImage(uint16_t width, uint16_t height)
-        : StandaloneImage(AllocAlignedData(width * height * 4, LV_DRAW_BUF_ALIGN), width, height, 4)
+        : StandaloneImage(AllocAlignedData(width * height * 4, 128), width, height, 4)
     {
         memset(m_data.get(), 0, width * height * 4);
     }

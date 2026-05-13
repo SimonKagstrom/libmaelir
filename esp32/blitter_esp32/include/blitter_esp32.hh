@@ -14,16 +14,11 @@ public:
     BlitterEsp32();
 
 private:
-    static constexpr auto kTileSize = 256;
-    static constexpr auto kTilePixelCount = kTileSize * kTileSize;
-    static constexpr auto kMaxTransactions =
-        (hal::kDisplayWidth * hal::kDisplayHeight) / kTilePixelCount +
-        hal::kDisplayWidth / kTileSize + 1 + hal::kDisplayHeight / kTileSize +
-        8; // Worst case: all tiles are 1 pixel and we have to blit each pixel separately, plus some extra for partial tiles on the edges
+    static constexpr auto kMaxTransactions = 48; // Worst case: all tiles are 1 pixel and we have to blit each pixel separately, plus some extra for partial tiles on the edges
 
     void BlitOperations(std::span<const hal::BlitOperation> operations) final;
 
-    void BlitOne(const hal::BlitOperation& op, bool last);
+    void BlitOne(const hal::BlitOperation& op, bool last, int16_t &min_x, int16_t &max_x, int16_t &min_y, int16_t &max_y);
 
     bool OnTransactionDone();
 

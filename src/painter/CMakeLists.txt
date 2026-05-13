@@ -6,6 +6,7 @@ target_link_libraries(painter
 PUBLIC
     libmaelir_interface
     lvgl
+    os
 )
 
 target_include_directories(painter

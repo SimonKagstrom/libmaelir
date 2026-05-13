@@ -27,10 +27,15 @@ BlitterHost::BlitOne(const hal::BlitOperation& op)
     // kDisplayWidth x kDisplayHeight. For a full-screen rotated blit the output picture is the
     // physical panel size, which is src_height x src_width (axes swapped). We derive the dst
     // picture width from dst_offset + out_width <= dst_pic_w, using the op's output dimensions.
-    const int32_t dst_pic_w =
-        (op.rotation != hal::Rotation::k0) ? op.src_height : hal::kDisplayWidth;
+    const int32_t src_stride = (op.src_stride > 0) ? op.src_stride : op.src_width;
+    const int32_t dst_pic_w = (op.dst_stride > 0)
+                                  ? op.dst_stride
+                                  : ((op.rotation != hal::Rotation::k0) ? op.src_height
+                                                                        : hal::kDisplayWidth);
     const int32_t dst_pic_h =
-        (op.rotation != hal::Rotation::k0) ? op.src_width : hal::kDisplayHeight;
+        (op.dst_height > 0)
+            ? op.dst_height
+            : ((op.rotation != hal::Rotation::k0) ? op.src_width : hal::kDisplayHeight);
 
     for (int32_t line = 0; line < out_height; ++line)
     {
@@ -87,7 +92,7 @@ BlitterHost::BlitOne(const hal::BlitOperation& op)
                 continue;
             }
 
-            auto src_color = op.src_data[src_y * op.src_width + src_x];
+            auto src_color = op.src_data[src_y * src_stride + src_x];
             op.dst_data[dst_y * dst_pic_w + dst_x] = src_color;
         }
     }
@@ -98,8 +103,17 @@ BlitterHost::BlitOperations(std::span<const hal::BlitOperation> operations)
 {
     for (const auto& op : operations)
     {
-        if (op.height <= 0 || op.width <= 0 || op.dst_offset_x >= hal::kDisplayWidth ||
-            op.dst_offset_y >= hal::kDisplayHeight)
+        const int32_t dst_pic_w = (op.dst_stride > 0)
+                                      ? op.dst_stride
+                                      : ((op.rotation != hal::Rotation::k0) ? op.src_height
+                                                                            : hal::kDisplayWidth);
+        const int32_t dst_pic_h =
+            (op.dst_height > 0)
+                ? op.dst_height
+                : ((op.rotation != hal::Rotation::k0) ? op.src_width : hal::kDisplayHeight);
+
+        if (op.height <= 0 || op.width <= 0 || op.dst_offset_x >= dst_pic_w ||
+            op.dst_offset_y >= dst_pic_h)
         {
             continue;
         }

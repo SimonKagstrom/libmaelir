@@ -37,14 +37,25 @@ GetDestinationFramebufferSize(hal::Rotation rotation)
     }
 }
 
+std::pair<uint32_t, uint32_t>
+GetDestinationPictureSize(const hal::BlitOperation& op)
+{
+    if (op.dst_stride > 0 && op.dst_height > 0)
+    {
+        return {static_cast<uint32_t>(op.dst_stride), static_cast<uint32_t>(op.dst_height)};
+    }
+
+    return GetDestinationFramebufferSize(op.rotation);
+}
+
 size_t
 GetDestinationBufferSizeBytes(const hal::BlitOperation& op)
 {
-    auto [dst_pic_w, dst_pic_h] = GetDestinationFramebufferSize(op.rotation);
+    auto [dst_pic_w, dst_pic_h] = GetDestinationPictureSize(op);
     return static_cast<size_t>(dst_pic_w) * static_cast<size_t>(dst_pic_h) * sizeof(uint16_t);
 }
 
-} // namespace blitter_esp32_internal
+} // namespace
 
 BlitterEsp32::BlitterEsp32()
 {
@@ -60,18 +71,42 @@ BlitterEsp32::BlitterEsp32()
 
 
 void
-BlitterEsp32::BlitOne(const hal::BlitOperation& op, bool last)
+BlitterEsp32::BlitOne(const hal::BlitOperation& op,
+                      bool last,
+                      int16_t& min_x,
+                      int16_t& max_x,
+                      int16_t& min_y,
+                      int16_t& max_y)
 {
     ppa_srm_rotation_angle_t angle =
         static_cast<ppa_srm_rotation_angle_t>(std::to_underlying(op.rotation));
-    auto [dst_pic_w, dst_pic_h] = GetDestinationFramebufferSize(op.rotation);
+    auto [dst_pic_w, dst_pic_h] = GetDestinationPictureSize(op);
+    const uint32_t src_pic_w =
+        static_cast<uint32_t>(op.src_stride > 0 ? op.src_stride : op.src_width);
+
+    if (op.dst_offset_x < min_x)
+    {
+        min_x = op.dst_offset_x;
+    }
+    if (op.dst_offset_x + op.width > max_x)
+    {
+        max_x = op.dst_offset_x + op.width;
+    }
+    if (op.dst_offset_y < min_y)
+    {
+        min_y = op.dst_offset_y;
+    }
+    if (op.dst_offset_y + op.height > max_y)
+    {
+        max_y = op.dst_offset_y + op.height;
+    }
 
     ppa_srm_oper_config_t cfg = {
         .in =
             {
                 // Source tiles are rectangular: src_width x src_height
                 .buffer = const_cast<void*>(static_cast<const void*>(op.src_data)),
-                .pic_w = static_cast<uint32_t>(op.src_width),
+                .pic_w = src_pic_w,
                 .pic_h = static_cast<uint32_t>(op.src_height),
                 .block_w = static_cast<uint32_t>(op.width),
                 .block_h = static_cast<uint32_t>(op.height),
@@ -110,14 +145,11 @@ BlitterEsp32::BlitOne(const hal::BlitOperation& op, bool last)
 void
 BlitterEsp32::BlitOperations(std::span<const hal::BlitOperation> operations)
 {
-    uint16_t* frame_buffer = nullptr;
-
     m_prepared_operations.clear();
 
     for (const auto& op : operations)
     {
         m_prepared_operations.push_back(op);
-        frame_buffer = reinterpret_cast<uint16_t*>(op.dst_data);
     }
 
     if (m_prepared_operations.empty())
@@ -125,14 +157,37 @@ BlitterEsp32::BlitOperations(std::span<const hal::BlitOperation> operations)
         return;
     }
 
-    for (size_t i = 0; i < m_prepared_operations.size(); ++i)
+    uint16_t* dst_buffer = m_prepared_operations.front().dst_data;
+    const size_t dst_buffer_bytes = GetDestinationBufferSizeBytes(m_prepared_operations.front());
+
+    // Flush CPU writes (e.g., memset) to physical memory before PPA DMA reads the destination
+    esp_cache_msync(dst_buffer,
+                    dst_buffer_bytes,
+                    ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA);
+    // Flush source tile data: PNG decode writes via CPU/L2 cache, PPA DMA reads from physical memory
+    for (const auto& op : m_prepared_operations)
     {
-        BlitOne(m_prepared_operations[i], i == m_prepared_operations.size() - 1);
+        const size_t src_bytes =
+            static_cast<size_t>(op.src_stride > 0 ? op.src_stride : op.src_width) *
+            static_cast<size_t>(op.src_height) * sizeof(uint16_t);
+        esp_cache_msync(const_cast<void*>(static_cast<const void*>(op.src_data)),
+                        src_bytes,
+                        ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA);
     }
 
-    // For now this syncs the entire screen
-    esp_cache_msync(
-        frame_buffer,
-        static_cast<size_t>(hal::kDisplayWidth * hal::kDisplayHeight * sizeof(uint16_t)),
-        ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA);
+    int16_t min_x = 0, max_x = ~0, min_y = 0, max_y = ~0;
+    for (size_t i = 0; i < m_prepared_operations.size(); ++i)
+    {
+        BlitOne(m_prepared_operations[i],
+                i == m_prepared_operations.size() - 1,
+                min_x,
+                max_x,
+                min_y,
+                max_y);
+    }
+
+    // Invalidate CPU cache so CPU sees the data PPA DMA wrote to physical memory
+    esp_cache_msync(dst_buffer,
+                    dst_buffer_bytes,
+                    ESP_CACHE_MSYNC_FLAG_DIR_M2C | ESP_CACHE_MSYNC_FLAG_TYPE_DATA);
 }
