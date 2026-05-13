@@ -121,7 +121,6 @@ BlitterEsp32::BlitOne(const hal::BlitOperation& op, bool last)
         .byte_swap = false,
         .alpha_update_mode = PPA_ALPHA_NO_CHANGE,
         .alpha_fix_val = 0,
-        // Block on the last transaction
         .mode = PPA_TRANS_MODE_NON_BLOCKING,
         .user_data = this,
     };
@@ -148,27 +147,11 @@ BlitterEsp32::BlitOperations(std::span<const hal::BlitOperation> operations)
     uint16_t* dst_buffer = m_prepared_operations.front().dst_data;
     const size_t dst_buffer_bytes = GetDestinationBufferSizeBytes(m_prepared_operations.front());
 
-    // Flush source tile data: PNG decode writes via CPU/L2 cache, PPA DMA reads from physical memory
-    for (const auto& op : m_prepared_operations)
-    {
-        const size_t src_bytes =
-            static_cast<size_t>(op.src_stride > 0 ? op.src_stride : op.src_width) *
-            static_cast<size_t>(op.src_height) * sizeof(uint16_t);
-        esp_cache_msync(const_cast<void*>(static_cast<const void*>(op.src_data)),
-                        src_bytes,
-                        ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA);
-    }
-
     m_pending_transactions += static_cast<uint32_t>(m_prepared_operations.size());
     for (size_t i = 0; i < m_prepared_operations.size(); ++i)
     {
         BlitOne(m_prepared_operations[i], i == m_prepared_operations.size() - 1);
     }
-
-    // Invalidate CPU cache so CPU sees the data PPA DMA wrote to physical memory
-    esp_cache_msync(dst_buffer,
-                    dst_buffer_bytes,
-                    ESP_CACHE_MSYNC_FLAG_DIR_M2C | ESP_CACHE_MSYNC_FLAG_TYPE_DATA);
 }
 
 void
