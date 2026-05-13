@@ -9,6 +9,10 @@ public:
 
 private:
     void BlitOperations(std::span<const hal::BlitOperation> operations) final;
+    void WaitForBlitsDone() final
+    {
+        // Nothing
+    }
 
     void BlitOne(const hal::BlitOperation& op);
 };

@@ -67,12 +67,21 @@ BlitterEsp32::BlitterEsp32()
 
     auto res = ppa_register_client(&cfg, &m_client);
     assert(res == ESP_OK);
+
+    auto event_callbacks = ppa_event_callbacks_t {
+        .on_trans_done = [](ppa_client_handle_t ppa_client, ppa_event_data_t *event_data, void *user_data) {
+            auto* self = static_cast<BlitterEsp32*>(user_data);
+            self->OnTransactionDone();
+
+            return false;
+        },
+    };
+    ppa_client_register_event_callbacks(m_client, &event_callbacks);
 }
 
 
 void
-BlitterEsp32::BlitOne(const hal::BlitOperation& op,
-                      bool last)
+BlitterEsp32::BlitOne(const hal::BlitOperation& op, bool last)
 {
     ppa_srm_rotation_angle_t angle =
         static_cast<ppa_srm_rotation_angle_t>(std::to_underlying(op.rotation));
@@ -113,8 +122,8 @@ BlitterEsp32::BlitOne(const hal::BlitOperation& op,
         .alpha_update_mode = PPA_ALPHA_NO_CHANGE,
         .alpha_fix_val = 0,
         // Block on the last transaction
-        .mode = last ? PPA_TRANS_MODE_BLOCKING : PPA_TRANS_MODE_NON_BLOCKING,
-        .user_data = nullptr,
+        .mode = PPA_TRANS_MODE_NON_BLOCKING,
+        .user_data = this,
     };
 
     auto ret = ppa_do_scale_rotate_mirror(m_client, &cfg);
@@ -150,6 +159,7 @@ BlitterEsp32::BlitOperations(std::span<const hal::BlitOperation> operations)
                         ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA);
     }
 
+    m_pending_transactions += static_cast<uint32_t>(m_prepared_operations.size());
     for (size_t i = 0; i < m_prepared_operations.size(); ++i)
     {
         BlitOne(m_prepared_operations[i], i == m_prepared_operations.size() - 1);
@@ -159,4 +169,23 @@ BlitterEsp32::BlitOperations(std::span<const hal::BlitOperation> operations)
     esp_cache_msync(dst_buffer,
                     dst_buffer_bytes,
                     ESP_CACHE_MSYNC_FLAG_DIR_M2C | ESP_CACHE_MSYNC_FLAG_TYPE_DATA);
+}
+
+void
+BlitterEsp32::OnTransactionDone()
+{
+    const int32_t previous = m_pending_transactions.fetch_sub(1, std::memory_order_acq_rel);
+    if (previous == 1)
+    {
+        m_transaction_done_semaphore.release();
+    }
+}
+
+void
+BlitterEsp32::WaitForBlitsDone()
+{
+    if (m_pending_transactions.load() > 0)
+    {
+        m_transaction_done_semaphore.acquire();
+    }
 }

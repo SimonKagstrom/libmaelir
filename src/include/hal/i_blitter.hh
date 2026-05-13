@@ -32,6 +32,8 @@ public:
     virtual ~IBlitter() = default;
 
     virtual void BlitOperations(std::span<const hal::BlitOperation> operations) = 0;
+
+    virtual void WaitForBlitsDone() = 0;
 };
 
 } // namespace hal
