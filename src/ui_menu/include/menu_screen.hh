@@ -6,6 +6,7 @@
 #include <etl/vector.h>
 #include <functional>
 #include <string>
+#include <string_view>
 
 class MenuScreen
 {
@@ -36,6 +37,11 @@ public:
         void AddBooleanEntry(const char* text,
                              bool default_value,
                              const std::function<void(bool)>& on_click);
+
+        void AddRollerEntry(const char* text,
+                            std::span<const std::string_view> values,
+                            std::string_view default_value,
+                            const std::function<void(int which)>& on_click);
 
         void AddNumericEntry(const char* text,
                              NumericEntryConfig config,

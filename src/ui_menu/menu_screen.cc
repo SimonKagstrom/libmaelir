@@ -31,7 +31,9 @@ MenuScreen::MenuScreen(os::TimerManager& timer_manager,
     lv_style_set_radius(&m_style_numeric_roller_selected, 10);
 
     m_input_group = lv_group_create();
+    lv_group_set_wrap(m_input_group, false);
     m_menu = lv_menu_create(m_screen);
+    lv_obj_set_scrollbar_mode(m_menu, LV_SCROLLBAR_MODE_OFF);
 
     lv_obj_set_size(m_menu, hal::kDisplayWidth * 0.68f, hal::kDisplayHeight * 0.80f);
     lv_obj_center(m_menu);
@@ -82,6 +84,7 @@ MenuScreen::~MenuScreen()
         lv_indev_set_group(m_lvgl_input_dev, nullptr);
     }
     lv_group_delete(m_input_group);
+    lv_obj_delete(m_menu);
 }
 
 void
@@ -125,9 +128,12 @@ MenuScreen::Page::AddSubPage(const char* text)
     lv_label_set_text(next_indicator, LV_SYMBOL_RIGHT);
     lv_group_add_obj(m_parent.m_input_group, cont);
     lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
+    lv_obj_set_scrollbar_mode(page, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_flex_grow(label, 1);
 
     lv_menu_set_load_page_event(m_parent.m_menu, cont, page);
+    m_parent.m_event_listeners.push_back(LvEventListener::Create(
+        cont, LV_EVENT_FOCUSED, [cont](lv_event_t*) { lv_obj_scroll_to_view(cont, LV_ANIM_OFF); }));
     m_parent.m_event_listeners.push_back(LvEventListener::Create(
         cont, LV_EVENT_CLICKED, [group = m_parent.m_input_group](lv_event_t*) {
             lv_group_focus_next(group);
@@ -147,6 +153,8 @@ MenuScreen::Page::AddEntry(const std::string& text, const std::function<void()>&
     lv_group_add_obj(m_parent.m_input_group, cont);
     lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
     lv_obj_set_flex_grow(label, 1);
+    m_parent.m_event_listeners.push_back(LvEventListener::Create(
+        cont, LV_EVENT_FOCUSED, [cont](lv_event_t*) { lv_obj_scroll_to_view(cont, LV_ANIM_OFF); }));
 
     m_parent.m_event_listeners.push_back(
         LvEventListener::Create(cont, LV_EVENT_CLICKED, [on_click](lv_event_t*) { on_click(); }));
@@ -175,6 +183,10 @@ MenuScreen::Page::AddBooleanEntry(const char* text,
         boolean_switch, selected_switch_color, (int)LV_PART_INDICATOR | (int)LV_STATE_CHECKED);
 
     lv_group_add_obj(m_parent.m_input_group, boolean_switch);
+    m_parent.m_event_listeners.push_back(
+        LvEventListener::Create(boolean_switch, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
+            lv_obj_scroll_to_view(cont, LV_ANIM_OFF);
+        }));
 
     m_parent.m_event_listeners.push_back(
         LvEventListener::Create(boolean_switch, LV_EVENT_CLICKED, [on_click](lv_event_t* e) {
@@ -183,6 +195,71 @@ MenuScreen::Page::AddBooleanEntry(const char* text,
             on_click(checked);
         }));
 }
+
+void
+MenuScreen::Page::AddRollerEntry(const char* text,
+                                 std::span<const std::string_view> values,
+                                 std::string_view default_value,
+                                 const std::function<void(int which)>& on_click)
+{
+    auto cont = lv_menu_cont_create(m_page);
+    auto label = lv_label_create(cont);
+    auto roller = lv_roller_create(cont);
+
+    lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
+    lv_obj_add_style(roller,
+                     &m_parent.m_style_numeric_roller_main_focused,
+                     (int)LV_PART_MAIN | (int)LV_STATE_FOCUSED);
+    lv_obj_add_style(roller, &m_parent.m_style_numeric_roller_selected, LV_PART_SELECTED);
+    lv_obj_set_flex_grow(label, 1);
+    lv_label_set_text(label, text);
+
+    std::string options;
+    int selected_index = 0;
+    for (int i = 0; i < static_cast<int>(values.size()); i++)
+    {
+        if (!options.empty())
+        {
+            options += "\n";
+        }
+
+        auto v = values[i];
+        options += v;
+        if (v == default_value)
+        {
+            selected_index = i;
+        }
+    }
+
+    lv_roller_set_options(roller, options.c_str(), LV_ROLLER_MODE_NORMAL);
+    lv_roller_set_selected(roller, selected_index, LV_ANIM_OFF);
+    lv_roller_set_visible_row_count(roller, 1);
+
+    lv_group_add_obj(m_parent.m_input_group, roller);
+
+    // Keep the row highlighted while the roller is focused/edited.
+    m_parent.m_event_listeners.push_back(
+        LvEventListener::Create(roller, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
+            lv_obj_add_state(cont, LV_STATE_FOCUSED);
+            lv_obj_add_state(cont, LV_STATE_FOCUS_KEY);
+            lv_obj_scroll_to_view(cont, LV_ANIM_OFF);
+        }));
+
+    m_parent.m_event_listeners.push_back(
+        LvEventListener::Create(roller, LV_EVENT_DEFOCUSED, [cont](lv_event_t*) {
+            lv_obj_remove_state(cont, LV_STATE_FOCUSED);
+            lv_obj_remove_state(cont, LV_STATE_FOCUS_KEY);
+        }));
+
+    m_parent.m_event_listeners.push_back(
+        LvEventListener::Create(roller, LV_EVENT_CLICKED, [on_click](lv_event_t* e) {
+            auto roller = static_cast<lv_obj_t*>(lv_event_get_target(e));
+            auto selected = lv_roller_get_selected(roller);
+
+            on_click(selected);
+        }));
+}
+
 
 void
 MenuScreen::Page::AddNumericEntry(const char* text,
@@ -233,6 +310,7 @@ MenuScreen::Page::AddNumericEntry(const char* text,
         LvEventListener::Create(roller, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
             lv_obj_add_state(cont, LV_STATE_FOCUSED);
             lv_obj_add_state(cont, LV_STATE_FOCUS_KEY);
+            lv_obj_scroll_to_view(cont, LV_ANIM_OFF);
         }));
 
     m_parent.m_event_listeners.push_back(
