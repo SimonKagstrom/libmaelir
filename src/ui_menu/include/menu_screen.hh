@@ -67,6 +67,7 @@ public:
 
     Page& GetMainPage();
     void BumpExitTimer();
+    void ExitMenu();
 
 private:
     os::TimerManager& m_timer_manager;

@@ -96,6 +96,15 @@ MenuScreen::BumpExitTimer()
     });
 }
 
+void
+MenuScreen::ExitMenu()
+{
+    m_exit_timer = m_timer_manager.StartTimer(0s, [this]() {
+        m_on_close();
+        return std::nullopt;
+    });
+}
+
 MenuScreen::Page&
 MenuScreen::GetMainPage()
 {
