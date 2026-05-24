@@ -72,3 +72,13 @@ Filesystem::FileExists(std::string_view path) const
     fs::path full_path = fs::path(m_root_path) / fs::path(path);
     return fs::exists(full_path) && fs::is_regular_file(full_path);
 }
+
+void
+Filesystem::Move(std::string_view from, std::string_view to) const
+{
+    fs::path full_from = fs::path(m_root_path) / fs::path(from);
+    fs::path full_to = fs::path(m_root_path) / fs::path(to);
+
+    std::error_code ec;
+    fs::rename(full_from, full_to, ec);
+}
