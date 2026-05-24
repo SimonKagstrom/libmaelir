@@ -80,7 +80,10 @@ public:
         }
 
     protected:
-        explicit ReadOnly(ApplicationState& parent);
+        explicit ReadOnly(ApplicationState& parent)
+            : m_parent(parent)
+        {
+        }
 
         ApplicationState& m_parent;
     };

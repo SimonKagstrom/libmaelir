@@ -13,6 +13,7 @@ type_size_mapping = {
     "int8_t": 1,
     "int16_t": 2,
     "int32_t": 4,
+    "float" : 4,
 }
 
 
