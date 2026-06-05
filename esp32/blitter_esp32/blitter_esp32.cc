@@ -132,25 +132,18 @@ BlitterEsp32::BlitOne(const hal::BlitOperation& op, bool last)
 void
 BlitterEsp32::BlitOperations(std::span<const hal::BlitOperation> operations)
 {
-    m_prepared_operations.clear();
-
-    for (const auto& op : operations)
-    {
-        m_prepared_operations.push_back(op);
-    }
-
-    if (m_prepared_operations.empty())
+    if (operations.empty())
     {
         return;
     }
 
-    uint16_t* dst_buffer = m_prepared_operations.front().dst_data;
-    const size_t dst_buffer_bytes = GetDestinationBufferSizeBytes(m_prepared_operations.front());
+    uint16_t* dst_buffer = operations.front().dst_data;
+    const size_t dst_buffer_bytes = GetDestinationBufferSizeBytes(operations.front());
 
-    m_pending_transactions += static_cast<uint32_t>(m_prepared_operations.size());
-    for (size_t i = 0; i < m_prepared_operations.size(); ++i)
+    m_pending_transactions += static_cast<uint32_t>(operations.size());
+    for (size_t i = 0; i < operations.size(); ++i)
     {
-        BlitOne(m_prepared_operations[i], i == m_prepared_operations.size() - 1);
+        BlitOne(operations[i], i == operations.size() - 1);
     }
 }
 

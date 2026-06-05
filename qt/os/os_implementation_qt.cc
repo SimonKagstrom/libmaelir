@@ -18,8 +18,8 @@ namespace os
 {
 struct ThreadContext
 {
-    QThread* m_thread;
     os::binary_semaphore m_suspend_semaphore {0};
+    QThread* m_thread;
 };
 
 } // namespace os

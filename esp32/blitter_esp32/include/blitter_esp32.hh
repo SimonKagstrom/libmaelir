@@ -5,7 +5,6 @@
 
 #include <atomic>
 #include <driver/ppa.h>
-#include <etl/vector.h>
 
 // Warning: This class assumes correctly clipped operations are passed to the BlitOperations
 class BlitterEsp32 : public hal::IBlitter
@@ -23,7 +22,6 @@ private:
     void OnTransactionDone();
 
     ppa_client_handle_t m_client {nullptr};
-    etl::vector<hal::BlitOperation, kMaxTransactions> m_prepared_operations;
 
     os::binary_semaphore m_transaction_done_semaphore {0};
     std::atomic<int32_t> m_pending_transactions {0};
