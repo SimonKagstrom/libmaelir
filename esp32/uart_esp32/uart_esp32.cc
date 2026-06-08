@@ -1,6 +1,6 @@
 #include "uart_esp32.hh"
 
-constexpr auto kUartBufSize = 128;
+constexpr auto kUartBufSize = 1024;
 
 TargetUart::TargetUart(uart_port_t port_number, int baudrate, uint8_t rx_pin, uint8_t tx_pin)
     : m_port_number(port_number)
@@ -12,15 +12,22 @@ TargetUart::TargetUart(uart_port_t port_number, int baudrate, uint8_t rx_pin, ui
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT,
+        .flags =
+            {
+                .allow_pd = false,
+                .backup_before_sleep = false,
+            },
     };
 
-    auto intr_alloc_flags = 0;
+    auto intr_alloc_flags = ESP_INTR_FLAG_SHARED;
 
-    ESP_ERROR_CHECK(
-        uart_driver_install(m_port_number, kUartBufSize * 2, 0, 0, NULL, intr_alloc_flags));
+    ESP_ERROR_CHECK(uart_driver_install(m_port_number, kUartBufSize * 2, 0, 0, NULL, intr_alloc_flags));
     ESP_ERROR_CHECK(uart_param_config(m_port_number, &uart_config));
-    ESP_ERROR_CHECK(
-        uart_set_pin(m_port_number, tx_pin, rx_pin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    ESP_ERROR_CHECK(uart_set_pin(m_port_number,
+                                 tx_pin,
+                                 rx_pin,
+                                 UART_PIN_NO_CHANGE,
+                                 UART_PIN_NO_CHANGE));
 }
 
 void
