@@ -17,6 +17,7 @@ constexpr auto kLastIndex = {{ max_index }};
 {% for parameter in parameters %}
 struct {{ parameter.name }}
 {
+    {%- if parameter.type != 'void' %}
     {{parameter.type}} {{ parameter.name }};
 
     template<typename T>
@@ -29,8 +30,15 @@ struct {{ parameter.name }}
     {
         return {{ parameter.is_atomic|lower }};
     }
+
+    {%- endif %}
+    static consteval bool IsEvent()
+    {
+        return {{ 'true' if parameter.type == 'void' else 'false' }};
+    }
 };
 
+{% if parameter.type != 'void' %}
 template<>
 inline auto &{{ parameter.name }}::GetRef<struct {{ parameter.name }}>()
 {
@@ -42,6 +50,7 @@ inline const auto &{{ parameter.name }}::GetConstRef<struct {{ parameter.name }}
 {
     return {{parameter.name}};
 }
+{% endif %}
 
 
 {% endfor %}
@@ -51,11 +60,13 @@ template<typename T>
 auto DefaultValue();
 
 {% for asp in application_state_parameters %}
+{%- if asp.parameter.type != 'void' %}
 template<>
 consteval auto DefaultValue<struct {{ asp.parameter.name }}>()
 {
     return {{ asp.parameter.return_type }} {% for item in asp.default_value %}{{ item }}{{ ',' if not loop.last else '' }}{% endfor %};
 }
+{%- endif %}
 {% endfor %}
 
 
@@ -80,10 +91,12 @@ std::atomic<bool>
 struct state
 {
     {%- for asp in application_state_parameters %}
+    {%- if asp.parameter.type != 'void' %}
     {%- if asp.parameter.is_atomic == false %}
     std::shared_ptr<{{ asp.parameter.type }}> {{ asp.parameter.name }};
     {%- else %}
     std::atomic<{{ asp.parameter.type }}> {{ asp.parameter.name }};
+    {%- endif %}
     {%- endif %}
     {%- endfor %}
 
@@ -95,11 +108,14 @@ struct state
 };
 
 {% for asp in application_state_parameters %}
+{%- if asp.parameter.type != 'void' %}
 template<>
 inline auto &state::GetRef<struct {{ asp.parameter.name }}>()
 {
     return {{asp.parameter.name}};
 }
+
+{% endif %}
 {% endfor %}
 
 {% for param in orphans %}

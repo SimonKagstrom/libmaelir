@@ -6,6 +6,7 @@ import sys
 import os
 
 type_size_mapping = {
+    "Event" : 0,
     "bool": 1,
     "uint8_t": 1,
     "uint16_t": 2,
@@ -36,7 +37,7 @@ class Parameter:
 
     def __init__(self, name, type):
         self.name = name
-        self.type = type
+        self.type = type if type != "Event" else "void"
         self.return_type = ""
         self.is_atomic = type in type_size_mapping.keys()
 

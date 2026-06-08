@@ -106,6 +106,15 @@ public:
             m_parent.SetNoLock<T>(value);
         }
 
+        template <typename T>
+        void Post()
+        {
+            static_assert(T::IsEvent(), "Post can only be used with event parameters");
+
+            std::lock_guard lock(m_parent.m_mutex);
+            m_parent.NotifyChange(AS::IndexOf<T>());
+        }
+
     private:
         using ReadOnly::ReadOnly;
     };
@@ -254,6 +263,73 @@ public:
                 (m_checkout.template UpdateChanges<T>(cur, next), 0)...};
             m_checkout.m_state_index = next;
 
+            return m_checkout;
+        }
+
+    private:
+        Checkout m_checkout;
+    };
+
+    template <class... T>
+    class EventListener
+    {
+    public:
+        class Checkout
+        {
+        public:
+            friend class EventListener;
+
+            Checkout() = delete;
+            Checkout(const Checkout&) = delete;
+            Checkout& operator=(const Checkout&) = delete;
+            Checkout(Checkout&&) = delete;
+            Checkout& operator=(Checkout&&) = delete;
+
+            template <typename S>
+            const Checkout& OnEvent(const auto& callback) const
+            {
+                if (IsChanged<S>())
+                {
+                    callback();
+                }
+
+                return *this;
+            }
+        private:
+            template <typename S>
+            bool IsChanged() const
+            {
+                return m_changed.test(AS::IndexOf<S>());
+            }
+
+            explicit Checkout(ApplicationState& parent)
+                : m_parent(parent)
+            {
+            }
+
+            ApplicationState& m_parent;
+
+            // TODO:  Use local index
+            std::array<AS::storage::partial_state<T...>, 2> m_state;
+            uint8_t m_state_index {0};
+            ParameterBitset m_changed;
+        };
+
+        friend class ApplicationState;
+
+        EventListener(const EventListener&) = delete;
+        EventListener& operator=(const EventListener&) = delete;
+        EventListener(EventListener&&) = delete;
+        EventListener& operator=(EventListener&&) = delete;
+
+        explicit EventListener(ApplicationState& parent)
+            : m_checkout(parent)
+        {
+        }
+
+        const Checkout& Pull()
+        {
+            m_checkout.m_changed.reset();
             return m_checkout;
         }
 
