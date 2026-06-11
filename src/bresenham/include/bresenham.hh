@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <numeric>
 
 template <typename PointType>
 class Bresenham
@@ -122,8 +123,8 @@ public:
 
         // atan2 returns the angle in radians between the positive x-axis and the point (dx, dy)
         // We convert it to degrees and normalize it to [0, 360)
-        double angle_rad = std::atan2(dy, dx);
-        double angle_deg = std::fmod((angle_rad * 180.0 / M_PI) + 360.0, 360.0);
+        double angle_rad = atan2f(dy, dx);
+        double angle_deg = fmod((angle_rad * 180.0 / M_PI) + 360.0, 360.0);
 
         return static_cast<uint16_t>(angle_deg);
     }
