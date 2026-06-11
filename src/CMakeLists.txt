@@ -1,5 +1,6 @@
 add_subdirectory(application_state)
 add_subdirectory(base_thread)
+add_subdirectory(bresenham)
 add_subdirectory(button_debouncer)
 add_subdirectory(displays)
 add_subdirectory(filesystem)
