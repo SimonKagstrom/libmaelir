@@ -8,6 +8,9 @@ template <typename PointType>
 class Bresenham
 {
 public:
+    static constexpr auto kEndSentinel =
+        PointType {std::numeric_limits<int>::max(), std::numeric_limits<int>::max()};
+
     class Iterator
     {
     public:
@@ -26,12 +29,7 @@ public:
 
         bool operator==(const Iterator& other) const
         {
-            if (m_is_end && other.m_is_end)
-            {
-                return true;
-            }
-
-            return (m_is_end == other.m_is_end) && (m_current == other.m_current);
+            return m_current == other.m_current;
         }
 
         reference operator*() const
@@ -48,14 +46,15 @@ public:
         // and the next increment moves to the past-the-end sentinel.
         Iterator& operator++()
         {
-            if (m_is_end)
+            if (m_current == m_to)
             {
+                m_current = kEndSentinel;
                 return *this;
             }
 
             if (m_current == m_to)
             {
-                m_is_end = true;
+                m_current = kEndSentinel;
                 return *this;
             }
 
@@ -75,10 +74,9 @@ public:
         }
 
     private:
-        Iterator(const PointType& from, const PointType& to, bool is_end = false)
+        Iterator(const PointType& from, const PointType& to)
             : m_current(from)
             , m_to(to)
-            , m_is_end(is_end)
             , m_dx(std::abs(to.x - from.x))
             , m_dy(-std::abs(to.y - from.y))
             , m_sx(from.x < to.x ? 1 : -1)
@@ -89,7 +87,6 @@ public:
 
         PointType m_current;
         PointType m_to;
-        bool m_is_end {false};
 
         int m_dx {0};
         int m_dy {0};
@@ -113,7 +110,7 @@ public:
 
     auto end() const
     {
-        return Iterator(m_to, m_to, true);
+        return Iterator(kEndSentinel, kEndSentinel);
     }
 
     uint16_t GetHeading() const
