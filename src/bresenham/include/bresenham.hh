@@ -52,12 +52,6 @@ public:
                 return *this;
             }
 
-            if (m_current == m_to)
-            {
-                m_current = kEndSentinel;
-                return *this;
-            }
-
             const int twice_error = m_err * 2;
             if (twice_error >= m_dy)
             {
