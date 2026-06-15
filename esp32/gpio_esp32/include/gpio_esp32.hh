@@ -4,7 +4,7 @@
 
 #include <driver/gpio.h>
 
-class TargetGpio : public hal::IGpio
+class GpioEsp32 : public hal::IGpio
 {
 public:
     enum class Polarity
@@ -16,7 +16,7 @@ public:
     };
 
     // TODO: Handle output
-    TargetGpio(uint8_t pin, Polarity polarity = Polarity::kActiveHigh);
+    GpioEsp32(uint8_t pin, Polarity polarity = Polarity::kActiveHigh);
 
     bool GetState() const final;
 

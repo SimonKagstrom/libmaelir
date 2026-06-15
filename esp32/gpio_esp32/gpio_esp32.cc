@@ -1,26 +1,26 @@
 #include "gpio_esp32.hh"
 
-TargetGpio::TargetGpio(uint8_t pin, TargetGpio::Polarity polarity)
+GpioEsp32::GpioEsp32(uint8_t pin, GpioEsp32::Polarity polarity)
     : m_pin(static_cast<gpio_num_t>(pin))
     , m_polarity(polarity == Polarity::kActiveHigh ? 0 : 1)
 {
-    gpio_isr_handler_add(m_pin, TargetGpio::StaticButtonIsr, static_cast<void*>(this));
+    gpio_isr_handler_add(m_pin, GpioEsp32::StaticButtonIsr, static_cast<void*>(this));
 }
 
 void
-TargetGpio::SetState(bool state)
+GpioEsp32::SetState(bool state)
 {
     gpio_set_level(m_pin, state ^ m_polarity);
 }
 
 bool
-TargetGpio::GetState() const
+GpioEsp32::GetState() const
 {
     return gpio_get_level(m_pin) ^ m_polarity;
 }
 
 std::unique_ptr<ListenerCookie>
-TargetGpio::AttachIrqListener(std::function<void(bool)> on_state_change)
+GpioEsp32::AttachIrqListener(std::function<void(bool)> on_state_change)
 {
     m_on_state_change = std::move(on_state_change);
 
@@ -28,15 +28,15 @@ TargetGpio::AttachIrqListener(std::function<void(bool)> on_state_change)
 }
 
 void
-TargetGpio::ButtonIsr()
+GpioEsp32::ButtonIsr()
 {
     auto state = GetState();
     m_on_state_change(state);
 }
 
 void
-TargetGpio::StaticButtonIsr(void* arg)
+GpioEsp32::StaticButtonIsr(void* arg)
 {
-    auto self = static_cast<TargetGpio*>(arg);
+    auto self = static_cast<GpioEsp32*>(arg);
     self->ButtonIsr();
 }
