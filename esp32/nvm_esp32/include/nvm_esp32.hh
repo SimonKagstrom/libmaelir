@@ -4,10 +4,10 @@
 
 #include <nvs.h>
 
-class NvmTarget : public hal::INvm
+class Nvm32 : public hal::INvm
 {
 public:
-    NvmTarget();
+    Nvm32();
 
     void Commit() final;
     void EraseAll() final;
