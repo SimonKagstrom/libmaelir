@@ -9,6 +9,9 @@ parameters:
   bluetooth_connected:
     type: bool
 
+  gps_position_valid:
+    type: bool
+
   demo_mode:
     type: bool
 
