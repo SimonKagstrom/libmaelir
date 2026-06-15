@@ -104,9 +104,9 @@ CanEsp32::TwaiRxCb(const twai_rx_done_event_data_t* edata)
 
         rv = true;
     }
-    m_wakeup_notifier->NotifyFromIsr();
 
     m_rx_queue.push(idx);
+    m_wakeup_notifier->NotifyFromIsr();
 
     return rv;
 }
