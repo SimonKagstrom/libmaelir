@@ -107,6 +107,11 @@ public:
         return Iterator(kEndSentinel, kEndSentinel);
     }
 
+    bool IsMostlyVerticalSlope() const
+    {
+        return std::abs(m_to.y - m_from.y) > std::abs(m_to.x - m_from.x);
+    }
+
     uint16_t GetHeading() const
     {
         const int dx = m_to.x - m_from.x;

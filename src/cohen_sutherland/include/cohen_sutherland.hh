@@ -14,7 +14,7 @@ constexpr int kTop = 0b1000;
 
 // Compute the region code for a point (x, y)
 int
-ComputeRegionCode(int x, int y)
+ComputeRegionCode(auto x, auto y)
 {
     int code = kInside;
 
@@ -39,17 +39,17 @@ ComputeRegionCode(int x, int y)
 }
 
 bool
-PointClipsDisplay(int x, int y)
+PointClipsDisplay(auto x, auto y)
 {
     return ComputeRegionCode(x, y) == kInside;
 }
 
 // Check if the line between (x0, y0) and (x1, y1) clips the display area
 bool
-ClipLineToDisplay(int &x0, int &y0, int &x1, int &y1)
+ClipLineToDisplay(auto &x0, auto &y0, auto &x1, auto &y1)
 {
-    int code0 = ComputeRegionCode(x0, y0);
-    int code1 = ComputeRegionCode(x1, y1);
+    auto code0 = ComputeRegionCode(x0, y0);
+    auto code1 = ComputeRegionCode(x1, y1);
     bool accept = false;
 
     while (true)
@@ -68,10 +68,8 @@ ClipLineToDisplay(int &x0, int &y0, int &x1, int &y1)
         else
         {
             // Some segment of the line is kInside the display area
-            int code_out;
-            int x, y;
-
-            code_out = code1 > code0 ? code1 : code0;
+            auto code_out = code1 > code0 ? code1 : code0;
+            std::decay_t<decltype(x0)> x, y;
 
             if (code_out & kTop)
             {
