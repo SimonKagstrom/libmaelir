@@ -10,6 +10,7 @@
 #include <etl/delegate.h>
 #include <etl/mutex.h>
 #include <etl/vector.h>
+#include <mutex>
 #include <string_view>
 
 using ParameterBitset = etl::bitset<AS::kLastIndex + 1, uint32_t>;
@@ -214,14 +215,14 @@ public:
                 return m_state[index].template GetConstRef<S>();
             }
 
-            std::unique_lock<std::mutex> GetLock() const
+            std::unique_lock<etl::mutex> GetLock() const
             {
                 if constexpr (sizeof...(T) == 1)
                 {
                     // No mutex needed here
-                    return std::unique_lock<std::mutex>();
+                    return std::unique_lock<etl::mutex>();
                 }
-                return std::unique_lock<std::mutex>(m_parent.m_mutex);
+                return std::unique_lock<etl::mutex>(m_parent.m_mutex);
             }
 
             ApplicationState& m_parent;
@@ -295,6 +296,7 @@ public:
 
                 return *this;
             }
+
         private:
             template <typename S>
             bool IsChanged() const
