@@ -1,14 +1,14 @@
-add_library(mock_httpd_client EXCLUDE_FROM_ALL
-    mock_httpd_client.cc
+add_library(mock_https_client EXCLUDE_FROM_ALL
+    mock_https_client.cc
 )
 
-target_link_libraries(mock_httpd_client
+target_link_libraries(mock_https_client
 PUBLIC
-    httpd_client_interface
+    https_client_interface
     trompeloeil::trompeloeil
 )
 
-target_include_directories(mock_httpd_client
+target_include_directories(mock_https_client
 PUBLIC
     include
 )

@@ -1,9 +1,9 @@
-#include "httpd_client.hh"
+#include "https_client.hh"
 
 #include <cassert>
 #include <curl/curl.h>
 
-class HttpdClient::Impl
+class HttpsClient::Impl
 {
 public:
     Impl()
@@ -37,18 +37,18 @@ public:
     std::vector<std::byte> response_data;
 };
 
-HttpdClient::HttpdClient()
+HttpsClient::HttpsClient()
     : m_impl(new Impl())
 {
 }
 
-HttpdClient::~HttpdClient()
+HttpsClient::~HttpsClient()
 {
     delete m_impl;
 }
 
 std::optional<std::vector<std::byte>>
-HttpdClient::Get(const std::string& url, milliseconds timeout)
+HttpsClient::Get(const std::string& url, milliseconds timeout)
 {
     m_impl->response_data.clear();
 

@@ -72,7 +72,7 @@ Filesystem::FileExists(std::string_view path) const
     fs::path full_path = fs::path(m_root_path) / fs::path(path);
 
     // Check for non-directory, since FAT might mess things up with is_regular_file()
-    return fs::exists(full_path) && !fs::is_directory(full_path);
+    return fs::exists(full_path);// && !fs::is_directory(full_path);
 }
 
 void

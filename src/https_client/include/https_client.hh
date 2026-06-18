@@ -6,11 +6,11 @@
 #include <optional>
 #include <vector>
 
-class HttpdClient
+class HttpsClient
 {
 public:
-    HttpdClient();
-    virtual ~HttpdClient();
+    HttpsClient();
+    virtual ~HttpsClient();
 
     std::optional<std::vector<std::byte>> Get(const std::string& url, milliseconds timeout = 5s);
 
