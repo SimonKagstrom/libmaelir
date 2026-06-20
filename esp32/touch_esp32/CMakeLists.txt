@@ -10,5 +10,6 @@ PUBLIC
 target_link_libraries(touch_esp32
 PUBLIC
     idf::espressif__esp_lcd_touch
+    idf::espressif__esp_lcd_touch_gt911
     libmaelir_interface
 )
