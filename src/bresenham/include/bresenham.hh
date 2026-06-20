@@ -82,11 +82,11 @@ public:
         PointType m_current;
         PointType m_to;
 
-        int m_dx {0};
-        int m_dy {0};
-        int m_sx {0};
-        int m_sy {0};
-        int m_err {0};
+        decltype(PointType::x) m_dx;
+        decltype(PointType::y) m_dy {0};
+        decltype(PointType::x) m_sx {0};
+        decltype(PointType::y) m_sy {0};
+        decltype(PointType::x) m_err {0};
     };
 
     Bresenham(const PointType& from, const PointType& to)
