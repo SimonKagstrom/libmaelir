@@ -1,7 +1,9 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <iterator>
+#include <numbers>
 #include <numeric>
 
 template <typename PointType>
@@ -112,6 +114,18 @@ public:
         return std::abs(m_to.y - m_from.y) > std::abs(m_to.x - m_from.x);
     }
 
+    auto GetWidthSlope() const
+    {
+        if (IsMostlyVerticalSlope())
+        {
+            return std::make_pair(1, 0);
+        }
+        else
+        {
+            return std::make_pair(0, 1);
+        }
+    }
+
     uint16_t GetHeading() const
     {
         const int dx = m_to.x - m_from.x;
@@ -120,7 +134,7 @@ public:
         // atan2 returns the angle in radians between the positive x-axis and the point (dx, dy)
         // We convert it to degrees and normalize it to [0, 360)
         double angle_rad = atan2f(dy, dx);
-        double angle_deg = fmod((angle_rad * 180.0 / M_PI) + 360.0, 360.0);
+        double angle_deg = fmod((angle_rad * 180.0 / std::numbers::pi_v<float>)+360.0, 360.0);
 
         return static_cast<uint16_t>(angle_deg);
     }

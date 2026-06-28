@@ -7,6 +7,7 @@ PUBLIC
     libmaelir_interface
     lvgl
     os
+    bresenham
 )
 
 target_include_directories(painter
