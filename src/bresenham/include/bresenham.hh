@@ -133,8 +133,8 @@ public:
 
         // atan2 returns the angle in radians between the positive x-axis and the point (dx, dy)
         // We convert it to degrees and normalize it to [0, 360)
-        double angle_rad = atan2f(dy, dx);
-        double angle_deg = fmod((angle_rad * 180.0 / std::numbers::pi_v<float>)+360.0, 360.0);
+        float angle_rad = atan2f(dy, dx);
+        float angle_deg = fmod((angle_rad * 180.0f / std::numbers::pi_v<float>)+360.0f, 360.0f);
 
         return static_cast<uint16_t>(angle_deg);
     }
