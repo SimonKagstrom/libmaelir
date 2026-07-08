@@ -1,9 +1,9 @@
 #pragma once
 
 #include "bresenham.hh"
+#include "debug_assert.hh"
 #include "hal/i_display.hh"
 #include "image.hh"
-
 namespace painter
 {
 
@@ -29,30 +29,9 @@ void ZoomedBlit(
 
 template <typename PointType>
 inline void
-DrawClippedLine(uint16_t* frame_buffer,
-                PointType from,
-                PointType to,
-                uint16_t width,
-                uint16_t color)
+DrawClippedLine(
+    uint16_t* frame_buffer, PointType from, PointType to, uint16_t width, uint16_t color)
 {
-    if (from.x - width / 2 < 0)
-    {
-        from.x = 0;
-    }
-    if (from.x + width / 2 >= hal::kDisplayWidth)
-    {
-        from.x = hal::kDisplayWidth - 1;
-    }
-    if (from.y - width / 2 < 0)
-    {
-        from.y = 0;
-    }
-    if (from.y + width / 2 >= hal::kDisplayHeight)
-    {
-        from.y = hal::kDisplayHeight - 1;
-    }
-
-
     auto bresenham = Bresenham<PointType>(from, to);
     auto [dx, dy] = bresenham.GetWidthSlope();
 
@@ -63,6 +42,11 @@ DrawClippedLine(uint16_t* frame_buffer,
             PointType offset {dx * i, dy * i};
             auto offset_point = PointType {point.x + offset.x, point.y + offset.y};
 
+            if (offset_point.x < 0 || offset_point.x >= hal::kDisplayWidth || offset_point.y < 0 ||
+                offset_point.y >= hal::kDisplayHeight)
+            {
+                continue;
+            }
             frame_buffer[offset_point.y * hal::kDisplayWidth + offset_point.x] = color;
         }
     }
