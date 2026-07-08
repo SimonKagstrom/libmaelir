@@ -30,14 +30,14 @@ void ZoomedBlit(
 template <typename PointType>
 inline void
 DrawClippedLine(
-    uint16_t* frame_buffer, PointType from, PointType to, uint16_t width, uint16_t color)
+    uint16_t* frame_buffer, PointType from, PointType to, uint16_t thickness, uint16_t color)
 {
     auto bresenham = Bresenham<PointType>(from, to);
     auto [dx, dy] = bresenham.GetWidthSlope();
 
     for (auto& point : bresenham)
     {
-        for (int i = -width / 2; i < (width + 1) / 2; ++i)
+        for (int i = -thickness / 2; i < (thickness + 1) / 2; ++i)
         {
             PointType offset {dx * i, dy * i};
             auto offset_point = PointType {point.x + offset.x, point.y + offset.y};
