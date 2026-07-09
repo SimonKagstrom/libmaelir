@@ -5,7 +5,7 @@ using namespace os;
 constexpr auto kForever = milliseconds::max();
 constexpr uint8_t kDetachedTimer = 0xff;
 
-class TimerManager::TimerImpl : public ITimer
+class TimerManager::TimerImpl final : public ITimer
 {
 public:
     TimerImpl(TimerManager& manager, uint8_t entry_index)
