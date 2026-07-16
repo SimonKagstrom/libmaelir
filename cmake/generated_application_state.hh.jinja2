@@ -62,7 +62,7 @@ auto DefaultValue();
 {% for asp in application_state_parameters %}
 {%- if asp.parameter.type != 'void' %}
 template<>
-consteval auto DefaultValue<struct {{ asp.parameter.name }}>()
+constexpr auto DefaultValue<struct {{ asp.parameter.name }}>()
 {
     return {{ asp.parameter.return_type }} {% for item in asp.default_value %}{{ item }}{{ ',' if not loop.last else '' }}{% endfor %};
 }
