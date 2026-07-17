@@ -27,7 +27,9 @@ Prepare(int32_t width, int32_t height, auto& to)
         height += to.y;
     }
 
-    int32_t row_length = width - from_x;
+    // Width/height are reduced by clipping at negative destination coordinates.
+    // The copy length should therefore start from the clipped size directly.
+    int32_t row_length = width;
 
     to.x = std::max(static_cast<int32_t>(0), to.x);
     to.y = std::max(static_cast<int32_t>(0), to.y);
