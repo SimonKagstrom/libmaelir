@@ -4,7 +4,7 @@
 
 #include <nvs.h>
 
-class Nvm32 : public hal::INvm
+class NvmEsp32 : public hal::INvm
 {
 public:
     Nvm32();

@@ -3,7 +3,7 @@
 #include <nvs_flash.h>
 
 
-Nvm32::Nvm32()
+NvmEsp32::NvmEsp32()
 {
     auto err = Open();
     if (err == ESP_ERR_NVS_NOT_INITIALIZED)
@@ -21,31 +21,31 @@ Nvm32::Nvm32()
 }
 
 esp_err_t
-Nvm32::Open()
+NvmEsp32::Open()
 {
     return nvs_open("storage", NVS_READWRITE, &m_handle);
 }
 
 void
-Nvm32::Commit()
+NvmEsp32::Commit()
 {
     nvs_commit(m_handle);
 }
 
 void
-Nvm32::EraseAll()
+NvmEsp32::EraseAll()
 {
     nvs_erase_all(m_handle);
 }
 
 void
-Nvm32::EraseKey(const char* key)
+NvmEsp32::EraseKey(const char* key)
 {
     nvs_erase_key(m_handle, key);
 }
 
 std::optional<uint32_t>
-Nvm32::GetUint32_t(const char* key)
+NvmEsp32::GetUint32_t(const char* key)
 {
     uint32_t value;
     auto err = nvs_get_u32(m_handle, key, &value);
@@ -58,14 +58,14 @@ Nvm32::GetUint32_t(const char* key)
 }
 
 void
-Nvm32::SetUint32_t(const char* key, uint32_t value)
+NvmEsp32::SetUint32_t(const char* key, uint32_t value)
 {
     // Hope for the best and ignore the error
     nvs_set_u32(m_handle, key, value);
 }
 
 std::optional<std::string>
-Nvm32::GetString(const char* key)
+NvmEsp32::GetString(const char* key)
 {
     size_t required_size = 0;
     auto err = nvs_get_str(m_handle, key, nullptr, &required_size);
@@ -79,7 +79,7 @@ Nvm32::GetString(const char* key)
 }
 
 void
-Nvm32::SetString(const char* key, const std::string_view value)
+NvmEsp32::SetString(const char* key, const std::string_view value)
 {
     nvs_set_str(m_handle, key, value.data());
 }
