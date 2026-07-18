@@ -7,7 +7,7 @@
 class NvmEsp32 : public hal::INvm
 {
 public:
-    Nvm32();
+    NvmEsp32();
 
     void Commit() final;
     void EraseAll() final;
