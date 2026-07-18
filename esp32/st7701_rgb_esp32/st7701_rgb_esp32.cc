@@ -178,7 +178,7 @@ St7701RgbEsp32::St7701RgbEsp32(const esp_lcd_panel_io_3wire_spi_config_t& io_con
     assert(m_frame_buffers[1]);
 
     constexpr async_memcpy_config_t async_mem_cfg = {
-        .backlog = 16, .sram_trans_align = 64, .psram_trans_align = 64, .flags = 0};
+        .backlog = 16, .weight = 2, .dma_burst_size = 64, .flags = 0};
     esp_async_memcpy_install(&async_mem_cfg, &m_async_mem_handle);
 
     // Turn on the backlight
@@ -195,11 +195,12 @@ St7701RgbEsp32::St7701RgbEsp32(const esp_lcd_panel_io_3wire_spi_config_t& io_con
     };
 
     const esp_lcd_panel_dev_config_t panel_config = {
-        .reset_gpio_num = GPIO_NUM_NC,
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
         .data_endian = LCD_RGB_DATA_ENDIAN_LITTLE,
         .bits_per_pixel = 18,
+        .reset_gpio_num = GPIO_NUM_NC,
         .vendor_config = &vendor_config,
+        .flags {.reset_active_high = false},
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7701(panel_io, &panel_config, &m_panel_handle));
 
