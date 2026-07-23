@@ -15,7 +15,8 @@ type_size_mapping = {
     "int16_t": 2,
     "int32_t": 4,
     "float" : 4,
-    "milliseconds" : 4
+    "milliseconds" : 4,
+    "seconds" : 4,
 }
 
 
