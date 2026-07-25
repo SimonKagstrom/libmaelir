@@ -52,4 +52,27 @@ DrawClippedLine(
     }
 }
 
+template <typename PointType>
+inline void
+DrawClippedVerticalLine(
+    uint16_t* frame_buffer, PointType from, PointType to, uint16_t thickness, uint16_t color)
+{
+    if (from.x > to.x)
+    {
+        std::swap(from, to);
+    }
+
+    for (int x = from.x; x < from.x + thickness; ++x)
+    {
+        for (int y = from.y; y <= to.y; ++y)
+        {
+            if (x < 0 || x >= hal::kDisplayWidth || y < 0 || y >= hal::kDisplayHeight)
+            {
+                continue;
+            }
+            frame_buffer[y * hal::kDisplayWidth + x] = color;
+        }
+    }
+}
+
 } // namespace painter
