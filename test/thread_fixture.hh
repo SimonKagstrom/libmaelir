@@ -46,6 +46,26 @@ public:
         return true;
     }
 
+    void AdvanceTimeAndRunLoop(milliseconds time)
+    {
+        auto run_until = os::GetTimeStamp() + time;
+
+        // Run once first (to prime the next_wakeup)
+        DoRunLoop();
+        if (!m_next_wakeup_absolute)
+        {
+            AdvanceTime(time);
+            DoRunLoop();
+            return;
+        }
+
+        while (m_next_wakeup_absolute && *m_next_wakeup_absolute <= run_until)
+        {
+            SetTime(std::min(*m_next_wakeup_absolute, run_until));
+            DoRunLoop();
+        }
+    }
+
     /// Return the time the thread should wake up next time (if any)
     std::optional<milliseconds> NextWakeupTime() const
     {
