@@ -34,7 +34,7 @@ struct {{ parameter.name }}
     {%- endif %}
     static consteval bool IsEvent()
     {
-        return {{ 'true' if parameter.type == 'void' else 'false' }};
+        return {{ 'true' if parameter.is_event else 'false' }};
     }
 };
 

@@ -39,7 +39,8 @@ class Parameter:
 
     def __init__(self, name, type):
         self.name = name
-        self.type = type if type != "Event" else "void"
+        self.is_event = True if type == "Event" else False
+        self.type = type if not self.is_event else "uint8_t"
         self.return_type = ""
         self.is_atomic = type in type_size_mapping.keys()
 
@@ -51,6 +52,7 @@ class Parameter:
         return {
             "name": self.name,
             "type": self.type,
+            "is_event": self.is_event,
             "return_type": self.return_type,
             "is_atomic": self.is_atomic,
         }

@@ -113,6 +113,7 @@ public:
             static_assert(T::IsEvent(), "Post can only be used with event parameters");
 
             std::lock_guard lock(m_parent.m_mutex);
+            m_parent.SetNoLock<T>((m_parent.GetValue<T>() + 1) & 0xff);
             m_parent.NotifyChange(AS::IndexOf<T>());
         }
 
@@ -156,6 +157,9 @@ public:
             template <typename S>
             const Checkout& OnNewValue(const auto& callback) const
             {
+                static_assert(!S::IsEvent(),
+                              "OnNewValue can only be used with non-event parameters, until events "
+                              "have values");
                 if (IsChanged<S>())
                 {
                     callback(Get<S>());
@@ -167,6 +171,11 @@ public:
             template <typename S>
             const Checkout& OnChangedValue(const auto& callback) const
             {
+                static_assert(
+                    !S::IsEvent(),
+                    "OnChangedValue can only be used with non-event parameters, until events "
+                    "have values");
+
                 if (IsChanged<S>())
                 {
                     callback(GetReference<S>(!m_state_index), GetReference<S>(m_state_index));
