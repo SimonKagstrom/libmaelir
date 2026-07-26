@@ -276,6 +276,14 @@ public:
             return m_checkout;
         }
 
+
+        /// Return the value of the local storage
+        template <typename S>
+        auto Get() const
+        {
+            return m_checkout.template GetReference<S>(m_checkout.m_state_index);
+        }
+
     private:
         Checkout m_checkout;
     };
