@@ -6,8 +6,8 @@ struct GpsData
 {
     GpsPosition position;
 
-    float speed;
-    float heading;
+    float speed;   ///< Speed in knots
+    float heading; ///< Heading in degrees
 
     // Add time, height, etc.
     bool operator==(const GpsData& other) const = default;
