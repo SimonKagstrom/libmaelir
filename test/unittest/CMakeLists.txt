@@ -10,8 +10,6 @@ add_link_options(-fsanitize=address,undefined -g)
 include_directories(../../qt/lvgl_setup)
 add_compile_definitions(LV_CONF_INCLUDE_SIMPLE=1)
 
-find_package(fmt REQUIRED)
-
 enable_testing()
 
 add_subdirectory(.. libmaelir_unittest)
