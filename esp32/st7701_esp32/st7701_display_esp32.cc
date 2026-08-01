@@ -30,6 +30,8 @@ DisplaySt7701::DisplaySt7701(esp_lcd_panel_io_handle_t io_handle,
         };
 
     ESP_ERROR_CHECK(esp_lcd_dpi_panel_register_event_callbacks(m_panel_handle, &callbacks, this));
+
+    esp_lcd_dpi_panel_enable_dma2d(m_panel_handle);
 }
 
 uint16_t*
