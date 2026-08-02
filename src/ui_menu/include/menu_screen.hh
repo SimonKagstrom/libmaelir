@@ -81,8 +81,6 @@ private:
     lv_obj_t* m_menu;
     lv_group_t* m_input_group;
 
-    std::vector<std::unique_ptr<LvEventListener>> m_event_listeners;
-
     os::TimerHandle m_exit_timer;
     std::unique_ptr<Page> m_main_page;
 };

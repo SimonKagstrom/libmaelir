@@ -60,19 +60,16 @@ MenuScreen::MenuScreen(os::TimerManager& timer_manager,
     BumpExitTimer();
 
     // Register events to keep the screen alive on input
-    m_event_listeners.push_back(
-        LvEventListener::Create(m_menu, LV_EVENT_ROTARY, [this](lv_event_t*) { BumpExitTimer(); }));
-    m_event_listeners.push_back(
-        LvEventListener::Create(m_menu, LV_EVENT_KEY, [this](lv_event_t*) { BumpExitTimer(); }));
-    m_event_listeners.push_back(
-        LvEventListener::Create(m_menu, LV_EVENT_CLICKED, [this](lv_event_t* e) {
-            BumpExitTimer();
-            auto obj = static_cast<lv_obj_t*>(lv_event_get_target(e));
-            if (lv_menu_back_button_is_root(m_menu, obj))
-            {
-                m_on_close();
-            }
-        }));
+    LvEventListener::Create(m_menu, LV_EVENT_ROTARY, [this](lv_event_t*) { BumpExitTimer(); });
+    LvEventListener::Create(m_menu, LV_EVENT_KEY, [this](lv_event_t*) { BumpExitTimer(); });
+    LvEventListener::Create(m_menu, LV_EVENT_CLICKED, [this](lv_event_t* e) {
+        BumpExitTimer();
+        auto obj = static_cast<lv_obj_t*>(lv_event_get_target(e));
+        if (lv_menu_back_button_is_root(m_menu, obj))
+        {
+            m_on_close();
+        }
+    });
 
     m_main_page = std::make_unique<Page>(*this, main_page);
 }
@@ -141,12 +138,11 @@ MenuScreen::Page::AddSubPage(const char* text)
     lv_obj_set_flex_grow(label, 1);
 
     lv_menu_set_load_page_event(m_parent.m_menu, cont, page);
-    m_parent.m_event_listeners.push_back(LvEventListener::Create(
-        cont, LV_EVENT_FOCUSED, [cont](lv_event_t*) { lv_obj_scroll_to_view(cont, LV_ANIM_OFF); }));
-    m_parent.m_event_listeners.push_back(LvEventListener::Create(
-        cont, LV_EVENT_CLICKED, [group = m_parent.m_input_group](lv_event_t*) {
-            lv_group_focus_next(group);
-        }));
+    LvEventListener::Create(
+        cont, LV_EVENT_FOCUSED, [cont](lv_event_t*) { lv_obj_scroll_to_view(cont, LV_ANIM_OFF); });
+    LvEventListener::Create(cont, LV_EVENT_CLICKED, [group = m_parent.m_input_group](lv_event_t*) {
+        lv_group_focus_next(group);
+    });
 
     m_sub_pages.push_back(std::move(sub_page));
     return *m_sub_pages.back();
@@ -162,11 +158,10 @@ MenuScreen::Page::AddEntry(const std::string& text, const std::function<void()>&
     lv_group_add_obj(m_parent.m_input_group, cont);
     lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
     lv_obj_set_flex_grow(label, 1);
-    m_parent.m_event_listeners.push_back(LvEventListener::Create(
-        cont, LV_EVENT_FOCUSED, [cont](lv_event_t*) { lv_obj_scroll_to_view(cont, LV_ANIM_OFF); }));
+    LvEventListener::Create(
+        cont, LV_EVENT_FOCUSED, [cont](lv_event_t*) { lv_obj_scroll_to_view(cont, LV_ANIM_OFF); });
 
-    m_parent.m_event_listeners.push_back(
-        LvEventListener::Create(cont, LV_EVENT_CLICKED, [on_click](lv_event_t*) { on_click(); }));
+    LvEventListener::Create(cont, LV_EVENT_CLICKED, [on_click](lv_event_t*) { on_click(); });
 }
 
 void
@@ -192,17 +187,16 @@ MenuScreen::Page::AddBooleanEntry(const char* text,
         boolean_switch, selected_switch_color, (int)LV_PART_INDICATOR | (int)LV_STATE_CHECKED);
 
     lv_group_add_obj(m_parent.m_input_group, boolean_switch);
-    m_parent.m_event_listeners.push_back(
-        LvEventListener::Create(boolean_switch, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
-            lv_obj_scroll_to_view(cont, LV_ANIM_OFF);
-        }));
 
-    m_parent.m_event_listeners.push_back(
-        LvEventListener::Create(boolean_switch, LV_EVENT_CLICKED, [on_click](lv_event_t* e) {
-            auto sw = static_cast<lv_obj_t*>(lv_event_get_target(e));
-            auto checked = lv_obj_has_state(sw, LV_STATE_CHECKED);
-            on_click(checked);
-        }));
+    LvEventListener::Create(boolean_switch, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
+        lv_obj_scroll_to_view(cont, LV_ANIM_OFF);
+    });
+
+    LvEventListener::Create(boolean_switch, LV_EVENT_CLICKED, [on_click](lv_event_t* e) {
+        auto sw = static_cast<lv_obj_t*>(lv_event_get_target(e));
+        auto checked = lv_obj_has_state(sw, LV_STATE_CHECKED);
+        on_click(checked);
+    });
 }
 
 void
@@ -247,26 +241,23 @@ MenuScreen::Page::AddRollerEntry(const char* text,
     lv_group_add_obj(m_parent.m_input_group, roller);
 
     // Keep the row highlighted while the roller is focused/edited.
-    m_parent.m_event_listeners.push_back(
-        LvEventListener::Create(roller, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
-            lv_obj_add_state(cont, LV_STATE_FOCUSED);
-            lv_obj_add_state(cont, LV_STATE_FOCUS_KEY);
-            lv_obj_scroll_to_view(cont, LV_ANIM_OFF);
-        }));
+    LvEventListener::Create(roller, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
+        lv_obj_add_state(cont, LV_STATE_FOCUSED);
+        lv_obj_add_state(cont, LV_STATE_FOCUS_KEY);
+        lv_obj_scroll_to_view(cont, LV_ANIM_OFF);
+    });
 
-    m_parent.m_event_listeners.push_back(
-        LvEventListener::Create(roller, LV_EVENT_DEFOCUSED, [cont](lv_event_t*) {
-            lv_obj_remove_state(cont, LV_STATE_FOCUSED);
-            lv_obj_remove_state(cont, LV_STATE_FOCUS_KEY);
-        }));
+    LvEventListener::Create(roller, LV_EVENT_DEFOCUSED, [cont](lv_event_t*) {
+        lv_obj_remove_state(cont, LV_STATE_FOCUSED);
+        lv_obj_remove_state(cont, LV_STATE_FOCUS_KEY);
+    });
 
-    m_parent.m_event_listeners.push_back(
-        LvEventListener::Create(roller, LV_EVENT_CLICKED, [on_click](lv_event_t* e) {
-            auto roller = static_cast<lv_obj_t*>(lv_event_get_target(e));
-            auto selected = lv_roller_get_selected(roller);
+    LvEventListener::Create(roller, LV_EVENT_CLICKED, [on_click](lv_event_t* e) {
+        auto roller = static_cast<lv_obj_t*>(lv_event_get_target(e));
+        auto selected = lv_roller_get_selected(roller);
 
-            on_click(selected);
-        }));
+        on_click(selected);
+    });
 }
 
 
@@ -315,26 +306,24 @@ MenuScreen::Page::AddNumericEntry(const char* text,
     lv_group_add_obj(m_parent.m_input_group, roller);
 
     // Keep the row highlighted while the roller is focused/edited.
-    m_parent.m_event_listeners.push_back(
-        LvEventListener::Create(roller, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
-            lv_obj_add_state(cont, LV_STATE_FOCUSED);
-            lv_obj_add_state(cont, LV_STATE_FOCUS_KEY);
-            lv_obj_scroll_to_view(cont, LV_ANIM_OFF);
-        }));
 
-    m_parent.m_event_listeners.push_back(
-        LvEventListener::Create(roller, LV_EVENT_DEFOCUSED, [cont](lv_event_t*) {
-            lv_obj_remove_state(cont, LV_STATE_FOCUSED);
-            lv_obj_remove_state(cont, LV_STATE_FOCUS_KEY);
-        }));
+    LvEventListener::Create(roller, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
+        lv_obj_add_state(cont, LV_STATE_FOCUSED);
+        lv_obj_add_state(cont, LV_STATE_FOCUS_KEY);
+        lv_obj_scroll_to_view(cont, LV_ANIM_OFF);
+    });
 
-    m_parent.m_event_listeners.push_back(
-        LvEventListener::Create(roller, LV_EVENT_CLICKED, [on_click, config](lv_event_t* e) {
-            auto roller = static_cast<lv_obj_t*>(lv_event_get_target(e));
-            auto selected = lv_roller_get_selected(roller);
-            int value = config.low + selected * config.step;
-            on_click(value);
-        }));
+    LvEventListener::Create(roller, LV_EVENT_DEFOCUSED, [cont](lv_event_t*) {
+        lv_obj_remove_state(cont, LV_STATE_FOCUSED);
+        lv_obj_remove_state(cont, LV_STATE_FOCUS_KEY);
+    });
+
+    LvEventListener::Create(roller, LV_EVENT_CLICKED, [on_click, config](lv_event_t* e) {
+        auto roller = static_cast<lv_obj_t*>(lv_event_get_target(e));
+        auto selected = lv_roller_get_selected(roller);
+        int value = config.low + selected * config.step;
+        on_click(value);
+    });
 }
 
 
