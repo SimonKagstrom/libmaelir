@@ -52,25 +52,45 @@ DrawClippedLine(
     }
 }
 
-template <typename PointType>
+template <typename PointType, uint16_t thickness>
 inline void
-DrawClippedVerticalLine(
-    uint16_t* frame_buffer, PointType from, PointType to, uint16_t thickness, uint16_t color)
+DrawClippedVerticalLine(uint16_t* frame_buffer,
+                        PointType from,
+                        decltype(PointType::y) to_y,
+                        uint16_t color)
 {
-    if (from.x > to.x)
+    uint16_t line[16];
+
+    if (to_y < from.y)
     {
-        std::swap(from, to);
+        std::swap(from.y, to_y);
     }
 
-    for (int x = from.x; x < from.x + thickness; ++x)
+    to_y = std::clamp(to_y,
+                      static_cast<decltype(PointType::y)>(0),
+                      static_cast<decltype(PointType::y)>(hal::kDisplayHeight - 1));
+
+    // TODO for the future: Handle lines above 16 in a good way
+    static_assert(thickness <= 16, "Thickness must be <= 16 for now");
+    if constexpr (thickness > 1)
     {
-        for (int y = from.y; y <= to.y; ++y)
+        // Copy pre-filled lines
+        std::fill(line, line + thickness, color);
+
+        for (int y = from.y; y <= to_y; ++y)
         {
-            if (x < 0 || x >= hal::kDisplayWidth || y < 0 || y >= hal::kDisplayHeight)
+            memcpy(
+                &frame_buffer[y * hal::kDisplayWidth + from.x], line, thickness * sizeof(uint16_t));
+        }
+    }
+    else
+    {
+        for (int x = from.x; x < from.x + thickness; ++x)
+        {
+            for (int y = from.y; y <= to_y; ++y)
             {
-                continue;
+                frame_buffer[y * hal::kDisplayWidth + x] = color;
             }
-            frame_buffer[y * hal::kDisplayWidth + x] = color;
         }
     }
 }
