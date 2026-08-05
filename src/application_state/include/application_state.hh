@@ -568,10 +568,7 @@ public:
         return QueuedWriter<T...>(*this);
     }
 
-private:
-    class ListenerImpl;
-    class StateImpl;
-
+    // Read-only gets are allowed, so this is public
     template <typename T>
     auto Get()
     {
@@ -592,6 +589,10 @@ private:
             return out;
         }
     }
+
+private:
+    class ListenerImpl;
+    class StateImpl;
 
     template <typename T>
     auto GetValue()
