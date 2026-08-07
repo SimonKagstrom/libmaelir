@@ -38,7 +38,8 @@ function(convert_font BASE_NAME TTF SIZE_PIXELS RANGE EXTRA_SYMBOLS)
         COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR}
         COMMAND ${FONT_CONV_CMD}
 
-        COMMAND ${CMAKE_COMMAND} -E echo '\#include \"lvgl.h\"' > ${out_h}
+        COMMAND ${CMAKE_COMMAND} -E echo '\#pragma once' > ${out_h}
+        COMMAND ${CMAKE_COMMAND} -E echo '\#include \"lvgl.h\"' >> ${out_h}
         COMMAND ${CMAKE_COMMAND} -E echo 'constexpr auto kPixelSize_${BASE_NAME} = ${SIZE_PIXELS}\;' >> ${out_h}
         COMMAND ${CMAKE_COMMAND} -E echo 'extern const lv_font_t ${BASE_NAME}\;' >> ${out_h}
         DEPENDS ${TTF}
