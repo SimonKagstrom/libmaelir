@@ -17,3 +17,7 @@ parameters:
 
   position:
     type: struct GpsData
+
+  ota_update_active:
+    type: bool
+    default: false

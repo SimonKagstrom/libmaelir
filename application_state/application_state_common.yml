@@ -2,3 +2,4 @@ application_state:
   demo_mode: false
   wifi_connected: false
   bluetooth_connected: false
+  ota_update_active: false
