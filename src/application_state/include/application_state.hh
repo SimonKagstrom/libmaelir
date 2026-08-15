@@ -10,6 +10,7 @@
 #include <etl/delegate.h>
 #include <etl/mutex.h>
 #include <etl/vector.h>
+#include <memory>
 #include <mutex>
 #include <string_view>
 
@@ -584,7 +585,8 @@ public:
             using pointer_type = std::remove_reference_t<decltype(m_global_state.GetRef<T>())>;
             using element_type = typename pointer_type::element_type;
 
-            std::shared_ptr<const element_type> out = m_global_state.GetRef<T>();
+            std::shared_ptr<const element_type> out =
+                std::atomic_load_explicit(&m_global_state.GetRef<T>(), std::memory_order_acquire);
 
             return out;
         }
@@ -603,7 +605,9 @@ private:
         }
         else
         {
-            return *m_global_state.GetRef<T>();
+            auto value_ptr =
+                std::atomic_load_explicit(&m_global_state.GetRef<T>(), std::memory_order_acquire);
+            return *value_ptr;
         }
     }
 
@@ -617,9 +621,12 @@ private:
         }
         else
         {
-            auto& ref = m_global_state.GetRef<T>();
+            using pointer_type = std::remove_reference_t<decltype(m_global_state.GetRef<T>())>;
+            using element_type = typename pointer_type::element_type;
 
-            m_global_state.GetRef<T>() = std::make_shared<std::decay_t<decltype(*ref)>>(value);
+            auto out = std::make_shared<element_type>(value);
+            std::atomic_store_explicit(
+                &m_global_state.GetRef<T>(), std::move(out), std::memory_order_release);
         }
     }
 
