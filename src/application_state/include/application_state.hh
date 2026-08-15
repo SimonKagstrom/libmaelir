@@ -19,6 +19,13 @@ using ParameterBitset = etl::bitset<AS::kLastIndex + 1, uint32_t>;
 // Fit in an uint32_t
 constexpr auto kMaxApplicationStateListeners = 32;
 
+/*
+ * We'd like to use std::atomic<std::shared_ptr<T>> + .load() etc, but clang doesn't support that.
+ *
+ * Instead, silence the deprecation warning for GCC
+ */
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 namespace AS::storage
 {
 
