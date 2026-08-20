@@ -3,7 +3,7 @@ include(FetchContent)
 FetchContent_Declare(
   doctest
   GIT_REPOSITORY https://github.com/doctest/doctest.git
-  GIT_TAG        6804767ee637789db8a5cb281381cae98dc36906 # v2.5.2
+  GIT_TAG        v2.5.3
 )
 FetchContent_Declare(
   trompeloeil
