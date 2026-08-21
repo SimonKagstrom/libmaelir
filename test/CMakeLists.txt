@@ -8,7 +8,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   trompeloeil
   GIT_REPOSITORY https://github.com/rollbear/trompeloeil.git
-  GIT_TAG        eaeb89c1ce9d354b0ba7eb921fd5712cdbd78adf # v49
+  GIT_TAG        v49
 )
 FetchContent_MakeAvailable(doctest trompeloeil)
 
