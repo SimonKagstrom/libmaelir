@@ -7,6 +7,14 @@
 namespace painter
 {
 
+enum class LineStyle
+{
+    kSolid,
+    kDashed,
+
+    kValueCount,
+};
+
 struct Rect
 {
     int32_t x;
@@ -91,6 +99,34 @@ DrawClippedVerticalLine(uint16_t* frame_buffer,
             {
                 frame_buffer[y * hal::kDisplayWidth + x] = color;
             }
+        }
+    }
+}
+
+template <typename PointType, uint16_t thickness, LineStyle style = LineStyle::kSolid>
+inline void
+DrawClippedHorizontalLine(uint16_t* frame_buffer,
+                          PointType from,
+                          decltype(PointType::x) to_x,
+                          uint16_t color)
+{
+    // Assumed to be clipped, panic if not
+    debug_assert(from.y >= 0 && from.y < hal::kDisplayHeight);
+    debug_assert(to_x >= 0 && to_x < hal::kDisplayWidth);
+
+    for (auto y = from.y; y < from.y + thickness; ++y)
+    {
+        for (auto x = from.x; x <= to_x; ++x)
+        {
+            if constexpr (style == LineStyle::kDashed)
+            {
+                if ((x - from.x) % 8 < 4)
+                {
+                    continue;
+                }
+            }
+
+            frame_buffer[y * hal::kDisplayWidth + x] = color;
         }
     }
 }
