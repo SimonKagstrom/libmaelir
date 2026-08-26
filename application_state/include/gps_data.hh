@@ -2,6 +2,17 @@
 
 #include "hal/i_gps.hh"
 
+#include <cstdint>
+
+enum class GpsStatus : uint8_t
+{
+    kSilent,
+    kNoFix,
+    kPositionValid,
+
+    kValueCount,
+};
+
 struct GpsData
 {
     GpsPosition position;

@@ -10,7 +10,7 @@ parameters:
     type: bool
 
   gps_position_valid:
-    type: bool
+    type: enum GpsStatus
 
   demo_mode:
     type: bool

@@ -1,5 +1,11 @@
 #include "generated_application_state.hh"
 
+{%- for asp in application_state_parameters %}
+{%- if asp.parameter.type.startswith('enum') %}
+static_assert(sizeof({{ asp.parameter.type }}) == 1, "Enum size must be 1 byte");
+{%- endif %}
+{%- endfor %}
+
 void AS::storage::state::SetupDefaultValues()
 {
     {%- for asp in application_state_parameters %}

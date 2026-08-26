@@ -7,7 +7,8 @@ import os
 
 type_size_mapping = {
     "Event" : 0,
-    "bool": 1,
+    "bool" : 1,
+    "enum" : 1,
     "uint8_t": 1,
     "uint16_t": 2,
     "uint32_t": 4,
@@ -43,6 +44,10 @@ class Parameter:
         self.type = type if not self.is_event else "uint8_t"
         self.return_type = ""
         self.is_atomic = type in type_size_mapping.keys()
+
+        if self.type.startswith("enum"):
+            self.is_atomic = True
+
 
         if self.type.startswith("struct"):
             self.type = self.type[len("struct") :].strip()
@@ -208,8 +213,8 @@ if __name__ == "__main__":
     # Sort the application state by alignment (largest first)
     application_state.sort(
         key=lambda asp: (
-            type_size_mapping[asp.parameter.type]
-            if asp.parameter.type in type_size_mapping
+            type_size_mapping[asp.parameter.type.split(' ', 1)[0]]
+            if asp.parameter.type.split(' ', 1)[0] in type_size_mapping
             # Variable/unknown size parameters are placed at the end
             else 32
         ),
