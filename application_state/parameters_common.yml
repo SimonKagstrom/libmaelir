@@ -9,7 +9,7 @@ parameters:
   bluetooth_connected:
     type: bool
 
-  gps_position_valid:
+  gps_status:
     type: enum GpsStatus
 
   demo_mode:
