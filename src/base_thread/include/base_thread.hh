@@ -128,7 +128,7 @@ private:
         }
     }
 
-    binary_semaphore m_semaphore {0};
+    binary_semaphore m_semaphore {1};
     Impl* m_impl {nullptr}; // Raw pointer to allow forward declaration
     TimerManager m_timer_manager;
 };
