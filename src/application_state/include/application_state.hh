@@ -44,7 +44,11 @@ struct partial_state : public T...
         return static_cast<const S&>(*this).template GetConstRef<S>();
     }
 
-    // Might be used in the future, if the number of global indicies are > 32
+    static consteval auto PartialCount()
+    {
+        return sizeof...(T);
+    }
+
     template <typename S>
     static consteval auto PartialIndexOf()
     {
@@ -62,14 +66,7 @@ struct partial_state : public T...
         return size_t {0};
     }
 
-    template <typename S>
-    static consteval auto PartialToGlobalIndex(auto partial_index)
-    {
-        static_assert((std::is_same_v<S, T> || ...), "Type is not part of this partial_state");
-
-        constexpr std::array<unsigned, sizeof...(T)> global_indices {AS::IndexOf<T>()...};
-        return global_indices[partial_index];
-    }
+    using ParameterBitset = etl::bitset<sizeof...(T), uint32_t>;
 };
 
 } // namespace AS::storage
@@ -148,7 +145,7 @@ public:
             template <typename S>
             bool IsChanged() const
             {
-                return m_changed.test(AS::IndexOf<S>());
+                return m_changed.test(PartialState::template PartialIndexOf<S>());
             }
 
             template <typename S>
@@ -219,7 +216,7 @@ public:
             {
                 if (GetReference<S>(cur) != GetReference<S>(next))
                 {
-                    m_changed.set(AS::IndexOf<S>());
+                    m_changed.set(PartialState::template PartialIndexOf<S>());
                 }
             }
 
@@ -243,11 +240,11 @@ public:
             }
 
             ApplicationState& m_parent;
+            using PartialState = AS::storage::partial_state<T...>;
 
-            // TODO:  Use local index
-            std::array<AS::storage::partial_state<T...>, 2> m_state;
+            std::array<PartialState, 2> m_state;
             uint8_t m_state_index {0};
-            ParameterBitset m_changed;
+            PartialState::ParameterBitset m_changed;
         };
 
         friend class ApplicationState;
@@ -326,20 +323,22 @@ public:
             template <typename S>
             bool IsChanged() const
             {
-                return m_changed.test(AS::IndexOf<S>());
+                return m_changed.test(PartialState::template PartialIndexOf<S>());
             }
 
             explicit Checkout(ApplicationState& parent)
                 : m_parent(parent)
             {
+                static_assert(PartialState::PartialCount() <= 32 &&
+                              "No more than 32 parameters for an uint32_t");
             }
+            using PartialState = AS::storage::partial_state<T...>;
 
             ApplicationState& m_parent;
 
-            // TODO:  Use local index
-            std::array<AS::storage::partial_state<T...>, 2> m_state;
+            std::array<PartialState, 2> m_state;
             uint8_t m_state_index {0};
-            ParameterBitset m_changed;
+            PartialState::ParameterBitset m_changed;
         };
 
         friend class ApplicationState;
@@ -389,7 +388,7 @@ public:
             std::lock_guard lock(m_parent.m_mutex);
 
             (void)std::initializer_list<int> {
-                (m_changed.test(AS::IndexOf<T>())
+                (m_changed.test(PartialState::template PartialIndexOf<T>())
                      ? (m_parent.SetNoLockCollectChanged<T>(Get<T>(), global_changed), 0)
                      : 0)...};
 
@@ -401,7 +400,7 @@ public:
         auto& GetWritableReference()
         {
             // Assume it being changed when a reference is used (the actual check will be during writeback)
-            m_changed.set(AS::IndexOf<S>());
+            m_changed.set(PartialState::template PartialIndexOf<S>());
 
             return GetReference<S>();
         }
@@ -420,13 +419,16 @@ public:
             static_assert(std::disjunction_v<std::is_same<S, T>...>);
 
             m_state.template GetRef<S>() = value;
-            m_changed.set(AS::IndexOf<S>());
+            m_changed.set(PartialState::template PartialIndexOf<S>());
         }
 
     private:
         explicit PartialSnapshot(ApplicationState& parent)
             : m_parent(parent)
         {
+            static_assert(PartialState::PartialCount() <= 32 &&
+                          "No more than 32 parameters for an uint32_t");
+
             // Hold the lock since the GetValue might refer to a shared_ptr
             std::lock_guard lock(m_parent.m_mutex);
 
@@ -443,10 +445,12 @@ public:
             return m_state.template GetRef<S>();
         }
 
-        ApplicationState& m_parent;
-        AS::storage::partial_state<T...> m_state;
+        using PartialState = AS::storage::partial_state<T...>;
 
-        ParameterBitset m_changed;
+        ApplicationState& m_parent;
+        PartialState m_state;
+
+        PartialState::ParameterBitset m_changed;
     };
 
 
@@ -472,7 +476,7 @@ public:
             std::lock_guard lock(m_parent.m_mutex);
 
             (void)std::initializer_list<int> {
-                (m_changed.test(AS::IndexOf<T>())
+                (m_changed.test(PartialState::template PartialIndexOf<T>())
                      ? (m_parent.SetNoLockCollectChanged<T>(Get<T>(), global_changed), 0)
                      : 0)...};
 
@@ -485,13 +489,16 @@ public:
             static_assert(std::disjunction_v<std::is_same<S, T>...>);
 
             m_state.template GetRef<S>() = value;
-            m_changed.set(AS::IndexOf<S>());
+            m_changed.set(PartialState::template PartialIndexOf<S>());
         }
 
     private:
         explicit QueuedWriter(ApplicationState& parent)
             : m_parent(parent)
         {
+            static_assert(PartialState::PartialCount() <= 32 &&
+                          "No more than 32 parameters for an uint32_t");
+
             // No initialization, these are write-only
         }
 
@@ -504,10 +511,12 @@ public:
             return m_state.template GetRef<S>();
         }
 
-        ApplicationState& m_parent;
-        AS::storage::partial_state<T...> m_state;
+        using PartialState = AS::storage::partial_state<T...>;
 
-        ParameterBitset m_changed;
+        ApplicationState& m_parent;
+        PartialState m_state;
+
+        PartialState::ParameterBitset m_changed;
     };
 
 

@@ -8,8 +8,6 @@ constexpr auto kInvalidListener = 0;
 
 static os::binary_semaphore g_dummy_sem {0};
 
-static_assert(ParameterBitset().size() <= 32 && "time to use partial indicies");
-
 ApplicationState::ApplicationState()
 {
     m_global_state.SetupDefaultValues();
