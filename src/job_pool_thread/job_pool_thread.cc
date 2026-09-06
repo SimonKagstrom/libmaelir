@@ -68,7 +68,7 @@ JobPoolThread::OnActivation()
         {
             // Timeout value (or 0ms, which is also handled the same way)
             m_threads[thread->m_thread_id].wakeup_handle = StartTimer(*result, [this, thread]() {
-                Awake(thread);
+                WakeupPooledThread(thread);
 
                 return std::nullopt;
             });
@@ -98,7 +98,7 @@ JobPoolThread::AttachPooledThread(std::unique_ptr<PooledThreadBase> thread)
 
 // Context: Another thread, or even an interrupt
 void
-JobPoolThread::Awake(PooledThreadBase* thread)
+JobPoolThread::WakeupPooledThread(PooledThreadBase* thread)
 {
     debug_assert(thread->m_thread_id != 255);
     m_ready_mask |= (1 << thread->m_thread_id);
@@ -148,7 +148,7 @@ PooledThreadBase::Awake()
 {
     debug_assert(m_job_pool_thread);
 
-    m_job_pool_thread->Awake(this);
+    m_job_pool_thread->WakeupPooledThread(this);
 }
 
 std::optional<milliseconds>

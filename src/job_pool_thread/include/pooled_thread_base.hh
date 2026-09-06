@@ -2,6 +2,7 @@
 
 #include "event_notifier.hh"
 #include "time.hh"
+#include "timer_manager.hh"
 
 #include <atomic>
 #include <optional>
@@ -36,6 +37,14 @@ public:
     void Awake();
 
 protected:
+    auto StartTimer(
+        milliseconds timeout, std::function<std::optional<milliseconds>()> on_timeout = []() {
+            return std::optional<milliseconds>();
+        })
+    {
+        return m_timer_manager.StartTimer(timeout, on_timeout);
+    }
+
     void Stop();
 
 private:
@@ -52,5 +61,5 @@ private:
 
     std::atomic<bool> m_awake {false};
 
-    bool m_detached { false };
+    bool m_detached {false};
 };
