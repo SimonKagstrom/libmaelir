@@ -1,3 +1,5 @@
+#ifndef LV_CONF_H
+#define LV_CONF_H
 
 /** Color depth: 1 (I1), 8 (L8), 16 (RGB565), 24 (RGB888), 32 (XRGB8888) */
 #define LV_COLOR_DEPTH 16
@@ -942,3 +944,5 @@
 #define LV_USE_DEMO_EBIKE			0
 
 #define LV_USE_DEMO_HIGH_RES        0
+
+#endif /* LV_CONF_H */

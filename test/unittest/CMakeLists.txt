@@ -14,6 +14,10 @@ enable_testing()
 
 add_subdirectory(.. libmaelir_unittest)
 
+if(NOT TARGET display_properties)
+    add_library(display_properties ALIAS display_800x800)
+endif()
+
 add_executable(unittest_libmaelir
     main.cc
     test_nmea_parser.cc
