@@ -13,8 +13,8 @@ public:
         m_thread = thread;
 
         // TODO: Allow multiple threads
-        m_on_thread_start = NAMED_ALLOW_CALL(*kernel_mock, OnThreadStart(_))
-                                .SIDE_EFFECT(m_thread->OnStartup());
+        m_on_thread_start =
+            NAMED_ALLOW_CALL(*kernel_mock, OnThreadStart(_)).SIDE_EFFECT(m_thread->OnStartup());
     }
 
     bool DoRunLoop()
@@ -64,6 +64,8 @@ public:
             SetTime(std::min(*m_next_wakeup_absolute, run_until));
             DoRunLoop();
         }
+
+        SetTime(run_until);
     }
 
     /// Return the time the thread should wake up next time (if any)
