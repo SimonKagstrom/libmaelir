@@ -11,6 +11,27 @@
 namespace os
 {
 
+std::optional<milliseconds>
+SelectWakeup(auto a, auto b)
+{
+    if (a && b)
+    {
+        return std::min(*a, *b);
+    }
+    else if (a)
+    {
+        return *a;
+    }
+    else if (b)
+    {
+        return *b;
+    }
+
+    // Unreachable
+    return std::nullopt;
+}
+
+
 class BaseThread : public OsThread
 {
 public:
@@ -80,25 +101,6 @@ protected:
 
 private:
     struct Impl;
-
-    std::optional<milliseconds> SelectWakeup(auto a, auto b) const
-    {
-        if (a && b)
-        {
-            return std::min(*a, *b);
-        }
-        else if (a)
-        {
-            return *a;
-        }
-        else if (b)
-        {
-            return *b;
-        }
-
-        // Unreachable
-        return std::nullopt;
-    }
 
     // Accessible for unit tests
     std::optional<milliseconds> RunLoop()
