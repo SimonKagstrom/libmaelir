@@ -15,7 +15,7 @@ public:
     friend class JobPoolThread;
 
     PooledThreadBase();
-    virtual ~PooledThreadBase();
+    virtual ~PooledThreadBase() = default;
 
     virtual void OnStartup()
     {
@@ -48,6 +48,7 @@ private:
 
     os::TimerManager m_timer_manager;
     JobPoolThread* m_job_pool_thread {nullptr};
+    uint8_t m_thread_id {255};
 
     std::atomic<bool> m_awake {false};
 

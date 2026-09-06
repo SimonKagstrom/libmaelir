@@ -378,4 +378,33 @@ TEST_CASE_FIXTURE(Fixture, "two pooled threads are created")
     }
 }
 
+TEST_CASE_FIXTURE(Fixture, "pooled threads can use notifications")
+{
+    GIVEN("two pooled threads")
+    {
+        auto [p0_up, p0] = CreatePooledThread();
+        auto [p1_up, p1] = CreatePooledThread();
+
+        REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt);
+        REQUIRE_CALL(*p1, OnActivation()).RETURN(std::nullopt);
+        job_thread->AttachPooledThread(std::move(p0_up));
+        job_thread->AttachPooledThread(std::move(p1_up));
+
+        WHEN("one thread is notified")
+        {
+            auto as_notifier = static_cast<IEventNotifier*>(p0);
+
+            auto r_activation = NAMED_REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt);
+
+            as_notifier->Notify();
+            DoRunLoop();
+
+            THEN("it's activated")
+            {
+                r_activation = nullptr;
+            }
+        }
+    }
+}
+
 TEST_SUITE_END();
