@@ -73,9 +73,9 @@ private:
     IEventNotifier& m_notifier;
     milliseconds m_last_expiery;
 
-    etl::bitset<kMaxTimers, uint8_t> m_pending_removals;
-    etl::bitset<kMaxTimers, uint8_t> m_pending_additions;
-    etl::bitset<kMaxTimers, uint8_t> m_free_timers;
+    etl::bitset<kMaxTimers, uint32_t> m_pending_removals;
+    etl::bitset<kMaxTimers, uint32_t> m_pending_additions;
+    etl::bitset<kMaxTimers, uint32_t> m_free_timers;
     bool m_in_expire {false};
 };
 
