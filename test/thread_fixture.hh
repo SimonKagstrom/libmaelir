@@ -25,6 +25,7 @@ public:
         if (m_next_wakeup_absolute && now >= *m_next_wakeup_absolute)
         {
             m_thread->m_semaphore.release();
+            m_next_wakeup_absolute = std::nullopt;
         }
 
         // The thread is not ready
@@ -33,10 +34,10 @@ public:
             return false;
         }
 
-        m_next_wakeup_time = m_thread->RunLoop();
-        if (m_next_wakeup_time)
+        auto wake_in = m_thread->RunLoop();
+        if (wake_in)
         {
-            m_next_wakeup_absolute = now + *m_next_wakeup_time;
+            m_next_wakeup_absolute = now + *wake_in;
         }
         else
         {
@@ -72,13 +73,16 @@ public:
     /// Return the time the thread should wake up next time (if any)
     std::optional<milliseconds> NextWakeupTime() const
     {
-        return m_next_wakeup_time;
+        if (!m_next_wakeup_absolute)
+        {
+            return std::nullopt;
+        }
+
+        return *m_next_wakeup_absolute - os::GetTimeStamp();
     }
 
 private:
     os::BaseThread* m_thread {nullptr};
-
-    std::optional<milliseconds> m_next_wakeup_time;
 
     std::optional<milliseconds> m_next_wakeup_absolute;
 
