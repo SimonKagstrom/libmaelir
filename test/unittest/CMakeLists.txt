@@ -18,6 +18,7 @@ add_executable(unittest_libmaelir
     main.cc
     test_nmea_parser.cc
     test_opportunistic_scheduler.cc
+    test_job_pool_thread.cc
     test_timer_manager.cc
 )
 
@@ -25,6 +26,7 @@ target_link_libraries(unittest_libmaelir
     os_unittest
     opportunistic_semaphore
     nmea_parser
+    job_pool_thread
     timer_manager
     doctest::doctest
     trompeloeil::trompeloeil
