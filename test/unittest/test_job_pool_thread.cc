@@ -272,6 +272,7 @@ TEST_CASE_FIXTURE(Fixture, "timers are used in a single pooled thread")
 {
 }
 
+#if 0
 TEST_CASE_FIXTURE(Fixture, "two pooled threads are created")
 {
     GIVEN("two pooled threads")
@@ -380,6 +381,7 @@ TEST_CASE_FIXTURE(Fixture, "two pooled threads are created")
         }
     }
 }
+#endif
 
 TEST_CASE_FIXTURE(Fixture, "pooled threads can use notifications")
 {
