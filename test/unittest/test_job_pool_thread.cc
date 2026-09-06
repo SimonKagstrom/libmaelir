@@ -255,8 +255,9 @@ TEST_CASE_FIXTURE(Fixture, "a single pooled thread can be removed")
 
     WHEN("the thread is removed during activation")
     {
+        auto l_p0 = p0;
         auto r_no_activation = NAMED_FORBID_CALL(*p0, OnActivation());
-        REQUIRE_CALL(*p0, OnActivation()).RETURN(0ms).SIDE_EFFECT(p0->DoStop());
+        REQUIRE_CALL(*p0, OnActivation()).RETURN(0ms).LR_SIDE_EFFECT(l_p0->DoStop());
         job_thread->Start("job_pool");
         DoRunLoop();
 
@@ -346,7 +347,8 @@ TEST_CASE_FIXTURE(Fixture, "two pooled threads are created")
 
         WHEN("a thread removes the other during startup")
         {
-            REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt).LR_SIDE_EFFECT(p1->DoStop());
+            auto l_p1 = p1; // Bindings not popular with older clangs
+            REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt).LR_SIDE_EFFECT(l_p1->DoStop());
             auto r_no_p1 = NAMED_FORBID_CALL(*p1, OnActivation());
             DoRunLoop();
 
@@ -364,7 +366,8 @@ TEST_CASE_FIXTURE(Fixture, "two pooled threads are created")
             job_thread->Start("job_pool");
             DoRunLoop();
 
-            REQUIRE_CALL(*p1, OnActivation()).RETURN(std::nullopt).LR_SIDE_EFFECT(p0->DoStop());
+            auto l_p0 = p0;
+            REQUIRE_CALL(*p1, OnActivation()).RETURN(std::nullopt).LR_SIDE_EFFECT(l_p0->DoStop());
             auto r_no_p0 = NAMED_FORBID_CALL(*p0, OnActivation());
 
             job_thread->Start("job_pool");
