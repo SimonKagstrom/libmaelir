@@ -18,10 +18,10 @@ public:
     void AttachPooledThread(PooledThreadBase* thread);
 
 private:
-    struct SleepThread
+    struct ThreadData
     {
         PooledThreadBase* thread;
-        milliseconds wakeup_time;
+        os::TimerHandle wakeup_handle;
     };
 
     void Awake(PooledThreadBase* thread);
@@ -30,9 +30,8 @@ private:
 
     void DetachThreadFromLists(PooledThreadBase* thread);
 
-    std::vector<PooledThreadBase*> m_wait_for_event_threads;
+    std::vector<ThreadData> m_threads;
     std::vector<PooledThreadBase*> m_ready_threads;
-    std::vector<SleepThread> m_sleeping_threads; // Sorted by wakeup time
 
     std::vector<PooledThreadBase*> m_removed_threads;
 };

@@ -21,15 +21,43 @@ JobPoolThread::OnStartup()
 std::optional<milliseconds>
 JobPoolThread::OnActivation()
 {
+    std::optional<milliseconds> out;
+
     auto ready = m_ready_threads;
+    m_ready_threads.clear();
+
     for (auto thread : ready)
     {
+        auto it = std::find_if(m_threads.begin(), m_threads.end(), [&](const auto& data) {
+            return data.thread == thread;
+        });
+        if (it == m_threads.end())
+        {
+            // Removed
+            continue;
+        }
         auto result = thread->RunLoop();
-        // FIXME!
-        return result;
+
+        if (result)
+        {
+            if (result == 0ms)
+            {
+                // Ready again
+                m_ready_threads.push_back(thread);
+                out = 0ms;
+            }
+            else if (result.has_value())
+            {
+                it->wakeup_handle = StartTimer(*result, [this, thread]() {
+                    Awake(thread);
+
+                    return std::nullopt;
+                });
+            }
+        }
     }
 
-    return std::nullopt;
+    return out;
 }
 
 void
@@ -37,6 +65,7 @@ JobPoolThread::AttachPooledThread(PooledThreadBase* thread)
 {
     thread->m_job_pool_thread = this;
 
+    m_threads.push_back({thread, nullptr});
     m_ready_threads.push_back(thread);
 }
 
@@ -59,10 +88,10 @@ JobPoolThread::DetachThreadFromLists(PooledThreadBase* thread)
 {
     m_ready_threads.erase(std::remove(m_ready_threads.begin(), m_ready_threads.end(), thread),
                           m_ready_threads.end());
-    m_wait_for_event_threads.erase(
-        std::remove(m_wait_for_event_threads.begin(), m_wait_for_event_threads.end(), thread),
-        m_wait_for_event_threads.end());
-    //m_sleeping_threads.erase(std::remove(m_sleeping_threads.begin(), m_sleeping_threads.end(), thread), m_sleeping_threads.end());
+    m_threads.erase(std::remove_if(m_threads.begin(),
+                                   m_threads.end(),
+                                   [&](const auto& data) { return data.thread == thread; }),
+                    m_threads.end());
 }
 
 

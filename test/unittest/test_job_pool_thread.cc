@@ -238,11 +238,122 @@ TEST_CASE_FIXTURE(Fixture, "a single pooled thread can be removed")
             r0 = nullptr;
         }
     }
+
+    WHEN("the thread is removed during activation")
+    {
+        //...
+    }
+}
+
+TEST_CASE_FIXTURE(Fixture, "timers are used in a single pooled thread")
+{
 }
 
 TEST_CASE_FIXTURE(Fixture, "two pooled threads are created")
 {
-}
+    GIVEN("two pooled threads")
+    {
+        auto p0 = std::make_unique<PooledThread>();
+        auto p1 = std::make_unique<PooledThread>();
 
+        job_thread->AttachPooledThread(p0.get());
+        job_thread->AttachPooledThread(p1.get());
+
+        THEN("both are started on startup")
+        {
+            REQUIRE_CALL(*p0, OnStartup());
+            REQUIRE_CALL(*p1, OnStartup());
+            REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt);
+            REQUIRE_CALL(*p1, OnActivation()).RETURN(std::nullopt);
+
+            job_thread->Start("job_pool");
+            DoRunLoop();
+        }
+
+        WHEN("one thread waits for event and one on a timer")
+        {
+            REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt);
+            REQUIRE_CALL(*p1, OnActivation()).RETURN(10ms);
+
+            job_thread->Start("job_pool");
+            DoRunLoop();
+
+            WHEN("the event occurs")
+            {
+                auto r_p0_on_event = NAMED_REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt);
+                FORBID_CALL(*p1, OnActivation());
+
+                p0->Awake();
+                DoRunLoop();
+
+                THEN("only p0 is executed")
+                {
+                    r_p0_on_event = nullptr;
+                }
+            }
+
+            WHEN("the timer occurs")
+            {
+                AdvanceTimeAndRunLoop(9ms);
+                auto r_p1_on_timer = NAMED_REQUIRE_CALL(*p1, OnActivation()).RETURN(std::nullopt);
+                FORBID_CALL(*p0, OnActivation());
+
+                AdvanceTimeAndRunLoop(1ms);
+
+                THEN("only p1 is executed")
+                {
+                    r_p1_on_timer = nullptr;
+                }
+            }
+        }
+
+        WHEN("both threads are runnable all the time")
+        {
+            auto r0 = NAMED_REQUIRE_CALL(*p0, OnActivation()).RETURN(0ms);
+            auto r1 = NAMED_REQUIRE_CALL(*p1, OnActivation()).RETURN(0ms);
+
+            job_thread->Start("job_pool");
+            DoRunLoop();
+
+            THEN("they are both executed immediately")
+            {
+                r0 = nullptr;
+                r1 = nullptr;
+            }
+        }
+
+        WHEN("a thread removes the other during startup")
+        {
+            REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt).LR_SIDE_EFFECT(p1 = nullptr);
+            auto r_no_p1 = NAMED_FORBID_CALL(*p1, OnActivation());
+            DoRunLoop();
+
+            THEN("p1 isn't executed")
+            {
+                r_no_p1 = nullptr;
+            }
+        }
+
+        WHEN("the removal order is reverse, after startup")
+        {
+            REQUIRE_CALL(*p0, OnActivation()).RETURN(1ms);
+            REQUIRE_CALL(*p1, OnActivation()).RETURN(0ms);
+
+            job_thread->Start("job_pool");
+            DoRunLoop();
+
+            REQUIRE_CALL(*p1, OnActivation()).RETURN(std::nullopt).LR_SIDE_EFFECT(p0 = nullptr);
+            auto r_no_p0 = NAMED_FORBID_CALL(*p0, OnActivation());
+
+            job_thread->Start("job_pool");
+            AdvanceTimeAndRunLoop(1ms);
+
+            THEN("p1 isn't executed")
+            {
+                r_no_p0 = nullptr;
+            }
+        }
+    }
+}
 
 TEST_SUITE_END();
