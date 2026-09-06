@@ -66,6 +66,7 @@ public:
         }
 
         SetTime(run_until);
+        DoRunLoop();
     }
 
     /// Return the time the thread should wake up next time (if any)
