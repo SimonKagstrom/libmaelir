@@ -35,6 +35,9 @@ public:
 
     void Awake();
 
+protected:
+    void Stop();
+
 private:
     // Used by the JobPoolThread. Either nullopt -> wait forever, 0ms -> run again or > 0ms -> wait for the specified duration
     std::optional<milliseconds> RunLoop();
@@ -47,4 +50,6 @@ private:
     JobPoolThread* m_job_pool_thread {nullptr};
 
     std::atomic<bool> m_awake {false};
+
+    bool m_detached { false };
 };

@@ -12,6 +12,12 @@ JobPoolThread::JobPoolThread()
 void
 JobPoolThread::OnStartup()
 {
+    for (auto thread : m_removed_threads)
+    {
+        DetachThreadFromLists(thread);
+    }
+    m_removed_threads.clear();
+
     for (auto thread : m_ready_threads)
     {
         thread->OnStartup();
@@ -23,17 +29,28 @@ JobPoolThread::OnActivation()
 {
     std::optional<milliseconds> out;
 
+    for (auto thread : m_removed_threads)
+    {
+        DetachThreadFromLists(thread);
+    }
+    m_removed_threads.clear();
+
     auto ready = m_ready_threads;
     m_ready_threads.clear();
 
     for (auto thread : ready)
     {
         auto it = std::find_if(m_threads.begin(), m_threads.end(), [&](const auto& data) {
-            return data.thread == thread;
+            return data.thread.get() == thread;
         });
         if (it == m_threads.end())
         {
             // Removed
+            continue;
+        }
+        if (thread->m_detached)
+        {
+            // Will be removed
             continue;
         }
         auto result = thread->RunLoop();
@@ -57,16 +74,22 @@ JobPoolThread::OnActivation()
         }
     }
 
+    for (auto thread : m_removed_threads)
+    {
+        DetachThreadFromLists(thread);
+    }
+    m_removed_threads.clear();
+
     return out;
 }
 
 void
-JobPoolThread::AttachPooledThread(PooledThreadBase* thread)
+JobPoolThread::AttachPooledThread(std::unique_ptr<PooledThreadBase> thread)
 {
     thread->m_job_pool_thread = this;
 
-    m_threads.push_back({thread, nullptr});
-    m_ready_threads.push_back(thread);
+    m_ready_threads.push_back(thread.get());
+    m_threads.push_back({std::move(thread), nullptr});
 }
 
 void
@@ -80,7 +103,7 @@ JobPoolThread::Awake(PooledThreadBase* thread)
 void
 JobPoolThread::RemoveThread(PooledThreadBase* thread)
 {
-    DetachThreadFromLists(thread);
+    m_removed_threads.push_back(thread);
 }
 
 void
@@ -90,7 +113,7 @@ JobPoolThread::DetachThreadFromLists(PooledThreadBase* thread)
                           m_ready_threads.end());
     m_threads.erase(std::remove_if(m_threads.begin(),
                                    m_threads.end(),
-                                   [&](const auto& data) { return data.thread == thread; }),
+                                   [&](const auto& data) { return data.thread.get() == thread; }),
                     m_threads.end());
 }
 
@@ -104,10 +127,6 @@ PooledThreadBase::PooledThreadBase()
 
 PooledThreadBase::~PooledThreadBase()
 {
-    if (m_job_pool_thread)
-    {
-        m_job_pool_thread->RemoveThread(this);
-    }
 }
 
 void
@@ -127,12 +146,22 @@ PooledThreadBase::RunLoop()
     return os::SelectWakeup(thread_wakeup, timer_expiration);
 }
 
-// From IEventNotifier
+void
+PooledThreadBase::Stop()
+{
+    debug_assert(m_job_pool_thread);
+
+    m_detached = true;
+    m_job_pool_thread->RemoveThread(this);
+}
+
+// Context: Another thread potentially
 void
 PooledThreadBase::Notify()
 {
 }
 
+// Context: Interrupt
 void
 PooledThreadBase::NotifyFromIsr()
 {

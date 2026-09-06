@@ -15,12 +15,12 @@ public:
     void OnStartup() final;
     std::optional<milliseconds> OnActivation() final;
 
-    void AttachPooledThread(PooledThreadBase* thread);
+    void AttachPooledThread(std::unique_ptr<PooledThreadBase> thread);
 
 private:
     struct ThreadData
     {
-        PooledThreadBase* thread;
+        std::unique_ptr<PooledThreadBase> thread;
         os::TimerHandle wakeup_handle;
     };
 

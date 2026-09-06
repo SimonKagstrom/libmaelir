@@ -9,6 +9,12 @@ namespace
 class PooledThread : public PooledThreadBase
 {
 public:
+    void DoStop()
+    {
+        Stop();
+    }
+
+public:
     PooledThread()
     {
         m_expectations.push_back(NAMED_ALLOW_CALL(*this, OnStartup()));
@@ -29,6 +35,14 @@ public:
         SetThread(job_thread.get());
     }
 
+    std::pair<std::unique_ptr<PooledThread>, PooledThread*> CreatePooledThread()
+    {
+        auto thread = std::make_unique<PooledThread>();
+        auto raw_ptr = thread.get();
+
+        return {std::move(thread), raw_ptr};
+    }
+
     std::unique_ptr<JobPoolThread> job_thread {std::make_unique<JobPoolThread>()};
 };
 
@@ -38,14 +52,14 @@ TEST_SUITE_BEGIN("job_pool_thread");
 
 TEST_CASE_FIXTURE(Fixture, "OnStartup is called for all pooled threads on start")
 {
-    auto p0 = std::make_unique<PooledThread>();
-    auto p1 = std::make_unique<PooledThread>();
+    auto [p0_up, p0] = CreatePooledThread();
+    auto [p1_up, p1] = CreatePooledThread();
 
     ALLOW_CALL(*p0, OnActivation()).RETURN(std::nullopt);
     ALLOW_CALL(*p1, OnActivation()).RETURN(std::nullopt);
 
-    job_thread->AttachPooledThread(p0.get());
-    job_thread->AttachPooledThread(p1.get());
+    job_thread->AttachPooledThread(std::move(p0_up));
+    job_thread->AttachPooledThread(std::move(p1_up));
 
     WHEN("the job thread is started")
     {
@@ -67,7 +81,7 @@ TEST_CASE_FIXTURE(Fixture, "OnStartup is called for all pooled threads on start"
         auto r0 = NAMED_FORBID_CALL(*p0, OnStartup());
         auto r1 = NAMED_REQUIRE_CALL(*p1, OnStartup());
 
-        p0 = nullptr;
+        p0->DoStop();
         job_thread->Start("job_pool");
         DoRunLoop();
 
@@ -87,8 +101,8 @@ TEST_CASE_FIXTURE(Fixture, "OnStartup is called for all pooled threads on start"
 
 TEST_CASE_FIXTURE(Fixture, "a single pooled thread can run all the time")
 {
-    auto p0 = std::make_unique<PooledThread>();
-    job_thread->AttachPooledThread(p0.get());
+    auto [p0_up, p0] = CreatePooledThread();
+    job_thread->AttachPooledThread(std::move(p0_up));
 
     WHEN("the task runs")
     {
@@ -109,9 +123,9 @@ TEST_CASE_FIXTURE(Fixture, "a single pooled thread can run all the time")
 
 TEST_CASE_FIXTURE(Fixture, "a single pooled thread can wait for events")
 {
-    auto p0 = std::make_unique<PooledThread>();
+    auto [p0_up, p0] = CreatePooledThread();
 
-    job_thread->AttachPooledThread(p0.get());
+    job_thread->AttachPooledThread(std::move(p0_up));
 
     WHEN("the task runs")
     {
@@ -145,9 +159,9 @@ TEST_CASE_FIXTURE(Fixture, "a single pooled thread can wait for events")
 
 TEST_CASE_FIXTURE(Fixture, "a single pooled thread can wait for a timeout")
 {
-    auto p0 = std::make_unique<PooledThread>();
+    auto [p0_up, p0] = CreatePooledThread();
 
-    job_thread->AttachPooledThread(p0.get());
+    job_thread->AttachPooledThread(std::move(p0_up));
 
     WHEN("the task runs")
     {
@@ -187,15 +201,15 @@ TEST_CASE_FIXTURE(Fixture, "a single pooled thread can wait for a timeout")
 
 TEST_CASE_FIXTURE(Fixture, "a single pooled thread can be removed")
 {
-    auto p0 = std::make_unique<PooledThread>();
+    auto [p0_up, p0] = CreatePooledThread();
 
-    job_thread->AttachPooledThread(p0.get());
+    job_thread->AttachPooledThread(std::move(p0_up));
 
     WHEN("the thread is removed before start")
     {
         auto r0 = NAMED_FORBID_CALL(*p0, OnActivation());
 
-        p0 = nullptr;
+        p0->DoStop();
         job_thread->Start("job_pool");
         DoRunLoop();
 
@@ -212,7 +226,7 @@ TEST_CASE_FIXTURE(Fixture, "a single pooled thread can be removed")
         AdvanceTimeAndRunLoop(5ms);
 
         r0 = NAMED_FORBID_CALL(*p0, OnActivation());
-        p0 = nullptr;
+        p0->DoStop();
         AdvanceTimeAndRunLoop(5ms);
 
         THEN("the thread is not run")
@@ -230,7 +244,7 @@ TEST_CASE_FIXTURE(Fixture, "a single pooled thread can be removed")
         r0 = NAMED_FORBID_CALL(*p0, OnActivation());
         // Wake via an event
         p0->Awake();
-        p0 = nullptr;
+        p0->DoStop();
         DoRunLoop();
 
         THEN("the thread is not run")
@@ -241,7 +255,15 @@ TEST_CASE_FIXTURE(Fixture, "a single pooled thread can be removed")
 
     WHEN("the thread is removed during activation")
     {
-        //...
+        auto r_no_activation = NAMED_FORBID_CALL(*p0, OnActivation());
+        REQUIRE_CALL(*p0, OnActivation()).RETURN(0ms).SIDE_EFFECT(p0->DoStop());
+        job_thread->Start("job_pool");
+        DoRunLoop();
+
+        THEN("the thread is not run again")
+        {
+            r_no_activation = nullptr;
+        }
     }
 }
 
@@ -253,11 +275,11 @@ TEST_CASE_FIXTURE(Fixture, "two pooled threads are created")
 {
     GIVEN("two pooled threads")
     {
-        auto p0 = std::make_unique<PooledThread>();
-        auto p1 = std::make_unique<PooledThread>();
+        auto [p0_up, p0] = CreatePooledThread();
+        auto [p1_up, p1] = CreatePooledThread();
 
-        job_thread->AttachPooledThread(p0.get());
-        job_thread->AttachPooledThread(p1.get());
+        job_thread->AttachPooledThread(std::move(p0_up));
+        job_thread->AttachPooledThread(std::move(p1_up));
 
         THEN("both are started on startup")
         {
@@ -324,7 +346,7 @@ TEST_CASE_FIXTURE(Fixture, "two pooled threads are created")
 
         WHEN("a thread removes the other during startup")
         {
-            REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt).LR_SIDE_EFFECT(p1 = nullptr);
+            REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt).LR_SIDE_EFFECT(p1->DoStop());
             auto r_no_p1 = NAMED_FORBID_CALL(*p1, OnActivation());
             DoRunLoop();
 
@@ -342,7 +364,7 @@ TEST_CASE_FIXTURE(Fixture, "two pooled threads are created")
             job_thread->Start("job_pool");
             DoRunLoop();
 
-            REQUIRE_CALL(*p1, OnActivation()).RETURN(std::nullopt).LR_SIDE_EFFECT(p0 = nullptr);
+            REQUIRE_CALL(*p1, OnActivation()).RETURN(std::nullopt).LR_SIDE_EFFECT(p0->DoStop());
             auto r_no_p0 = NAMED_FORBID_CALL(*p0, OnActivation());
 
             job_thread->Start("job_pool");
