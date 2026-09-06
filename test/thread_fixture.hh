@@ -82,11 +82,11 @@ public:
     }
 
 private:
+    std::shared_ptr<os::MockKernel> kernel_mock {os::detail::GetKernelMock()};
+
     os::BaseThread* m_thread {nullptr};
 
     std::optional<milliseconds> m_next_wakeup_absolute;
 
     std::unique_ptr<trompeloeil::expectation> m_on_thread_start;
-
-    std::shared_ptr<os::MockKernel> kernel_mock {os::detail::GetKernelMock()};
 };
