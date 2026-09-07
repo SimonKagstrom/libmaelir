@@ -370,7 +370,6 @@ TEST_CASE_FIXTURE(Fixture, "two pooled threads are created")
             REQUIRE_CALL(*p1, OnActivation()).RETURN(std::nullopt).LR_SIDE_EFFECT(l_p0->DoStop());
             auto r_no_p0 = NAMED_FORBID_CALL(*p0, OnActivation());
 
-            job_thread->Start("job_pool");
             AdvanceTimeAndRunLoop(1ms);
 
             THEN("p1 isn't executed")
