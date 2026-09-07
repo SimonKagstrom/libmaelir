@@ -1,5 +1,6 @@
 #pragma once
 
+#include "debug_assert.hh"
 #include "os_implementation.hh"
 #include "semaphore.hh"
 #include "thread_parameters.hh"
@@ -43,10 +44,11 @@ public:
      */
     void Start(const char* name, ThreadCore core, ThreadPriority priority, uint32_t stack_size)
     {
+        debug_assert(m_running == false && "a thread can't be started twice");
+
         m_running = true;
-        printf("Starting thread %s\n",
-               name
-);
+        printf("Starting thread %s\n", name);
+
         m_self = detail::StartThread(name, core, priority, stack_size, [this]() { ThreadLoop(); });
     }
 
