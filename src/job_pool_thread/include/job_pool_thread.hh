@@ -27,7 +27,7 @@ private:
         os::TimerHandle wakeup_handle;
     };
 
-    void WakeupPooledThread(PooledThreadBase* thread);
+    void WakeupPooledThread(const PooledThreadBase* thread);
     // On thread exit
     void RemoveThread(PooledThreadBase* thread);
 

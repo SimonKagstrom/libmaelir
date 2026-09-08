@@ -37,16 +37,14 @@ JobPoolThread::OnActivation()
     for (auto index = woken_bits.find_first(true); index != woken_bits.npos;
          index = woken_bits.find_next(true, index + 1))
     {
-        auto thread = m_threads[index].thread.get();
-
-        if (!thread)
+        if (auto thread = m_threads[index].thread.get(); thread)
         {
-            // This should be very unlikely
-            printf("Thread %u has been removed (?), not making ready\n", (unsigned)index);
+            m_ready_threads.push_back(thread);
         }
         else
         {
-            m_ready_threads.push_back(thread);
+            // This should be very unlikely
+            printf("Thread %u has been removed (?), not making ready\n", (unsigned)index);
         }
 
         m_ready_mask &= ~(1 << index);
@@ -98,12 +96,12 @@ JobPoolThread::AttachPooledThread(std::unique_ptr<PooledThreadBase> thread)
 
 // Context: Another thread, or even an interrupt
 void
-JobPoolThread::WakeupPooledThread(PooledThreadBase* thread)
+JobPoolThread::WakeupPooledThread(const PooledThreadBase* thread)
 {
     debug_assert(thread->m_thread_id != 255);
     m_ready_mask |= (1 << thread->m_thread_id);
 
-    BaseThread::Awake();
+    Awake();
 }
 
 void
