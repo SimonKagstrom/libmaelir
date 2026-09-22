@@ -73,5 +73,5 @@ function(convert_font BASE_NAME TTF SIZE_PIXELS RANGE EXTRA_SYMBOLS)
 endfunction()
 
 function(convert_symbols BASE_NAME SIZE_PIXELS RANGE )
-    convert_font(${BASE_NAME} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../external/lvgl/scripts/built_in_font/FontAwesome5-Solid+Brands+Regular.woff ${SIZE_PIXELS} ${RANGE} "")
+    convert_font(${BASE_NAME} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../external/lvgl/scripts/generators/built_in_font/FontAwesome5-Solid+Brands+Regular.woff ${SIZE_PIXELS} ${RANGE} "")
 endfunction()
