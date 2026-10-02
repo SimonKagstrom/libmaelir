@@ -115,9 +115,21 @@ public:
         template <typename T>
         Drainer& On(auto handler)
         {
+            using Handler = decltype(handler);
+            static_assert(std::is_invocable_v<Handler, std::shared_ptr<const T>> ||
+                              std::is_invocable_v<Handler>,
+                          "The handler must take the message, or nothing");
+
             m_handlers[detail::IndexOfImpl<T, Messages>::Get()] =
                 [h = std::move(handler)](const detail::RawEnvelope& raw) {
-                    h(std::static_pointer_cast<const T>(raw.message));
+                    if constexpr (std::is_invocable_v<Handler, std::shared_ptr<const T>>)
+                    {
+                        h(std::static_pointer_cast<const T>(raw.message));
+                    }
+                    else
+                    {
+                        h();
+                    }
                 };
             return *this;
         }
