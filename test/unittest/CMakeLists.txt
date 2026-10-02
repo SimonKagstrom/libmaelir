@@ -24,6 +24,7 @@ add_executable(unittest_libmaelir
     test_opportunistic_scheduler.cc
     test_job_pool_thread.cc
     test_timer_manager.cc
+    test_post_office.cc
 )
 
 target_link_libraries(unittest_libmaelir
@@ -32,7 +33,9 @@ target_link_libraries(unittest_libmaelir
     nmea_parser
     job_pool_thread
     timer_manager
+    post_office
     doctest::doctest
     trompeloeil::trompeloeil
+    unittest_messages
 )
 add_test(NAME unittest_libmaelir COMMAND unittest_libmaelir)

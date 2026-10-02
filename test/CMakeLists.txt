@@ -16,6 +16,7 @@ FetchContent_MakeAvailable(doctest trompeloeil)
 add_subdirectory(../ libmaelir)
 add_subdirectory(mock_filesystem)
 add_subdirectory(mock_https_client)
+add_subdirectory(unittest_messages)
 
 add_library(os_implementation_unittest EXCLUDE_FROM_ALL
   os/os_implementation.cc
