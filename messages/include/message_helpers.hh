@@ -20,7 +20,7 @@ struct IndexOfImpl<T, std::tuple<Ts...>>
                       "The message must be in AllMessages exactly once");
 
         constexpr std::array<bool, sizeof...(Ts)> matches {std::is_same_v<T, Ts>...};
-        for (size_t index = 0; index < matches.size(); ++index)
+        for (std::size_t index = 0; index < matches.size(); ++index)
         {
             if (matches[index])
             {

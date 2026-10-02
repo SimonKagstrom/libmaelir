@@ -32,6 +32,9 @@ public:
 class Fixture : public ThreadFixture
 {
 public:
+    MAKE_MOCK0(Samsa, void());
+    MAKE_MOCK0(Gregor, void());
+
     PostOffice<MSG::AllMessages> post_office;
 };
 
@@ -114,6 +117,7 @@ TEST_CASE_FIXTURE(Fixture, "messages can be handled")
         {
             auto msg = gregor_listener->m_mailbox->Pop();
             REQUIRE(msg != std::nullopt);
+            REQUIRE(msg->Is<MSG::gregor>());
 
             THEN("no messages remain")
             {
@@ -139,9 +143,50 @@ TEST_CASE_FIXTURE(Fixture, "messages can be handled")
             auto msg = samsa_listener->m_mailbox->Pop();
             REQUIRE(msg != std::nullopt);
             auto samsa = msg->As<MSG::samsa>();
+            REQUIRE(msg->Is<MSG::samsa>());
 
             CHECK(samsa);
             // No fields in samsa
+        }
+    }
+}
+
+TEST_CASE_FIXTURE(Fixture, "messages can be handled through callbacks")
+{
+    auto all_listener = std::make_unique<ReceiverThread<MSG::gregor, MSG::samsa>>(post_office);
+    ALLOW_CALL(all_listener->notifier, Notify());
+
+    WHEN("a single message comes in")
+    {
+        post_office.Send<MSG::samsa>({});
+        THEN("only that is handled")
+        {
+            REQUIRE_CALL(*this, Samsa());
+            while (auto msg = all_listener->m_mailbox->Pop())
+            {
+                msg->On<MSG::samsa>([&](auto samsa) { Samsa(); }).On<MSG::gregor>([&](auto gregor) {
+                    Gregor();
+                });
+            }
+        }
+    }
+
+    WHEN("multiple messages come in")
+    {
+        post_office.Send<MSG::samsa>({});
+        post_office.Send<MSG::gregor>({"id=15", "name"});
+
+        THEN("all are handled")
+        {
+            trompeloeil::sequence seq;
+            REQUIRE_CALL(*this, Samsa()).IN_SEQUENCE(seq);
+            REQUIRE_CALL(*this, Gregor()).IN_SEQUENCE(seq);
+
+            while (auto msg = all_listener->m_mailbox->Pop())
+            {
+                msg->On<MSG::gregor>([&](auto gregor) { Gregor(); })
+                    .On<MSG::samsa>([&](auto samsa) { Samsa(); });
+            }
         }
     }
 }

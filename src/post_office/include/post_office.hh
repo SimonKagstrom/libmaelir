@@ -77,6 +77,17 @@ public:
             return std::static_pointer_cast<const T>(raw.message);
         }
 
+        template <typename T>
+        auto On(std::function<void(std::shared_ptr<const T>)> handler)
+        {
+            if (Is<T>())
+            {
+                handler(As<T>());
+            }
+
+            return *this;
+        }
+
         detail::RawEnvelope raw;
     };
 
