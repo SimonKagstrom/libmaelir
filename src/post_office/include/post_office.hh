@@ -213,7 +213,7 @@ public:
 
         // A single allocation, freed when the last receiver has dropped it
         std::shared_ptr<const void> p = std::make_shared<const MessageType>(std::move(message));
-        std::vector<std::shared_ptr<detail::MailboxImpl>> receivers;
+        etl::vector<std::shared_ptr<detail::MailboxImpl>, kMaxSubscribersPerMessage> receivers;
 
         // Lock context
         {
