@@ -51,7 +51,7 @@ TEST_CASE_FIXTURE(Fixture, "A message which noone listens to simply drops sent m
 
 TEST_CASE_FIXTURE(Fixture, "messages are not queued up for late listeners")
 {
-    post_office.Send<MSG::samsa>({});
+    post_office.Send<MSG::samsa>();
 
     auto samsa_listener = std::make_unique<ReceiverThread<MSG::samsa>>(post_office);
     CHECK(samsa_listener->m_mailbox->Pop() == std::nullopt);
@@ -70,7 +70,7 @@ TEST_CASE_FIXTURE(Fixture, "listeners get notified when they get messages")
         auto r_no_gregor = NAMED_FORBID_CALL(gregor_listener->notifier, Notify());
 
 
-        post_office.Send<MSG::samsa>({});
+        post_office.Send<MSG::samsa>();
 
         THEN("listeners are notified")
         {
@@ -88,7 +88,7 @@ TEST_CASE_FIXTURE(Fixture, "listeners get notified when they get messages")
         samsa_listener = nullptr;
 
         auto r_all = NAMED_REQUIRE_CALL(all_listener->notifier, Notify());
-        post_office.Send<MSG::samsa>({});
+        post_office.Send<MSG::samsa>();
 
         THEN("the other is still notified")
         {
@@ -136,7 +136,7 @@ TEST_CASE_FIXTURE(Fixture, "messages can be handled")
 
     WHEN("the empty message is sent")
     {
-        post_office.Send<MSG::samsa>({});
+        post_office.Send<MSG::samsa>();
 
         THEN("it can be handled")
         {
@@ -158,7 +158,7 @@ TEST_CASE_FIXTURE(Fixture, "messages can be handled through callbacks")
 
     WHEN("a single message comes in")
     {
-        post_office.Send<MSG::samsa>({});
+        post_office.Send<MSG::samsa>();
         THEN("only that is handled")
         {
             REQUIRE_CALL(*this, Samsa());
@@ -173,7 +173,7 @@ TEST_CASE_FIXTURE(Fixture, "messages can be handled through callbacks")
 
     WHEN("multiple messages come in")
     {
-        post_office.Send<MSG::samsa>({});
+        post_office.Send<MSG::samsa>();
         post_office.Send<MSG::gregor>({"id=15", "name"});
 
         trompeloeil::sequence seq;

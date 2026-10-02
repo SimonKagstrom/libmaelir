@@ -234,6 +234,13 @@ public:
         }
     }
 
+    // Overloaded version for no parameters
+    template <typename MessageType>
+    void Send()
+    {
+        Send(MessageType {});
+    }
+
 private:
     template <typename T>
     static consteval uint8_t IndexOf()
