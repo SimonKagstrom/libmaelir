@@ -121,7 +121,7 @@ TEST_CASE_FIXTURE(Fixture, "messages can be handled")
 
             THEN("no messages remain")
             {
-                REQUIRE(samsa_listener->m_mailbox->Pop() == std::nullopt);
+                REQUIRE(gregor_listener->m_mailbox->Pop() == std::nullopt);
             }
 
             AND_THEN("it can be handled")
@@ -176,9 +176,9 @@ TEST_CASE_FIXTURE(Fixture, "messages can be handled through callbacks")
         post_office.Send<MSG::samsa>({});
         post_office.Send<MSG::gregor>({"id=15", "name"});
 
+        trompeloeil::sequence seq;
         THEN("all are handled")
         {
-            trompeloeil::sequence seq;
             REQUIRE_CALL(*this, Samsa()).IN_SEQUENCE(seq);
             REQUIRE_CALL(*this, Gregor()).IN_SEQUENCE(seq);
 
@@ -187,6 +187,16 @@ TEST_CASE_FIXTURE(Fixture, "messages can be handled through callbacks")
                 msg->On<MSG::gregor>([&](auto gregor) { Gregor(); })
                     .On<MSG::samsa>([&](auto samsa) { Samsa(); });
             }
+        }
+
+        AND_THEN("the collect short form can be used")
+        {
+            REQUIRE_CALL(*this, Samsa()).IN_SEQUENCE(seq);
+            REQUIRE_CALL(*this, Gregor()).IN_SEQUENCE(seq);
+
+            all_listener->m_mailbox->Collect()
+                .On<MSG::samsa>([&](auto samsa) { Samsa(); })
+                .On<MSG::gregor>([&](auto gregor) { Gregor(); });
         }
     }
 }

@@ -78,7 +78,7 @@ public:
         }
 
         template <typename T>
-        auto On(std::function<void(std::shared_ptr<const T>)> handler)
+        const Envelope& On(std::function<void(std::shared_ptr<const T>)> handler) const
         {
             if (Is<T>())
             {
@@ -90,6 +90,44 @@ public:
 
         detail::RawEnvelope raw;
     };
+    class Drainer
+    {
+    public:
+        explicit Drainer(Mailbox& mailbox)
+            : m_mailbox(mailbox)
+        {
+        }
+
+        Drainer(const Drainer&) = delete;
+        Drainer& operator=(const Drainer&) = delete;
+
+        ~Drainer()
+        {
+            while (auto raw = m_mailbox.m_impl->Pop())
+            {
+                if (auto& handler = m_handlers[raw->index])
+                {
+                    handler(*raw);
+                }
+            }
+        }
+
+        template <typename T>
+        Drainer& On(auto handler)
+        {
+            m_handlers[detail::IndexOfImpl<T, Messages>::Get()] =
+                [h = std::move(handler)](const detail::RawEnvelope& raw) {
+                    h(std::static_pointer_cast<const T>(raw.message));
+                };
+            return *this;
+        }
+
+    private:
+        Mailbox& m_mailbox;
+        std::array<std::function<void(const detail::RawEnvelope&)>, std::tuple_size_v<Messages>>
+            m_handlers;
+    };
+
 
     ~Mailbox()
     {
@@ -113,6 +151,11 @@ public:
 
         return std::nullopt;
     }
+
+    Drainer Collect()
+    {
+        return Drainer(*this);
+    } // guaranteed copy elision, no move needed
 
 private:
     Mailbox(PostOffice<Messages>& post_office, std::shared_ptr<detail::MailboxImpl> impl)
