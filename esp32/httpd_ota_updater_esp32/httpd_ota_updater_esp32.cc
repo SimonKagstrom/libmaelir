@@ -4,6 +4,7 @@
 #include "time.hh"
 
 #include <esp_mac.h>
+#include <esp_netif.h>
 #include <esp_ota_ops.h>
 #include <esp_system.h>
 #include <esp_wifi.h>
@@ -12,8 +13,6 @@
 #include <nvs_flash.h>
 #include <string.h>
 #include <sys/param.h>
-
-#define WIFI_SSID "ESP32 OTA Update"
 
 constexpr auto kBufSize = 256;
 
@@ -77,8 +76,11 @@ constexpr const char* index_html = R"VOBB(<!DOCTYPE html>
 </html>)VOBB";
 
 
-TargetHttpdOtaUpdater::TargetHttpdOtaUpdater(hal::IDisplay& display)
+TargetHttpdOtaUpdater::TargetHttpdOtaUpdater(hal::IDisplay& display,
+                                             Mode mode,
+                                             std::string_view access_point_name)
     : m_display(display)
+    , m_mode(mode)
 {
     esp_ota_img_states_t ota_state_running_part;
 
@@ -89,14 +91,17 @@ TargetHttpdOtaUpdater::TargetHttpdOtaUpdater(hal::IDisplay& display)
         m_application_has_been_updated = ota_state_running_part == ESP_OTA_IMG_PENDING_VERIFY;
     }
 
-    uint8_t mac[8] = {};
-    if (esp_read_mac(mac, esp_mac_type_t::ESP_MAC_BASE) == ESP_OK)
+    if (m_mode == Mode::kAccessPoint)
     {
-        m_wifi_ssid = std::format("Maelir_{:2x}{:2x}", mac[4], mac[5]);
-    }
-    else
-    {
-        m_wifi_ssid = "Maelir";
+        uint8_t mac[8] = {};
+        if (esp_read_mac(mac, esp_mac_type_t::ESP_MAC_BASE) == ESP_OK)
+        {
+            m_wifi_ssid = std::format("{}_{:2x}{:2x}", access_point_name, mac[4], mac[5]);
+        }
+        else
+        {
+            m_wifi_ssid = access_point_name;
+        }
     }
 }
 
@@ -106,10 +111,31 @@ TargetHttpdOtaUpdater::ApplicationHasBeenUpdated() const
     return m_application_has_been_updated;
 }
 
-const char*
-TargetHttpdOtaUpdater::GetSsid()
+std::string
+TargetHttpdOtaUpdater::GetAccessPointSsid()
 {
-    return m_wifi_ssid.c_str();
+    return m_wifi_ssid;
+}
+
+std::string
+TargetHttpdOtaUpdater::GetUpdateUrl()
+{
+    if (m_mode == Mode::kAccessPoint)
+    {
+        // The default address of the access point
+        return "http://192.168.4.1";
+    }
+
+    // The regular (station) Wifi connection, the server listens on all interfaces
+    auto netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    esp_netif_ip_info_t ip_info {};
+
+    if (!netif || esp_netif_get_ip_info(netif, &ip_info) != ESP_OK || ip_info.ip.addr == 0)
+    {
+        return "";
+    }
+
+    return std::format("http://" IPSTR, IP2STR(&ip_info.ip));
 }
 
 void
@@ -253,14 +279,16 @@ TargetHttpdOtaUpdater::SoftApInit(void)
     return res;
 }
 
-
 void
 TargetHttpdOtaUpdater::Update(std::function<void(uint8_t)> progress)
 {
     m_progress = progress;
     m_receive_buf = std::make_unique<char[]>(kBufSize);
 
-    ESP_ERROR_CHECK(SoftApInit());
+    if (m_mode == Mode::kAccessPoint)
+    {
+        ESP_ERROR_CHECK(SoftApInit());
+    }
     ESP_ERROR_CHECK(HttpServerInit());
 
     /* Mark current app as valid */

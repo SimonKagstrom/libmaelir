@@ -9,10 +9,6 @@ OtaUpdater::OtaUpdater(hal::IOtaUpdater& updater, ApplicationState& application_
     , m_state_listener(application_state.AttachListener<AS::ota_update_active>(GetSemaphore()))
     , m_progress([](auto) { /* Do nothing by default */ })
 {
-    m_instructions =
-        std::format("Connect to the Wifi AP {}\nand go to http://192.168.4.1", m_updater.GetSsid());
-
-
     if (m_has_been_updated)
     {
         // Wait 10s and then mark the application as valid if it has been updated
@@ -23,10 +19,22 @@ OtaUpdater::OtaUpdater(hal::IOtaUpdater& updater, ApplicationState& application_
     }
 }
 
-const char*
+std::string
 OtaUpdater::GetInstructions() const
 {
-    return m_instructions.c_str();
+    const auto url = m_updater.GetUpdateUrl();
+
+    if (url.empty())
+    {
+        return "Waiting for the Wifi connection...";
+    }
+
+    if (const auto ssid = m_updater.GetAccessPointSsid(); !ssid.empty())
+    {
+        return std::format("Connect to the Wifi AP {}\nand go to {}", ssid, url);
+    }
+
+    return std::format("Go to {}\nand upload the firmware file", url);
 }
 
 bool

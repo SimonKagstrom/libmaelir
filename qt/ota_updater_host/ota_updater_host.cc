@@ -31,8 +31,14 @@ OtaUpdaterHost::MarkApplicationAsValid()
     printf("OtaUpdater: MarkApplicationAsValid\n");
 }
 
-const char*
-OtaUpdaterHost::GetSsid()
+std::string
+OtaUpdaterHost::GetUpdateUrl()
 {
-    return "libmaelir";
+    return "http://localhost";
+}
+
+std::string
+OtaUpdaterHost::GetAccessPointSsid()
+{
+    return "";
 }

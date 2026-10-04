@@ -18,7 +18,8 @@ public:
 
     bool ApplicationHasBeenUpdated() const;
 
-    const char* GetInstructions() const;
+    // What to do to update (depends on the Wifi connection)
+    std::string GetInstructions() const;
 
 private:
     std::optional<milliseconds> OnActivation() final;
@@ -33,5 +34,4 @@ private:
     os::TimerHandle m_application_valid_timer;
 
     etl::mutex m_mutex;
-    std::string m_instructions;
 };

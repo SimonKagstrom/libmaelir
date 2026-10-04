@@ -14,7 +14,9 @@ private:
 
     void MarkApplicationAsValid() final;
 
-    const char* GetSsid() final;
+    std::string GetUpdateUrl() final;
+
+    std::string GetAccessPointSsid() final;
 
     const bool m_updated;
 };
