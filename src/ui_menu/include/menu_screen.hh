@@ -7,6 +7,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 class MenuScreen
 {
@@ -21,8 +22,6 @@ public:
     class Page
     {
     public:
-        explicit Page(MenuScreen& parent);
-
         Page(const Page&) = delete;
         Page& operator=(const Page&) = delete;
         Page(Page&&) = default;
@@ -48,11 +47,15 @@ public:
                              int default_value,
                              const std::function<void(int value)>& on_click);
 
-        Page(MenuScreen& parent, lv_obj_t* parent_menu);
+        Page(MenuScreen& parent, lv_obj_t* page, std::string_view title);
 
     private:
+        // A row (description to the left, controls to the right)
+        lv_obj_t* CreateRow();
+
         MenuScreen& m_parent;
         lv_obj_t* m_page;
+        std::string m_title;
 
         std::vector<std::unique_ptr<Page>> m_sub_pages;
     };
@@ -70,16 +73,39 @@ public:
     void ExitMenu();
 
 private:
+    // A page entered from another page (the opener), or the main page
+    struct VisiblePage
+    {
+        lv_obj_t* page;
+        std::string title;
+        lv_obj_t* opener;
+    };
+
+    // A (hidden) page in the content area
+    lv_obj_t* CreatePage();
+    void EnterPage(lv_obj_t* page, std::string_view title, lv_obj_t* opener);
+    // Back to the previous page, or close the menu from the main page
+    void Back();
+    void ShowPage(const VisiblePage& visible_page, lv_obj_t* focus);
+
     os::TimerManager& m_timer_manager;
     lv_obj_t* m_screen;
     lv_indev_t* m_lvgl_input_dev;
     std::function<void()> m_on_close;
 
     lv_style_t m_style_selected;
+    lv_style_t m_style_row;
+    lv_style_t m_style_header_button;
+    lv_style_t m_style_separator;
     lv_style_t m_style_numeric_roller_main_focused;
     lv_style_t m_style_numeric_roller_selected;
     lv_obj_t* m_menu;
+    lv_obj_t* m_back_button;
+    lv_obj_t* m_title_label;
+    lv_obj_t* m_content;
     lv_group_t* m_input_group;
+
+    std::vector<VisiblePage> m_page_stack;
 
     os::TimerHandle m_exit_timer;
     std::unique_ptr<Page> m_main_page;
