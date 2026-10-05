@@ -19,7 +19,7 @@ private:
     void WaitForBlitsDone() final;
 
     void BlitOne(const hal::BlitOperation& op, bool last);
-    void OnTransactionDone();
+    bool OnTransactionDone();
 
     ppa_client_handle_t m_client {nullptr};
 

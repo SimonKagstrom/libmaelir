@@ -71,9 +71,8 @@ BlitterEsp32::BlitterEsp32()
     auto event_callbacks = ppa_event_callbacks_t {
         .on_trans_done = [](ppa_client_handle_t ppa_client, ppa_event_data_t *event_data, void *user_data) {
             auto* self = static_cast<BlitterEsp32*>(user_data);
-            self->OnTransactionDone();
 
-            return false;
+            return self->OnTransactionDone();
         },
     };
     ppa_client_register_event_callbacks(m_client, &event_callbacks);
@@ -147,14 +146,16 @@ BlitterEsp32::BlitOperations(std::span<const hal::BlitOperation> operations)
     }
 }
 
-void
+bool
 BlitterEsp32::OnTransactionDone()
 {
     const int32_t previous = m_pending_transactions.fetch_sub(1, std::memory_order_acq_rel);
     if (previous == 1)
     {
-        m_transaction_done_semaphore.release_from_isr();
+        return m_transaction_done_semaphore.release_from_isr();
     }
+
+    return false;
 }
 
 void
