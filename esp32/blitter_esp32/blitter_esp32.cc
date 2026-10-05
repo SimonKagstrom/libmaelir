@@ -160,7 +160,9 @@ BlitterEsp32::OnTransactionDone()
 void
 BlitterEsp32::WaitForBlitsDone()
 {
-    if (m_pending_transactions.load() > 0)
+    // Loop, since the semaphore can hold a stale release from an earlier batch which
+    // completed before anyone waited for it
+    while (m_pending_transactions.load(std::memory_order_acquire) > 0)
     {
         m_transaction_done_semaphore.acquire();
     }
