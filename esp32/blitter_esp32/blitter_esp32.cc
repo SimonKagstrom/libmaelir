@@ -153,7 +153,7 @@ BlitterEsp32::OnTransactionDone()
     const int32_t previous = m_pending_transactions.fetch_sub(1, std::memory_order_acq_rel);
     if (previous == 1)
     {
-        m_transaction_done_semaphore.release();
+        m_transaction_done_semaphore.release_from_isr();
     }
 }
 
