@@ -135,7 +135,10 @@ TargetHttpdOtaUpdater::GetUpdateUrl()
         return "";
     }
 
-    return std::format("http://" IPSTR, IP2STR(&ip_info.ip));
+    char buf[32] = {};
+    snprintf(buf, sizeof(buf), "" IPSTR, IP2STR(&ip_info.ip));
+
+    return std::format("http://{}", buf);
 }
 
 void
