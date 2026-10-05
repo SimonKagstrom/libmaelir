@@ -2,6 +2,9 @@
 
 #include "time.hh"
 
+// Horror!
+bool g_upgrade_started;
+
 OtaUpdaterHost::OtaUpdaterHost(bool updated)
     : m_updated(updated)
 {
@@ -11,6 +14,11 @@ OtaUpdaterHost::OtaUpdaterHost(bool updated)
 void
 OtaUpdaterHost::Update(std::function<void(uint8_t)> progress)
 {
+    while (!g_upgrade_started)
+    {
+        os::Sleep(50ms);
+    }
+
     for (auto perc = 0; perc <= 100; ++perc)
     {
         progress(perc);
