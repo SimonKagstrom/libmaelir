@@ -112,16 +112,6 @@ public:
             m_parent.SetNoLock<T>(value);
         }
 
-        template <typename T>
-        void Post()
-        {
-            static_assert(T::IsEvent(), "Post can only be used with event parameters");
-
-            std::lock_guard lock(m_parent.m_mutex);
-            m_parent.SetNoLock<T>((m_parent.GetValue<T>() + 1) & 0xff);
-            m_parent.NotifyChange(AS::IndexOf<T>());
-        }
-
     private:
         using ReadOnly::ReadOnly;
     };
