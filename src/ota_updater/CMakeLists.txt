@@ -10,5 +10,5 @@ PUBLIC
 target_link_libraries(ota_updater
 PUBLIC
     application_state
-    base_thread
+    job_pool_thread
 )

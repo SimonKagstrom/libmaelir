@@ -1,14 +1,14 @@
 #pragma once
 
 #include "application_state.hh"
-#include "base_thread.hh"
+#include "pooled_thread_base.hh"
 #include "hal/i_ota_updater.hh"
 #include "listener_cookie.hh"
 
 #include <etl/mutex.h>
 #include <string>
 
-class OtaUpdater : public os::BaseThread
+class OtaUpdater : public PooledThreadBase
 {
 public:
     OtaUpdater(hal::IOtaUpdater& updater, ApplicationState& application_state);

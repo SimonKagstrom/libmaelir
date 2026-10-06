@@ -6,7 +6,7 @@ OtaUpdater::OtaUpdater(hal::IOtaUpdater& updater, ApplicationState& application_
     : m_updater(updater)
     , m_application_state(application_state)
     , m_has_been_updated(m_updater.ApplicationHasBeenUpdated())
-    , m_state_listener(application_state.AttachListener<AS::ota_update_active>(GetSemaphore()))
+    , m_state_listener(application_state.AttachListener<AS::ota_update_active>(*this))
     , m_progress([](auto) { /* Do nothing by default */ })
 {
     if (m_has_been_updated)
