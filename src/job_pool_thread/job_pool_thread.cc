@@ -47,7 +47,7 @@ JobPoolThread::OnActivation()
             printf("Thread %u has been removed (?), not making ready\n", (unsigned)index);
         }
 
-        m_ready_mask &= ~(1 << index);
+        m_ready_mask &= ~(1u << index);
     }
 
     auto ready = m_ready_threads;
@@ -99,7 +99,7 @@ void
 JobPoolThread::WakeupPooledThread(const PooledThreadBase* thread)
 {
     debug_assert(thread->m_thread_id != 255);
-    m_ready_mask |= (1 << thread->m_thread_id);
+    m_ready_mask |= (1u << thread->m_thread_id);
 
     Awake();
 }

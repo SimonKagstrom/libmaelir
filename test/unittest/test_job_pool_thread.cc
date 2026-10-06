@@ -409,4 +409,37 @@ TEST_CASE_FIXTURE(Fixture, "pooled threads can use notifications")
     }
 }
 
+TEST_CASE_FIXTURE(Fixture, "the last pooled thread slot can be used")
+{
+    // 32 threads, so that the last one gets thread id 31 (the highest bit in the ready mask)
+    std::vector<PooledThread*> threads;
+    std::vector<std::unique_ptr<trompeloeil::expectation>> expectations;
+
+    for (auto i = 0; i < 32; i++)
+    {
+        auto [thread_up, thread] = CreatePooledThread();
+
+        expectations.push_back(NAMED_ALLOW_CALL(*thread, OnActivation()).RETURN(std::nullopt));
+        threads.push_back(thread);
+        job_thread->AttachPooledThread(std::move(thread_up));
+    }
+
+    job_thread->Start("job_pool");
+    DoRunLoop();
+
+    WHEN("the last thread is woken")
+    {
+        auto last = threads.back();
+        auto r_activation = NAMED_REQUIRE_CALL(*last, OnActivation()).RETURN(std::nullopt);
+
+        last->Awake();
+        DoRunLoop();
+
+        THEN("it's run")
+        {
+            r_activation = nullptr;
+        }
+    }
+}
+
 TEST_SUITE_END();
