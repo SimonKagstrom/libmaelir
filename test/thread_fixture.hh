@@ -47,27 +47,41 @@ public:
         return true;
     }
 
+    /*
+     * Run the loop again while the thread is ready, like the real thread loop does. E.g., a job
+     * pool wakes a pooled thread from its timer (i.e., during the run loop). Limited, since a
+     * thread can be ready all the time.
+     */
+    void RunLoopWhileReady()
+    {
+        constexpr auto kMaxRunsPerTimePoint = 16;
+
+        for (auto i = 0; i < kMaxRunsPerTimePoint && DoRunLoop(); i++)
+        {
+        }
+    }
+
     void AdvanceTimeAndRunLoop(milliseconds time)
     {
         auto run_until = os::GetTimeStamp() + time;
 
         // Run once first (to prime the next_wakeup)
-        DoRunLoop();
+        RunLoopWhileReady();
         if (!m_next_wakeup_absolute)
         {
             AdvanceTime(time);
-            DoRunLoop();
+            RunLoopWhileReady();
             return;
         }
 
         while (m_next_wakeup_absolute && *m_next_wakeup_absolute <= run_until)
         {
             SetTime(std::min(*m_next_wakeup_absolute, run_until));
-            DoRunLoop();
+            RunLoopWhileReady();
         }
 
         SetTime(run_until);
-        DoRunLoop();
+        RunLoopWhileReady();
     }
 
     /// Return the time the thread should wake up next time (if any)
