@@ -87,6 +87,7 @@ JobPoolThread::AttachPooledThread(std::unique_ptr<PooledThreadBase> thread)
 
     m_free_thread_ids[index] = false;
 
+    // The id before the job pool thread, since a set job pool thread means that it can be woken
     thread->m_thread_id = static_cast<uint8_t>(index);
     thread->m_job_pool_thread = this;
 
@@ -144,9 +145,16 @@ PooledThreadBase::PooledThreadBase()
 void
 PooledThreadBase::Awake()
 {
-    debug_assert(m_job_pool_thread);
+    auto job_pool_thread = m_job_pool_thread.load();
 
-    m_job_pool_thread->WakeupPooledThread(this);
+    // Not yet attached, e.g., notified by an application state listener before that. Nothing to
+    // do, since the thread is run when attached anyway
+    if (job_pool_thread == nullptr)
+    {
+        return;
+    }
+
+    job_pool_thread->WakeupPooledThread(this);
 }
 
 std::optional<milliseconds>
@@ -161,10 +169,11 @@ PooledThreadBase::RunLoop()
 void
 PooledThreadBase::Stop()
 {
-    debug_assert(m_job_pool_thread);
+    auto job_pool_thread = m_job_pool_thread.load();
+    debug_assert(job_pool_thread);
 
     m_detached = true;
-    m_job_pool_thread->RemoveThread(this);
+    job_pool_thread->RemoveThread(this);
 }
 
 // Context: Another thread potentially

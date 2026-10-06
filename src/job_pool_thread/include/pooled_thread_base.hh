@@ -56,7 +56,8 @@ private:
     void NotifyFromIsr() final;
 
     os::TimerManager m_timer_manager;
-    JobPoolThread* m_job_pool_thread {nullptr};
+    // Set when attached, but notifications can come from other threads before that
+    std::atomic<JobPoolThread*> m_job_pool_thread {nullptr};
     uint8_t m_thread_id {255};
 
     std::atomic<bool> m_awake {false};

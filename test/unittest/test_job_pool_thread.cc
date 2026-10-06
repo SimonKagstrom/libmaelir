@@ -409,6 +409,33 @@ TEST_CASE_FIXTURE(Fixture, "pooled threads can use notifications")
     }
 }
 
+TEST_CASE_FIXTURE(Fixture, "a pooled thread can be notified before being attached")
+{
+    // E.g., an application state listener which is attached in the constructor, and notified by
+    // another thread before the pooled thread is attached to the job pool
+    auto [p0_up, p0] = CreatePooledThread();
+
+    WHEN("the thread is notified before being attached")
+    {
+        static_cast<IEventNotifier*>(p0)->Notify();
+        p0->Awake();
+
+        AND_WHEN("it's attached and the pool started")
+        {
+            auto r_activation = NAMED_REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt);
+
+            job_thread->AttachPooledThread(std::move(p0_up));
+            job_thread->Start("job_pool");
+            DoRunLoop();
+
+            THEN("it's run")
+            {
+                r_activation = nullptr;
+            }
+        }
+    }
+}
+
 TEST_CASE_FIXTURE(Fixture, "the last pooled thread slot can be used")
 {
     // 32 threads, so that the last one gets thread id 31 (the highest bit in the ready mask)
