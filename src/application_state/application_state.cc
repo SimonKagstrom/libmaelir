@@ -4,14 +4,11 @@
 
 #include <mutex>
 
-constexpr auto kInvalidListener = 0;
-
 static os::binary_semaphore g_dummy_sem {0};
 
 ApplicationState::ApplicationState()
 {
     m_global_state.SetupDefaultValues();
-    m_listener_notifiers_by_index.push_back(&g_dummy_sem);
 }
 
 std::unique_ptr<ListenerCookie>
@@ -20,7 +17,7 @@ ApplicationState::DoAttachListener(const ParameterBitset& interested, IEventNoti
     std::lock_guard lock(m_mutex);
 
     if (m_reclaimed_listener_indices.empty() &&
-        m_listener_notifiers_by_index.size() > kMaxApplicationStateListeners)
+        m_listener_notifiers_by_index.size() >= kMaxApplicationStateListeners)
     {
         return nullptr;
     }
