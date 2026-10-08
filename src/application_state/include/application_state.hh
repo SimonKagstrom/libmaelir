@@ -152,9 +152,6 @@ public:
             template <typename S>
             const Checkout& OnNewValue(const auto& callback) const
             {
-                static_assert(!S::IsEvent(),
-                              "OnNewValue can only be used with non-event parameters, until events "
-                              "have values");
                 if (IsChanged<S>())
                 {
                     callback(Get<S>());
@@ -166,11 +163,6 @@ public:
             template <typename S>
             const Checkout& OnChangedValue(const auto& callback) const
             {
-                static_assert(
-                    !S::IsEvent(),
-                    "OnChangedValue can only be used with non-event parameters, until events "
-                    "have values");
-
                 if (IsChanged<S>())
                 {
                     callback(GetReference<S>(!m_state_index), GetReference<S>(m_state_index));
@@ -277,76 +269,6 @@ public:
         auto Get() const
         {
             return m_checkout.template GetReference<S>(m_checkout.m_state_index);
-        }
-
-    private:
-        Checkout m_checkout;
-    };
-
-    template <class... T>
-    class EventListener
-    {
-    public:
-        class Checkout
-        {
-        public:
-            friend class EventListener;
-
-            Checkout() = delete;
-            Checkout(const Checkout&) = delete;
-            Checkout& operator=(const Checkout&) = delete;
-            Checkout(Checkout&&) = delete;
-            Checkout& operator=(Checkout&&) = delete;
-
-            template <typename S>
-            const Checkout& OnEvent(const auto& callback) const
-            {
-                if (IsChanged<S>())
-                {
-                    callback();
-                }
-
-                return *this;
-            }
-
-        private:
-            template <typename S>
-            bool IsChanged() const
-            {
-                return m_changed.test(PartialState::template PartialIndexOf<S>());
-            }
-
-            explicit Checkout(ApplicationState& parent)
-                : m_parent(parent)
-            {
-                static_assert(PartialState::PartialCount() <= 32 &&
-                              "No more than 32 parameters for an uint32_t");
-            }
-            using PartialState = AS::storage::partial_state<T...>;
-
-            ApplicationState& m_parent;
-
-            std::array<PartialState, 2> m_state;
-            uint8_t m_state_index {0};
-            PartialState::ParameterBitset m_changed;
-        };
-
-        friend class ApplicationState;
-
-        EventListener(const EventListener&) = delete;
-        EventListener& operator=(const EventListener&) = delete;
-        EventListener(EventListener&&) = delete;
-        EventListener& operator=(EventListener&&) = delete;
-
-        explicit EventListener(ApplicationState& parent)
-            : m_checkout(parent)
-        {
-        }
-
-        const Checkout& Pull()
-        {
-            m_checkout.m_changed.reset();
-            return m_checkout;
         }
 
     private:
