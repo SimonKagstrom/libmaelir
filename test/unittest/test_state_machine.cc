@@ -25,7 +25,7 @@ public:
     }
 
 private:
-    OffNext Evaluate(Off&) final
+    Off::Next Evaluate(Off&) final
     {
         if (m_on)
         {
@@ -35,7 +35,7 @@ private:
         return kStay;
     }
 
-    OnNext Evaluate(On&) final
+    On::Next Evaluate(On&) final
     {
         if (!m_on)
         {
@@ -44,12 +44,12 @@ private:
         return kStay;
     }
 
-    DimmedNext Evaluate(Dimmed&) final
+    Dimmed::Next Evaluate(Dimmed&) final
     {
         return kStay;
     }
 
-    BrokenNext Evaluate(Broken&) final
+    Broken::Next Evaluate(Broken&) final
     {
         return kStay;
     }

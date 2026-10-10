@@ -46,12 +46,13 @@ public:
     static constexpr StayTag kStay {};
 
     // The return value from Evaluate(), which only accepts the transitions in the diagram.
-    // The constructors are consteval, so invalid transitions are compile errors
+    // The constructors are consteval, so invalid transitions are compile errors. Each state
+    // has its own as <state>::Next, e.g., Evaluate(On&) returns On::Next
     template <State... Allowed>
-    class Next
+    class Transition
     {
     public:
-        consteval Next(State to)
+        consteval Transition(State to)
             : m_to(to)
         {
             if (!((to == Allowed) || ...))
@@ -60,7 +61,7 @@ public:
             }
         }
 
-        consteval Next(StayTag)
+        consteval Transition(StayTag)
         {
         }
 
@@ -78,18 +79,6 @@ public:
 
         std::optional<State> m_to;
     };
-
-    // The allowed transitions from each state, according to the diagram
-    {%- for state in states %}
-    {%- for transition in state.transitions %}
-    // {{ state.name }} -> {{ transition.target }}{% if transition.label %}: {{ transition.label }}{% endif %}
-    {%- endfor %}
-    using {{ state.name }}Next = Next<
-        {%- for transition in state.transitions -%}
-        State::k{{ transition.target }}{{ ", " if not loop.last }}
-        {%- endfor -%}
-    >;
-    {%- endfor %}
 
     static constexpr std::string_view StateName(State state)
     {
@@ -115,9 +104,14 @@ public:
 //       };
 //   };
 //
-// State data is default-constructed on each entry, and destroyed on exit
+// State data is default-constructed on each entry, and destroyed on exit. Next is the
+// return type of Evaluate() for the state, with the allowed transitions in the diagram
 struct {{ class_name }}Data
 {
+    using State = {{ class_name }}Types::State;
+    template <State... Allowed>
+    using Transition = {{ class_name }}Types::Transition<Allowed...>;
+
     // Common to all states
     struct StateData
     {
@@ -132,6 +126,14 @@ struct {{ class_name }}Data
     {%- endif %}
     struct {{ state.name }} : StateData
     {
+        {%- for transition in state.transitions %}
+        // -> {{ transition.target }}{% if transition.label %}: {{ transition.label }}{% endif %}
+        {%- endfor %}
+        using Next = Transition<
+            {%- for transition in state.transitions -%}
+            State::k{{ transition.target }}{{ ", " if not loop.last }}
+            {%- endfor -%}
+        >;
     };
     {%- endfor %}
 };
@@ -180,7 +182,7 @@ protected:
 
     // Mandatory, return kStay to remain in the state
     {%- for state in states %}
-    virtual {{ state.name }}Next Evaluate({{ state.name }}&) = 0;
+    virtual typename {{ state.name }}::Next Evaluate({{ state.name }}&) = 0;
     {%- endfor %}
 
     // Optional
@@ -204,10 +206,8 @@ private:
     };
 
     // [*] -> {{ initial_state }}
-    using GeneratedInitialNext = Next<State::k{{ initial_state }}>;
-
     // The synthetic initial state is handled here, and can't be overridden
-    GeneratedInitialNext Evaluate(GeneratedInitial&)
+    Transition<State::k{{ initial_state }}> Evaluate(GeneratedInitial&)
     {
         return State::k{{ initial_state }};
     }

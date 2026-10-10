@@ -28,6 +28,7 @@ RESERVED_NAMES = {
     "StateData",
     "State",
     "Next",
+    "Transition",
     "CustomData",
     "StayTag",
     "Evaluate",
