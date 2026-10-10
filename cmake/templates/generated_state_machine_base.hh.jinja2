@@ -118,10 +118,9 @@ public:
 // State data is default-constructed on each entry, and destroyed on exit
 struct {{ class_name }}Data
 {
-    // Common to all states. The timer is cancelled when the state is exited
+    // Common to all states
     struct StateData
     {
-        os::TimerHandle timer;
     };
     {%- for state in states %}
 
