@@ -4,7 +4,7 @@ function(generate_application_state DEST_LIBRARY INPUT_FILE_LIST)
     set(out_cc ${OUTPUT_DIRECTORY}/generated_application_state.cc)
     set(out_hh ${OUTPUT_DIRECTORY}/generated_application_state.hh)
 
-    message(STATUS "Generating application state")
+    message(STATUS "Generating application state ${DEST_LIBRARY}")
     add_custom_command(
         OUTPUT ${out_cc} ${out_hh}
         COMMAND python3 ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/tools/generate_application_state.py ${OUTPUT_DIRECTORY} ${INPUT_FILE_LIST}

@@ -18,23 +18,27 @@ if(NOT TARGET display_properties)
     add_library(display_properties ALIAS display_800x800)
 endif()
 
+generate_state_machine(lamp_state_machine_base lamp_state_machine.md)
+
 add_executable(unittest_libmaelir
     main.cc
     test_nmea_parser.cc
     test_opportunistic_scheduler.cc
     test_job_pool_thread.cc
+    test_state_machine.cc
     test_timer_manager.cc
     test_post_office.cc
 )
 
 target_link_libraries(unittest_libmaelir
-    os_unittest
-    opportunistic_semaphore
-    nmea_parser
-    job_pool_thread
-    timer_manager
-    post_office
     doctest::doctest
+    job_pool_thread
+    lamp_state_machine_base
+    nmea_parser
+    opportunistic_semaphore
+    os_unittest
+    post_office
+    timer_manager
     trompeloeil::trompeloeil
     unittest_messages
 )
