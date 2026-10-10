@@ -1,6 +1,8 @@
-#include "test.hh"
-#include "timer_manager.hh"
+#include "base_thread.hh"
 #include "mock_time.hh"
+#include "test.hh"
+#include "thread_fixture.hh"
+#include "timer_manager.hh"
 
 using namespace os;
 
@@ -15,6 +17,42 @@ public:
 
 class Fixture : public TimeFixture
 {
+};
+
+// A thread which starts a timer (without a callback) on the first activation
+class TimerThread : public os::BaseThread
+{
+public:
+    bool timer_seen_expired {false};
+
+private:
+    std::optional<milliseconds> OnActivation() final
+    {
+        if (!m_timer)
+        {
+            m_timer = StartTimer(1s);
+        }
+        else if (m_timer->IsExpired())
+        {
+            timer_seen_expired = true;
+        }
+
+        return std::nullopt;
+    }
+
+    TimerHandle m_timer;
+};
+
+class ThreadTimerFixture : public ThreadFixture
+{
+public:
+    ThreadTimerFixture()
+    {
+        SetThread(&thread);
+        thread.Start("timer_thread");
+    }
+
+    TimerThread thread;
 };
 
 } // namespace
@@ -501,6 +539,29 @@ TEST_CASE_FIXTURE(Fixture, "a new timer can be started from the timer callback")
                 REQUIRE(r_cb);
                 REQUIRE(expire_time == 10ms);
             }
+        }
+    }
+}
+
+TEST_CASE_FIXTURE(ThreadTimerFixture, "a timer started in OnActivation sets the next wakeup of the thread")
+{
+    DoRunLoop();
+
+    REQUIRE(NextWakeupTime() == 1s);
+}
+
+TEST_CASE_FIXTURE(ThreadTimerFixture, "an expired timer is seen as expired in OnActivation")
+{
+    DoRunLoop();
+    REQUIRE(thread.timer_seen_expired == false);
+
+    WHEN("the timer expires")
+    {
+        AdvanceTimeAndRunLoop(1s);
+
+        THEN("OnActivation sees it as expired in the same wakeup")
+        {
+            REQUIRE(thread.timer_seen_expired);
         }
     }
 }

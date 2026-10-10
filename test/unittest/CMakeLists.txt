@@ -31,6 +31,7 @@ add_executable(unittest_libmaelir
 )
 
 target_link_libraries(unittest_libmaelir
+    base_thread
     doctest::doctest
     job_pool_thread
     lamp_state_machine_base
