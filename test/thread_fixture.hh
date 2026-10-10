@@ -2,13 +2,15 @@
 
 #include "base_thread.hh"
 #include "mock_time.hh"
+#include "pooled_thread_base.hh"
 #include "test.hh"
 #pragma once
 
-class ThreadFixture : public TimeFixture
+template <typename ThreadClass>
+class ThreadFixtureBase : public TimeFixture
 {
 public:
-    void SetThread(os::BaseThread* thread)
+    void SetThread(ThreadClass* thread)
     {
         m_thread = thread;
 
@@ -24,12 +26,12 @@ public:
         auto now = os::GetTimeStamp();
         if (m_next_wakeup_absolute && now >= *m_next_wakeup_absolute)
         {
-            m_thread->m_semaphore.release();
+            m_thread->GetNotifier().release();
             m_next_wakeup_absolute = std::nullopt;
         }
 
         // The thread is not ready
-        if (!m_thread->m_semaphore.try_acquire())
+        if (!m_thread->GetNotifier().try_acquire())
         {
             return false;
         }
@@ -98,9 +100,12 @@ public:
 private:
     std::shared_ptr<os::MockKernel> kernel_mock {os::detail::GetKernelMock()};
 
-    os::BaseThread* m_thread {nullptr};
+    ThreadClass* m_thread {nullptr};
 
     std::optional<milliseconds> m_next_wakeup_absolute;
 
     std::unique_ptr<trompeloeil::expectation> m_on_thread_start;
 };
+
+using ThreadFixture = ThreadFixtureBase<os::BaseThread>;
+using PooledThreadFixture = ThreadFixtureBase<PooledThreadBase>;

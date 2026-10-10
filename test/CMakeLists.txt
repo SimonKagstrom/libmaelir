@@ -47,6 +47,7 @@ add_library(os_unittest EXCLUDE_FROM_ALL
 
 target_link_libraries(os_unittest
     base_thread
+    job_pool_thread
     os
     os_implementation_unittest
     doctest::doctest

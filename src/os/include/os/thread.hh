@@ -9,17 +9,12 @@
 #include <cstdint>
 #include <optional>
 
-class ThreadFixture;
-
 namespace os
 {
 
 class OsThread
 {
 public:
-    // For unit tests
-    friend class ::ThreadFixture;
-
     virtual ~OsThread() = default;
 
     virtual void Awake() = 0;

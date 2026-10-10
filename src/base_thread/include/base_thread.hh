@@ -8,6 +8,9 @@
 #include <atomic>
 #include <optional>
 
+template <typename ThreadClass>
+class ThreadFixtureBase;
+
 namespace os
 {
 
@@ -35,8 +38,7 @@ SelectWakeup(auto a, auto b)
 class BaseThread : public OsThread
 {
 public:
-    // For unit tests
-    friend class ::ThreadFixture;
+    friend class ThreadFixtureBase<BaseThread>;
 
     BaseThread()
         : m_timer_manager(m_semaphore)
@@ -84,7 +86,13 @@ protected:
         return m_timer_manager.StartTimer(0ms, deferred_job);
     }
 
+    // TODO: Deprecated, use GetNotifier instead
     auto& GetSemaphore()
+    {
+        return m_semaphore;
+    }
+
+    auto& GetNotifier()
     {
         return m_semaphore;
     }
