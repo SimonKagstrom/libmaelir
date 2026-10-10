@@ -23,7 +23,21 @@ import sys
 import jinja2
 
 # Names used by the generated code
-RESERVED_NAMES = {"GeneratedInitial", "StateData", "State", "Next"}
+RESERVED_NAMES = {
+    "GeneratedInitial",
+    "StateData",
+    "State",
+    "Next",
+    "CustomData",
+    "StayTag",
+    "Evaluate",
+    "Enter",
+    "Exit",
+    "OnTransition",
+    "RunStateMachine",
+    "CurrentState",
+    "StateName",
+}
 
 IDENTIFIER = r"[A-Za-z_][A-Za-z0-9_]*"
 STATE_REF = rf"(\[\*\]|{IDENTIFIER})(?::::{IDENTIFIER})?"

@@ -137,14 +137,14 @@ struct {{ class_name }}Data
     {%- endfor %}
 };
 
-template <typename Data = {{ class_name }}Data>
+template <typename CustomData = {{ class_name }}Data>
 class {{ class_name }}Base : public {{ class_name }}Types
 {
 public:
-    static_assert(std::is_base_of_v<{{ class_name }}Data, Data>,
+    static_assert(std::is_base_of_v<{{ class_name }}Data, CustomData>,
                   "The state data must inherit from {{ class_name }}Data");
 {% for state in states %}
-    using {{ state.name }} = typename Data::{{ state.name }};
+    using {{ state.name }} = typename CustomData::{{ state.name }};
 {%- endfor %}
 
     virtual ~{{ class_name }}Base() = default;
@@ -225,7 +225,8 @@ private:
 
     static_assert(std::variant_size_v<StateVariant> == std::to_underlying(State::kValueCount));
 
-    static constexpr auto kMaxTransitionsPerRun = 16;
+    // Only to catch state machines which never settle
+    static constexpr auto kMaxTransitionsPerRun = 256;
 
     template <size_t... I>
     void EmplaceState(State state, std::index_sequence<I...>)
