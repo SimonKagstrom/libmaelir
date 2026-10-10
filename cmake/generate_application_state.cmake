@@ -7,13 +7,13 @@ function(generate_application_state DEST_LIBRARY INPUT_FILE_LIST)
     message(STATUS "Generating application state")
     add_custom_command(
         OUTPUT ${out_cc} ${out_hh}
-        COMMAND python3 ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/generate_application_state.py ${OUTPUT_DIRECTORY} ${INPUT_FILE_LIST}
+        COMMAND python3 ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/tools/generate_application_state.py ${OUTPUT_DIRECTORY} ${INPUT_FILE_LIST}
         WORKING_DIRECTORY ${CMAKE_CURRENT_FUNCTION_LIST_DIR}
         DEPENDS
           ${INPUT_FILE_LIST}
-          ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/generated_application_state.hh.jinja2
-          ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/generated_application_state.cc.jinja2
-          ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/generate_application_state.py
+          ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/templates/generated_application_state.hh.jinja2
+          ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/templates/generated_application_state.cc.jinja2
+          ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/tools/generate_application_state.py
         COMMENT "Generating application state from ${INPUT_FILE_LIST}"
     )
 

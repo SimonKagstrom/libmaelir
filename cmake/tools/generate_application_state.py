@@ -155,7 +155,9 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    template_directory = os.path.dirname(os.path.abspath(__file__))
+    template_directory = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "templates"
+    )
     output_directory = sys.argv[1]
     input_files = sys.argv[2:]
 
