@@ -35,27 +35,50 @@ void ZoomedBlit(
     uint16_t* frame_buffer, uint32_t buffer_width, const Image& image, unsigned factor, Rect to);
 
 
-template <typename PointType>
+// The line itself is assumed to be clipped to the display, but the thickness can extend outside
+template <typename PointType, uint16_t thickness>
 inline void
-DrawClippedLine(
-    uint16_t* frame_buffer, PointType from, PointType to, uint16_t thickness, uint16_t color)
+DrawClippedLine(uint16_t* frame_buffer, PointType from, PointType to, uint16_t color)
 {
+    static_assert(thickness > 0, "Thickness must be at least 1");
+
+    // The pixels of a point are offset by kFirst..kLast across the line
+    constexpr auto kFirst = -static_cast<int>(thickness) / 2;
+    constexpr auto kLast = (static_cast<int>(thickness) + 1) / 2 - 1;
+
     auto bresenham = Bresenham<PointType>(from, to);
     auto [dx, dy] = bresenham.GetWidthSlope();
+    // One pixel across the line in the frame buffer
+    const auto step = dy * static_cast<int>(hal::kDisplayWidth) + dx;
 
     for (auto& point : bresenham)
     {
-        for (int i = -thickness / 2; i < (thickness + 1) / 2; ++i)
+        // The common case, the whole width is within the display (conservatively in both directions)
+        if (point.x + kFirst >= 0 && point.x + kLast < static_cast<int>(hal::kDisplayWidth) &&
+            point.y + kFirst >= 0 && point.y + kLast < static_cast<int>(hal::kDisplayHeight))
         {
-            PointType offset {dx * i, dy * i};
-            auto offset_point = PointType {point.x + offset.x, point.y + offset.y};
+            auto pixel = &frame_buffer[(point.y + kFirst * dy) * hal::kDisplayWidth + point.x +
+                                       kFirst * dx];
 
-            if (offset_point.x < 0 || offset_point.x >= hal::kDisplayWidth || offset_point.y < 0 ||
-                offset_point.y >= hal::kDisplayHeight)
+            for (auto i = 0; i < thickness; ++i)
+            {
+                pixel[i * step] = color;
+            }
+            continue;
+        }
+
+        // Near the edges
+        for (auto i = kFirst; i <= kLast; ++i)
+        {
+            auto x = point.x + dx * i;
+            auto y = point.y + dy * i;
+
+            if (x < 0 || x >= static_cast<int>(hal::kDisplayWidth) || y < 0 ||
+                y >= static_cast<int>(hal::kDisplayHeight))
             {
                 continue;
             }
-            frame_buffer[offset_point.y * hal::kDisplayWidth + offset_point.x] = color;
+            frame_buffer[y * hal::kDisplayWidth + x] = color;
         }
     }
 }

@@ -24,6 +24,7 @@ add_executable(unittest_libmaelir
     main.cc
     test_nmea_parser.cc
     test_opportunistic_scheduler.cc
+    test_painter.cc
     test_job_pool_thread.cc
     test_state_machine.cc
     test_timer_manager.cc
@@ -38,6 +39,7 @@ target_link_libraries(unittest_libmaelir
     nmea_parser
     opportunistic_semaphore
     os_unittest
+    painter
     post_office
     timer_manager
     trompeloeil::trompeloeil
