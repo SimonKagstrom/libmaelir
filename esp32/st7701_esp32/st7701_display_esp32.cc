@@ -1,6 +1,7 @@
 #include "st7701_display_esp32.hh"
 
 #include <esp_heap_caps.h>
+#include <esp_idf_version.h>
 #include <esp_lcd_panel_ops.h>
 
 DisplaySt7701::DisplaySt7701(esp_lcd_panel_io_handle_t io_handle,
@@ -22,12 +23,17 @@ DisplaySt7701::DisplaySt7701(esp_lcd_panel_io_handle_t io_handle,
                                  MALLOC_CAP_SPIRAM | MALLOC_CAP_CACHE_ALIGNED));
 
     esp_lcd_dpi_panel_event_callbacks_t callbacks = {};
-    callbacks.on_refresh_done =
+    auto on_frame_buf_complete =
         [](esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_event_data_t* edata, void* user_ctx) {
             auto* self = static_cast<DisplaySt7701*>(user_ctx);
             self->OnVsync();
             return false;
         };
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 1, 0)
+    callbacks.on_frame_buf_complete = on_frame_buf_complete;
+#else
+    callbacks.on_refresh_done = on_frame_buf_complete;
+#endif
 
     ESP_ERROR_CHECK(esp_lcd_dpi_panel_register_event_callbacks(m_panel_handle, &callbacks, this));
 
