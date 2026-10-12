@@ -115,9 +115,9 @@ public:
         release();
     }
 
-    void NotifyFromIsr() final
+    bool NotifyFromIsr() final
     {
-        release_from_isr();
+        return release_from_isr();
     }
 
     // TODO: Privatize, but maybe available for unit tests

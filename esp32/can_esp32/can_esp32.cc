@@ -83,7 +83,6 @@ CanEsp32::SendFrame(uint32_t id, std::span<const uint8_t> data)
 bool
 CanEsp32::TwaiRxCb(const twai_rx_done_event_data_t* edata)
 {
-    bool rv = false;
     uint8_t idx;
 
     if (!m_rx_free_buffer_indicies.pop(idx))
@@ -101,14 +100,12 @@ CanEsp32::TwaiRxCb(const twai_rx_done_event_data_t* edata)
     if (twai_node_receive_from_isr(m_node_hdl, &rx_frame) == ESP_OK)
     {
         frame.Set(rx_frame.header.id, rx_frame.header.dlc);
-
-        rv = true;
     }
 
     m_rx_queue.push(idx);
-    m_wakeup_notifier->NotifyFromIsr();
 
-    return rv;
+    // Yield on ISR exit if the receiving thread was woken
+    return m_wakeup_notifier->NotifyFromIsr();
 }
 
 

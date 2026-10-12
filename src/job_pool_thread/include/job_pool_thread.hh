@@ -27,7 +27,8 @@ private:
         os::TimerHandle wakeup_handle;
     };
 
-    void WakeupPooledThread(const PooledThreadBase* thread, bool from_isr);
+    // Returns true if a higher priority task was woken (only from an ISR)
+    bool WakeupPooledThread(const PooledThreadBase* thread, bool from_isr);
     // On thread exit
     void RemoveThread(PooledThreadBase* thread);
 

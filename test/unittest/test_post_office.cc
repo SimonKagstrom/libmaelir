@@ -10,9 +10,10 @@ class MockEventNotifier : public IEventNotifier
 public:
     MAKE_MOCK0(Notify, void(), final);
 
-    void NotifyFromIsr() final
+    bool NotifyFromIsr() final
     {
         REQUIRE(false); // NotifyFromIsr should not be called by messages
+        return false;
     }
 };
 

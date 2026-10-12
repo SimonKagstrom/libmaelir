@@ -53,7 +53,7 @@ private:
 
     // From IEventNotifier
     void Notify() final;
-    void NotifyFromIsr() final;
+    bool NotifyFromIsr() final;
 
     os::TimerManager m_timer_manager;
     // Set when attached, but notifications can come from other threads before that

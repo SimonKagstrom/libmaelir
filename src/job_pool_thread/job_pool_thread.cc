@@ -102,7 +102,7 @@ JobPoolThread::AttachPooledThread(std::unique_ptr<PooledThreadBase> thread)
 }
 
 // Context: Another thread, or even an interrupt
-void
+bool
 JobPoolThread::WakeupPooledThread(const PooledThreadBase* thread, bool from_isr)
 {
     debug_assert(thread->m_thread_id != 255);
@@ -110,13 +110,12 @@ JobPoolThread::WakeupPooledThread(const PooledThreadBase* thread, bool from_isr)
 
     if (from_isr)
     {
-        // TODO: Return value ignored
-        AwakeFromIsr();
+        return AwakeFromIsr();
     }
-    else
-    {
-        Awake();
-    }
+
+    Awake();
+
+    return false;
 }
 
 void
@@ -198,7 +197,7 @@ PooledThreadBase::Notify()
 }
 
 // Context: Interrupt
-void
+bool
 PooledThreadBase::NotifyFromIsr()
 {
     auto job_pool_thread = m_job_pool_thread.load();
@@ -206,8 +205,8 @@ PooledThreadBase::NotifyFromIsr()
     // Not yet attached
     if (job_pool_thread == nullptr)
     {
-        return;
+        return false;
     }
 
-    job_pool_thread->WakeupPooledThread(this, true);
+    return job_pool_thread->WakeupPooledThread(this, true);
 }

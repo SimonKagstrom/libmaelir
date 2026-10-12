@@ -7,5 +7,6 @@ public:
 
     virtual void Notify() = 0;
 
-    virtual void NotifyFromIsr() = 0;
+    // Returns true if a higher priority task was woken, i.e., the ISR should yield on exit
+    virtual bool NotifyFromIsr() = 0;
 };

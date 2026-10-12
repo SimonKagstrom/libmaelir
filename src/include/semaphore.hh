@@ -46,9 +46,9 @@ public:
         release();
     }
 
-    void NotifyFromIsr() final
+    bool NotifyFromIsr() final
     {
-        release_from_isr();
+        return release_from_isr();
     }
 };
 
