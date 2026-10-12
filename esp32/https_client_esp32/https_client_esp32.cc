@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <esp_crt_bundle.h>
 #include <esp_http_client.h>
 #include <esp_log.h>
 
@@ -45,6 +46,8 @@ HttpsClient::Get(const std::string& url, milliseconds timeout)
     config.is_async = false;
     config.auth_type = HTTP_AUTH_TYPE_BASIC;
     config.transport_type = HTTP_TRANSPORT_OVER_SSL;
+    // Verify the server against the CA certificates bundled in ESP-IDF
+    config.crt_bundle_attach = esp_crt_bundle_attach;
     config.timeout_ms = static_cast<int>(timeout.count());
     config.event_handler = [](esp_http_client_event_t* evt) -> esp_err_t {
         return Impl::WriteCallback(evt);

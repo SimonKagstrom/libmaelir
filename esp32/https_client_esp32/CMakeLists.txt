@@ -5,5 +5,6 @@ add_library(https_client_esp32 EXCLUDE_FROM_ALL
 target_link_libraries(https_client_esp32
 PUBLIC
     idf::esp_http_client
+    idf::mbedtls
     https_client_interface
 )
