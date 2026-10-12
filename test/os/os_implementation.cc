@@ -6,6 +6,8 @@ namespace
 {
 
 os::ThreadHandle g_current_thread;
+bool g_in_interrupt_context {false};
+unsigned g_non_isr_calls_in_interrupt_context {0};
 std::weak_ptr<os::MockKernel> g_kernel_mock;
 
 } // namespace
@@ -76,4 +78,22 @@ void
 os::detail::SetCurrentThread(os::ThreadHandle thread)
 {
     g_current_thread = thread;
+}
+
+void
+os::detail::SetInterruptContext(bool in_interrupt)
+{
+    g_in_interrupt_context = in_interrupt;
+}
+
+bool
+os::detail::InInterruptContext()
+{
+    return g_in_interrupt_context;
+}
+
+unsigned&
+os::detail::NonIsrCallsInInterruptContext()
+{
+    return g_non_isr_calls_in_interrupt_context;
 }

@@ -497,4 +497,36 @@ TEST_CASE_FIXTURE(Fixture, "the last pooled thread slot can be used")
     }
 }
 
+TEST_CASE_FIXTURE(Fixture, "a pooled thread can be woken from an interrupt")
+{
+    auto [p0_up, p0] = CreatePooledThread();
+
+    job_thread->AttachPooledThread(std::move(p0_up));
+
+    auto r0 = NAMED_REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt);
+    job_thread->Start("job_pool");
+    DoRunLoop();
+    r0 = nullptr;
+
+    WHEN("the thread is notified from an interrupt")
+    {
+        os::detail::NonIsrCallsInInterruptContext() = 0;
+
+        os::detail::SetInterruptContext(true);
+        static_cast<IEventNotifier&>(*p0).NotifyFromIsr();
+        os::detail::SetInterruptContext(false);
+
+        THEN("only ISR-safe calls are made")
+        {
+            REQUIRE(os::detail::NonIsrCallsInInterruptContext() == 0);
+        }
+
+        AND_THEN("the thread runs")
+        {
+            r0 = NAMED_REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt);
+            DoRunLoop();
+        }
+    }
+}
+
 TEST_SUITE_END();

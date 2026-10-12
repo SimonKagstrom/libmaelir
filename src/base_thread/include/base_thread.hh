@@ -55,6 +55,11 @@ public:
         m_semaphore.release();
     }
 
+    bool AwakeFromIsr()
+    {
+        return m_semaphore.release_from_isr();
+    }
+
 protected:
     /// @brief the thread has been awoken
     virtual std::optional<milliseconds> OnActivation() = 0;

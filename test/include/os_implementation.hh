@@ -48,6 +48,12 @@ void WaitThreadExit(ThreadHandle thread);
 void SetCurrentThread(ThreadHandle thread);
 std::shared_ptr<MockKernel> GetKernelMock();
 
+// Emulated interrupt context, to check that only ISR-safe calls are made from interrupts
+void SetInterruptContext(bool in_interrupt);
+bool InInterruptContext();
+// The number of non-ISR-safe calls made in interrupt context (should be 0)
+unsigned& NonIsrCallsInInterruptContext();
+
 template <typename T>
 inline mem_unique_ptr<T>
 AllocFastMem(unsigned alignment [[maybe_unused]])

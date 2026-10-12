@@ -32,25 +32,43 @@ counting_semaphore<least_max_value>::~counting_semaphore()
 {
 }
 
+namespace
+{
+
+template <ptrdiff_t least_max_value>
+void
+DoRelease(Impl& impl, ptrdiff_t update)
+{
+    impl.value =
+        std::clamp(impl.value + static_cast<int>(update), 0, static_cast<int>(least_max_value));
+
+    for (auto& thread : impl.waiting_threads)
+    {
+        os::AwakeThread(thread);
+    }
+    impl.waiting_threads.clear();
+}
+
+} // namespace
+
 template <ptrdiff_t least_max_value>
 void
 counting_semaphore<least_max_value>::release(ptrdiff_t update) noexcept
 {
-    m_impl->value =
-        std::clamp(m_impl->value + static_cast<int>(update), 0, static_cast<int>(least_max_value));
-
-    for (auto& thread : m_impl->waiting_threads)
+    // Like xSemaphoreGive(), not allowed from interrupts
+    if (os::detail::InInterruptContext())
     {
-        os::AwakeThread(thread);
+        os::detail::NonIsrCallsInInterruptContext()++;
     }
-    m_impl->waiting_threads.clear();
+
+    DoRelease<least_max_value>(*m_impl, update);
 }
 
 template <ptrdiff_t least_max_value>
 bool
 counting_semaphore<least_max_value>::release_from_isr(ptrdiff_t update) noexcept
 {
-    release(update);
+    DoRelease<least_max_value>(*m_impl, update);
 
     return false;
 }
