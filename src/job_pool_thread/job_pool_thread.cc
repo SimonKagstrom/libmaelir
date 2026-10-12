@@ -61,15 +61,21 @@ JobPoolThread::OnActivation()
             continue;
         }
         auto result = thread->RunLoop();
+        auto& wakeup_handle = m_threads[thread->m_thread_id].wakeup_handle;
 
         if (result)
         {
             // Timeout value (or 0ms, which is also handled the same way)
-            m_threads[thread->m_thread_id].wakeup_handle = StartTimer(*result, [this, thread]() {
+            wakeup_handle = StartTimer(*result, [this, thread]() {
                 WakeupPooledThread(thread);
 
                 return std::nullopt;
             });
+        }
+        else
+        {
+            // Wait for events only, so cancel any timeout from an earlier activation
+            wakeup_handle = nullptr;
         }
     }
 

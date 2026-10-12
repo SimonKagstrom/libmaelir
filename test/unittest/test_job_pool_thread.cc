@@ -157,6 +157,34 @@ TEST_CASE_FIXTURE(Fixture, "a single pooled thread can wait for events")
     }
 }
 
+TEST_CASE_FIXTURE(Fixture, "a pooled thread waiting for an event isn't woken by an earlier timeout")
+{
+    auto [p0_up, p0] = CreatePooledThread();
+
+    job_thread->AttachPooledThread(std::move(p0_up));
+
+    auto r0 = NAMED_REQUIRE_CALL(*p0, OnActivation()).RETURN(10ms);
+    job_thread->Start("job_pool");
+    DoRunLoop();
+    r0 = nullptr;
+
+    WHEN("the thread is woken by an event before the timeout, and then waits for events")
+    {
+        AdvanceTimeAndRunLoop(5ms);
+
+        r0 = NAMED_REQUIRE_CALL(*p0, OnActivation()).RETURN(std::nullopt);
+        p0->Awake();
+        DoRunLoop();
+        r0 = nullptr;
+
+        THEN("the earlier timeout doesn't activate it")
+        {
+            auto r_no_activation = NAMED_FORBID_CALL(*p0, OnActivation());
+            AdvanceTimeAndRunLoop(10ms);
+        }
+    }
+}
+
 TEST_CASE_FIXTURE(Fixture, "a single pooled thread can wait for a timeout")
 {
     auto [p0_up, p0] = CreatePooledThread();
