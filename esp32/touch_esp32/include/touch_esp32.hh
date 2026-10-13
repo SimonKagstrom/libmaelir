@@ -13,7 +13,7 @@ public:
     explicit TouchEsp32(const i2c_master_bus_config_t& i2c_mst_config, gpio_num_t interrupt_pin);
 
 private:
-    std::unique_ptr<ListenerCookie> AttachIrqListener(std::function<void()> on_state_changed) final;
+    ListenerCookie AttachIrqListener(std::function<void()> on_state_changed) final;
 
     std::span<const hal::ITouch::Data> GetActiveTouchData() final;
 

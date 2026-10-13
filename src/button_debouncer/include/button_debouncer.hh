@@ -30,14 +30,14 @@ private:
             // Not relevant
         }
 
-        std::unique_ptr<ListenerCookie>
+        ListenerCookie
         AttachIrqListener(std::function<void(bool)> on_state_change) final;
 
         ButtonDebouncer& m_parent;
         std::unique_ptr<hal::IGpio> m_button_gpio;
         std::function<void(bool)> m_on_state_change {[](auto) {}};
 
-        std::unique_ptr<ListenerCookie> m_interrupt_listener;
+        ListenerCookie m_interrupt_listener;
 
         uint8_t m_button_history {0};
         uint8_t m_history_count {0};

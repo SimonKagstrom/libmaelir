@@ -39,7 +39,7 @@ CanEsp32::CanEsp32(gpio_num_t tx_pin, gpio_num_t rx_pin, int baud_rate_bps)
 }
 
 
-std::unique_ptr<ListenerCookie>
+ListenerCookie
 CanEsp32::Start(IEventNotifier& sem)
 {
     // Should be stopped already, but make sure
@@ -54,7 +54,7 @@ CanEsp32::Start(IEventNotifier& sem)
     }
     twai_node_enable(m_node_hdl);
 
-    return std::make_unique<ListenerCookie>([this]() { m_wakeup_notifier = &g_dummy_sem; });
+    return ListenerCookie([this]() { m_wakeup_notifier = &g_dummy_sem; });
 }
 
 void

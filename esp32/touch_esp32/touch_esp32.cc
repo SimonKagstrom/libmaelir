@@ -57,16 +57,16 @@ TouchEsp32::TouchEsp32(const i2c_master_bus_config_t &i2c_mst_config, gpio_num_t
     ESP_ERROR_CHECK(esp_lcd_touch_new_i2c_gt911(tp_io_handle, &tp_cfg, &m_tp));
 }
 
-std::unique_ptr<ListenerCookie>
+ListenerCookie
 TouchEsp32::AttachIrqListener(std::function<void()> on_state_changed)
 {
     if (m_interrupt_pin == GPIO_NUM_NC)
     {
-        return nullptr;
+        return {};
     }
 
     m_on_state_changed_callback = std::move(on_state_changed);
-    return std::make_unique<ListenerCookie>([this]() { m_on_state_changed_callback = []() {}; });
+    return ListenerCookie([this]() { m_on_state_changed_callback = []() {}; });
 }
 
 std::span<const hal::ITouch::Data>

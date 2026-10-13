@@ -13,7 +13,7 @@ class OtaUpdater : public PooledThreadBase
 public:
     OtaUpdater(hal::IOtaUpdater& updater, ApplicationState& application_state);
 
-    std::unique_ptr<ListenerCookie>
+    ListenerCookie
     SubscribeOnProgress(const std::function<void(uint8_t)>& progress);
 
     bool ApplicationHasBeenUpdated() const;
@@ -29,7 +29,7 @@ private:
     bool m_doing_update {false};
     const bool m_has_been_updated;
 
-    std::unique_ptr<ListenerCookie> m_state_listener;
+    ListenerCookie m_state_listener;
     std::function<void(uint8_t)> m_progress;
     os::TimerHandle m_application_valid_timer;
 

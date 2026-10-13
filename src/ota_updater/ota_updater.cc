@@ -69,13 +69,13 @@ OtaUpdater::OnActivation()
     return out;
 }
 
-std::unique_ptr<ListenerCookie>
+ListenerCookie
 OtaUpdater::SubscribeOnProgress(const std::function<void(uint8_t)>& progress)
 {
     std::scoped_lock lock(m_mutex);
     m_progress = progress;
 
-    return std::make_unique<ListenerCookie>([this]() {
+    return ListenerCookie([this]() {
         std::scoped_lock release_lock(m_mutex);
         m_progress = [](auto) { /* nop! */ };
     });

@@ -13,7 +13,7 @@ public:
     CanEsp32(gpio_num_t tx_pin, gpio_num_t rx_pin, int baud_rate_bps);
 
 private:
-    std::unique_ptr<ListenerCookie> Start(IEventNotifier& sem) final;
+    ListenerCookie Start(IEventNotifier& sem) final;
     void Stop() final;
     bool SendFrame(uint32_t id, std::span<const uint8_t> data) final;
     std::optional<Frame> ReceiveFrame() final;

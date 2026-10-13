@@ -44,11 +44,11 @@ RotaryEncoder::RotaryEncoder(hal::IGpio& pin_a, hal::IGpio& pin_b)
     m_listeners.push_back(m_pin_b.AttachIrqListener([this](auto) { Process(); }));
 }
 
-std::unique_ptr<ListenerCookie>
+ListenerCookie
 RotaryEncoder::AttachIrqListener(std::function<void(Direction)> on_rotation)
 {
     m_on_rotation = std::move(on_rotation);
-    return std::make_unique<ListenerCookie>([this]() { m_on_rotation = [](auto) { /* nop! */ }; });
+    return ListenerCookie([this]() { m_on_rotation = [](auto) { /* nop! */ }; });
 }
 
 void

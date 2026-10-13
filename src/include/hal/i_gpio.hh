@@ -18,7 +18,7 @@ public:
 
     virtual void SetState(bool state) = 0;
 
-    virtual std::unique_ptr<ListenerCookie>
+    virtual ListenerCookie
     AttachIrqListener(std::function<void(bool)> on_state_change) = 0;
 };
 

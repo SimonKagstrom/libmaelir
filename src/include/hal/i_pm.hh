@@ -16,10 +16,10 @@ public:
         virtual ~ILock() = default;
 
         // From thread context
-        std::unique_ptr<ListenerCookie> FullPower()
+        ListenerCookie FullPower()
         {
             Lock();
-            return std::make_unique<ListenerCookie>([this]() { Unlock(); });
+            return ListenerCookie([this]() { Unlock(); });
         }
 
 

@@ -22,7 +22,7 @@ public:
 
     virtual ~ITouch() = default;
 
-    virtual std::unique_ptr<ListenerCookie>
+    virtual ListenerCookie
     AttachIrqListener(std::function<void()> on_state_changed) = 0;
 
     virtual std::span<const hal::ITouch::Data> GetActiveTouchData() = 0;

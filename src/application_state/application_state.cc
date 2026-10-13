@@ -11,7 +11,7 @@ ApplicationState::ApplicationState()
     m_global_state.SetupDefaultValues();
 }
 
-std::unique_ptr<ListenerCookie>
+ListenerCookie
 ApplicationState::DoAttachListener(const ParameterBitset& interested, IEventNotifier& notifier)
 {
     std::lock_guard lock(m_mutex);
@@ -19,7 +19,7 @@ ApplicationState::DoAttachListener(const ParameterBitset& interested, IEventNoti
     if (m_reclaimed_listener_indices.empty() &&
         m_listener_notifiers_by_index.size() >= kMaxApplicationStateListeners)
     {
-        return nullptr;
+        return {};
     }
 
     auto index = static_cast<uint8_t>(m_listener_notifiers_by_index.size());
@@ -42,7 +42,7 @@ ApplicationState::DoAttachListener(const ParameterBitset& interested, IEventNoti
     }
 
 
-    return std::make_unique<ListenerCookie>([this, index, interested]() {
+    return ListenerCookie([this, index, interested]() {
         std::lock_guard lock(m_mutex);
 
         m_listener_notifiers_by_index[index] = &g_dummy_sem;

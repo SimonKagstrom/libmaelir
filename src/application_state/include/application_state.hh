@@ -436,7 +436,7 @@ public:
 
 
     template <class... T>
-    std::unique_ptr<ListenerCookie> AttachListener(IEventNotifier& notifier)
+    ListenerCookie AttachListener(IEventNotifier& notifier)
     {
         static_assert((sizeof...(T) > 0) && "AttachListener requires at least one parameter");
         ParameterBitset interested;
@@ -584,7 +584,7 @@ private:
         changed.set(AS::IndexOf<T>());
     }
 
-    std::unique_ptr<ListenerCookie> DoAttachListener(const ParameterBitset& interested,
+    ListenerCookie DoAttachListener(const ParameterBitset& interested,
                                                      IEventNotifier& notifier);
     void NotifyChange(unsigned index);
 

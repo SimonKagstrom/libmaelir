@@ -22,12 +22,12 @@ GpioHost::GetState() const
     return m_state;
 }
 
-std::unique_ptr<ListenerCookie>
+ListenerCookie
 GpioHost::AttachIrqListener(std::function<void(bool)> on_state_change)
 {
     m_listeners.push_back(std::move(on_state_change));
 
-    return std::make_unique<ListenerCookie>([this, on_state_change]() {
+    return ListenerCookie([this, on_state_change]() {
         // TODO: Erase
     });
 }

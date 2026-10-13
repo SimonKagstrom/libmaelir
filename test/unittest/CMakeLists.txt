@@ -29,6 +29,7 @@ add_executable(unittest_libmaelir
     test_opportunistic_scheduler.cc
     test_painter.cc
     test_job_pool_thread.cc
+    test_listener_cookie.cc
     test_state_machine.cc
     test_timer_manager.cc
     test_post_office.cc

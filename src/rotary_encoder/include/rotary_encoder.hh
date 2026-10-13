@@ -20,7 +20,7 @@ public:
     virtual ~RotaryEncoder() = default;
 
     // Virtual for the simulator
-    virtual std::unique_ptr<ListenerCookie>
+    virtual ListenerCookie
     AttachIrqListener(std::function<void(Direction)> on_rotation);
 
 private:
@@ -31,7 +31,7 @@ private:
     hal::IGpio& m_pin_a;
     hal::IGpio& m_pin_b;
 
-    etl::vector<std::unique_ptr<ListenerCookie>, 2> m_listeners;
+    etl::vector<ListenerCookie, 2> m_listeners;
 
     uint8_t m_state {0};
 };

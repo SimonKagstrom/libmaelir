@@ -10,7 +10,7 @@ public:
     void SetState(bool state) override;
     bool GetState() const override;
 
-    std::unique_ptr<ListenerCookie>
+    ListenerCookie
     AttachIrqListener(std::function<void(bool)> on_state_change) override;
 
 private:

@@ -61,7 +61,7 @@ public:
 
     virtual ~ICan() = default;
 
-    [[nodiscard]] virtual std::unique_ptr<ListenerCookie> Start(IEventNotifier& sem) = 0;
+    [[nodiscard]] virtual ListenerCookie Start(IEventNotifier& sem) = 0;
     virtual void Stop() = 0;
 
     virtual bool SendFrame(uint32_t id, std::span<const uint8_t> data) = 0;

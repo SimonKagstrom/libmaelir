@@ -22,7 +22,7 @@ public:
 
     void SetState(bool state) final;
 
-    std::unique_ptr<ListenerCookie>
+    ListenerCookie
     AttachIrqListener(std::function<void(bool)> on_state_change) final;
 
 private:

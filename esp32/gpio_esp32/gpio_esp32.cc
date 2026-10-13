@@ -19,12 +19,12 @@ GpioEsp32::GetState() const
     return gpio_get_level(m_pin) ^ m_polarity;
 }
 
-std::unique_ptr<ListenerCookie>
+ListenerCookie
 GpioEsp32::AttachIrqListener(std::function<void(bool)> on_state_change)
 {
     m_on_state_change = std::move(on_state_change);
 
-    return std::make_unique<ListenerCookie>([this]() { m_on_state_change = [](auto) {}; });
+    return ListenerCookie([this]() { m_on_state_change = [](auto) {}; });
 }
 
 void

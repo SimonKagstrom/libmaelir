@@ -32,12 +32,12 @@ ButtonDebouncer::Button::~Button()
     m_parent.RemoveButton(this);
 }
 
-std::unique_ptr<ListenerCookie>
+ListenerCookie
 ButtonDebouncer::Button::AttachIrqListener(std::function<void(bool)> on_state_change)
 {
     m_on_state_change = std::move(on_state_change);
 
-    return std::make_unique<ListenerCookie>(
+    return ListenerCookie(
         [this]() { m_on_state_change = [](auto) { /* nop! */ }; });
 }
 
