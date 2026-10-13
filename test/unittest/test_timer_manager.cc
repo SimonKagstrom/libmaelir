@@ -5,10 +5,34 @@
 #include "thread_fixture.hh"
 #include "timer_manager.hh"
 
+#if defined(__SANITIZE_ADDRESS__)
+#define TEST_HAS_ASAN 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define TEST_HAS_ASAN 1
+#endif
+#endif
+
+#if defined(TEST_HAS_ASAN)
+#include <sanitizer/lsan_interface.h>
+#endif
+
 using namespace os;
 
 namespace
 {
+
+// Leak on purpose, without LeakSanitizer reporting it
+template <typename T>
+void
+IntentionallyLeak(std::unique_ptr<T> object)
+{
+    [[maybe_unused]] auto raw = object.release();
+
+#if defined(TEST_HAS_ASAN)
+    __lsan_ignore_object(raw);
+#endif
+}
 
 class MockCallback
 {
@@ -182,8 +206,8 @@ TEST_CASE_FIXTURE(Fixture, "destroying the timer manager with active timers asse
 
     manager = nullptr;
 
-    // Leak the handle, since releasing it would access the destroyed manager
-    timer.release();
+    // Releasing the handle would access the destroyed manager
+    IntentionallyLeak(std::move(timer));
 }
 
 TEST_CASE_FIXTURE(Fixture, "destroying the timer manager with only expired timers is OK")
