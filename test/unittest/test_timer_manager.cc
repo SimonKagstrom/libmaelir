@@ -113,6 +113,64 @@ TEST_CASE_FIXTURE(Fixture, "the timer manager can be filled without adverse effe
     }
 }
 
+TEST_CASE_FIXTURE(Fixture, "a timer can be restarted many times between expiries")
+{
+    TimerManager manager(m_sem);
+    MockCallback cb;
+
+    TimerHandle timer;
+
+    // More restarts than there are timers, without Expire() in between
+    for (auto i = 0; i < kMaxTimers * 3; i++)
+    {
+        timer = manager.StartTimer(10ms, [&cb]() {
+            cb.OnTimeout();
+            return std::nullopt;
+        });
+        REQUIRE(timer);
+    }
+
+    THEN("only the last one is active")
+    {
+        REQUIRE(manager.Expire() == 10ms);
+
+        REQUIRE_CALL(cb, OnTimeout());
+        AdvanceTime(10ms);
+        REQUIRE(manager.Expire() == std::nullopt);
+    }
+}
+
+TEST_CASE_FIXTURE(Fixture, "a released timer can be reused without an expiry in between")
+{
+    TimerManager manager(m_sem);
+
+    std::vector<TimerHandle> timers;
+
+    for (auto i = 0; i < kMaxTimers; i++)
+    {
+        timers.push_back(manager.StartTimer(milliseconds(i + 1), []() { return std::nullopt; }));
+        REQUIRE(timers.back());
+    }
+    REQUIRE(manager.StartTimer(1s, []() { return std::nullopt; }) == nullptr);
+
+    WHEN("a timer is released")
+    {
+        // The first one, i.e., the next to expire
+        timers.erase(timers.begin());
+
+        THEN("a new one can be added directly")
+        {
+            auto next = manager.StartTimer(1s, []() { return std::nullopt; });
+            REQUIRE(next);
+        }
+
+        AND_THEN("the released timer doesn't affect the next expiry")
+        {
+            REQUIRE(manager.Expire() == 2ms);
+        }
+    }
+}
+
 TEST_CASE_FIXTURE(Fixture, "a single shot timer is created")
 {
     TimerManager manager(m_sem);

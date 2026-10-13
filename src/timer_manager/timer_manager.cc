@@ -1,5 +1,7 @@
 #include "timer_manager.hh"
 
+#include <cstdio>
+
 using namespace os;
 
 constexpr auto kForever = milliseconds::max();
@@ -28,8 +30,7 @@ public:
     // Detach an expired timer (allow reusing it's index)
     void Detach()
     {
-        m_manager.EntryAt(m_entry_index).cookie = nullptr;
-        m_manager.m_pending_removals[m_entry_index] = true;
+        m_manager.ReleaseEntry(m_entry_index);
 
         m_entry_index = kDetachedTimer;
     }
@@ -79,6 +80,7 @@ TimerManager::StartTimer(milliseconds timeout,
 {
     if (m_free_timers.none())
     {
+        printf("TimerManager: Out of timers (max %d), the timer is not started\n", kMaxTimers);
         return nullptr;
     }
 
@@ -129,6 +131,30 @@ TimerManager::ActivatePendingTimers(milliseconds next_wakeup)
 }
 
 void
+TimerManager::ReleaseEntry(uint8_t index)
+{
+    auto& timer = m_timers[index];
+
+    timer.cookie = nullptr;
+
+    if (m_in_expire)
+    {
+        // The callback might be running, and Expire() iterates the active timers. Release when
+        // done with that
+        m_pending_removals[index] = true;
+        return;
+    }
+
+    // Outside Expire(), so the entry can be reused directly
+    if (auto it = std::ranges::find(m_active_timers, index); it != m_active_timers.end())
+    {
+        m_active_timers.erase(it);
+    }
+    timer.on_timeout = nullptr;
+    m_free_timers[index] = true;
+}
+
+void
 TimerManager::RemoveDeletedTimers()
 {
     for (auto index = m_pending_removals.find_first(true); index != m_pending_removals.npos;
@@ -139,6 +165,8 @@ TimerManager::RemoveDeletedTimers()
             m_active_timers.erase(it);
         }
 
+        // Not running anymore, so release the captures
+        m_timers[index].on_timeout = nullptr;
         m_free_timers[index] = true;
     }
 

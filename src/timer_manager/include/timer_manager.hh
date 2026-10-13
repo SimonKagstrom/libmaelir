@@ -39,7 +39,8 @@ public:
      *
      * @param timeout the timeout of the timer
      * @param on_timeout the function to call when the timer expires
-     * @return A handle to the timer. Releasing the handle will cancel the timer
+     * @return A handle to the timer, or nullptr if all kMaxTimers timers are in use. Releasing
+     * the handle will cancel the timer
      */
     TimerHandle StartTimer(milliseconds timeout,
                            std::function<std::optional<milliseconds>()> on_timeout);
@@ -62,6 +63,9 @@ private:
     }
 
     void BumpTime();
+
+    // Called when a timer handle is released, or a single-shot timer has expired
+    void ReleaseEntry(uint8_t index);
 
     void SortActiveTimers();
     milliseconds ActivatePendingTimers(milliseconds next_wakeup);
