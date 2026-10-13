@@ -1,4 +1,5 @@
 #include "base_thread.hh"
+#include "mock_debug_assert.hh"
 #include "mock_time.hh"
 #include "test.hh"
 #include "thread_fixture.hh"
@@ -169,6 +170,33 @@ TEST_CASE_FIXTURE(Fixture, "a released timer can be reused without an expiry in 
             REQUIRE(manager.Expire() == 2ms);
         }
     }
+}
+
+TEST_CASE_FIXTURE(Fixture, "destroying the timer manager with active timers asserts")
+{
+    auto manager = std::make_unique<TimerManager>(m_sem);
+    auto timer = manager->StartTimer(10ms, []() { return std::nullopt; });
+
+    MockAssertHandler asserts;
+    REQUIRE_CALL(asserts, OnAssert(_, _, _));
+
+    manager = nullptr;
+
+    // Leak the handle, since releasing it would access the destroyed manager
+    timer.release();
+}
+
+TEST_CASE_FIXTURE(Fixture, "destroying the timer manager with only expired timers is OK")
+{
+    auto manager = std::make_unique<TimerManager>(m_sem);
+    auto timer = manager->StartTimer(10ms, []() { return std::nullopt; });
+
+    AdvanceTime(10ms);
+    manager->Expire();
+    REQUIRE(timer->IsExpired());
+
+    // Without a MockAssertHandler, a failed debug_assert fails the test
+    manager = nullptr;
 }
 
 TEST_CASE_FIXTURE(Fixture, "a single shot timer is created")

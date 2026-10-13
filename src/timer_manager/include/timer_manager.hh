@@ -31,6 +31,8 @@ class TimerManager
 public:
     explicit TimerManager(IEventNotifier& notifier);
 
+    ~TimerManager();
+
     /**
      * @brief Start a timer
      *

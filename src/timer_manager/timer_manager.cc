@@ -1,5 +1,7 @@
 #include "timer_manager.hh"
 
+#include "debug_assert.hh"
+
 #include <cstdio>
 
 using namespace os;
@@ -61,6 +63,11 @@ TimerManager::TimerManager(IEventNotifier& notifier)
     , m_last_expiery(os::GetTimeStamp())
 {
     m_free_timers.set();
+}
+
+TimerManager::~TimerManager()
+{
+    debug_assert(m_active_timers.empty() && "TimerManager: timers still active on destruction");
 }
 
 void

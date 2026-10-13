@@ -28,4 +28,7 @@ target_include_directories(libmaelir_interface INTERFACE
 target_link_libraries(libmaelir_interface INTERFACE
     etl::etl
     display_properties
+    # Target-specific parts, e.g., debug_assert.hh. An alias to libmaelir_target_esp32,
+    # libmaelir_target_host or libmaelir_target_unittest
+    libmaelir_target
 )

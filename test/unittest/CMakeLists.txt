@@ -13,6 +13,9 @@ add_compile_definitions(LV_CONF_INCLUDE_SIMPLE=1)
 enable_testing()
 
 add_subdirectory(.. libmaelir_unittest)
+add_subdirectory(libmaelir_target_unittest)
+
+add_library(libmaelir_target ALIAS libmaelir_target_unittest)
 
 if(NOT TARGET display_properties)
     add_library(display_properties ALIAS display_800x800)

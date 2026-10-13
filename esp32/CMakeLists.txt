@@ -15,8 +15,10 @@ add_subdirectory(pm_esp32)
 add_subdirectory(stepper_motor_esp32)
 add_subdirectory(touch_esp32)
 add_subdirectory(os)
+add_subdirectory(libmaelir_target_esp32)
 
 add_library(https_client_implementation ALIAS https_client_esp32)
+add_library(libmaelir_target ALIAS libmaelir_target_esp32)
 
 add_library(os_implementation ALIAS os_esp32)
 
