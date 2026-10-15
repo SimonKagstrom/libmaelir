@@ -1,19 +1,15 @@
 #pragma once
 
-#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <iterator>
+#include <limits>
 #include <numbers>
-#include <numeric>
 
 template <typename PointType>
 class Bresenham
 {
 public:
-    static constexpr auto kEndSentinel =
-        PointType {std::numeric_limits<int>::max(), std::numeric_limits<int>::max()};
-
     class Iterator
     {
     public:
@@ -25,14 +21,14 @@ public:
         using pointer = const PointType*;
         using reference = const PointType&;
 
-        bool operator!=(const Iterator& other) const
-        {
-            return !(*this == other);
-        }
-
         bool operator==(const Iterator& other) const
         {
-            return m_current == other.m_current;
+            return m_done == other.m_done && (m_done || m_current == other.m_current);
+        }
+
+        bool operator==(std::default_sentinel_t) const
+        {
+            return m_done;
         }
 
         reference operator*() const
@@ -46,12 +42,12 @@ public:
         }
 
         // Advance by one Bresenham step. The point at m_to is yielded once,
-        // and the next increment moves to the past-the-end sentinel.
+        // and the next increment moves past the end.
         Iterator& operator++()
         {
             if (m_current == m_to)
             {
-                m_current = kEndSentinel;
+                m_done = true;
                 return *this;
             }
 
@@ -74,8 +70,8 @@ public:
         Iterator(const PointType& from, const PointType& to)
             : m_current(from)
             , m_to(to)
-            , m_dx(std::abs(to.x - from.x))
-            , m_dy(-std::abs(to.y - from.y))
+            , m_dx(std::abs(static_cast<int>(to.x) - static_cast<int>(from.x)))
+            , m_dy(-std::abs(static_cast<int>(to.y) - static_cast<int>(from.y)))
             , m_sx(from.x < to.x ? 1 : -1)
             , m_sy(from.y < to.y ? 1 : -1)
             , m_err(m_dx + m_dy)
@@ -85,11 +81,12 @@ public:
         PointType m_current;
         PointType m_to;
 
-        decltype(PointType::x) m_dx;
-        decltype(PointType::y) m_dy {0};
-        decltype(PointType::x) m_sx {0};
-        decltype(PointType::y) m_sy {0};
-        decltype(PointType::x) m_err {0};
+        int m_dx;
+        int m_dy;
+        int m_sx;
+        int m_sy;
+        int m_err;
+        bool m_done {false};
     };
 
     Bresenham(const PointType& from, const PointType& to)
@@ -107,7 +104,7 @@ public:
 
     auto end() const
     {
-        return Iterator(kEndSentinel, kEndSentinel);
+        return std::default_sentinel;
     }
 
     bool IsMostlyVerticalSlope() const
