@@ -74,27 +74,7 @@ struct partial_state : public T...
 class ApplicationState
 {
 public:
-    class ReadOnly
-    {
-    public:
-        friend class ApplicationState;
-
-        template <typename T>
-        auto Get()
-        {
-            return m_parent.Get<T>();
-        }
-
-    protected:
-        explicit ReadOnly(ApplicationState& parent)
-            : m_parent(parent)
-        {
-        }
-
-        ApplicationState& m_parent;
-    };
-
-    class ReadWrite : public ReadOnly
+    class ReadWrite
     {
     public:
         friend class ApplicationState;
@@ -106,6 +86,12 @@ public:
 
 
         template <typename T>
+        auto Get()
+        {
+            return m_parent.Get<T>();
+        }
+
+        template <typename T>
         void Set(const auto& value)
         {
             std::lock_guard lock(m_parent.m_mutex);
@@ -113,7 +99,12 @@ public:
         }
 
     private:
-        using ReadOnly::ReadOnly;
+        explicit ReadWrite(ApplicationState& parent)
+            : m_parent(parent)
+        {
+        }
+
+        ApplicationState& m_parent;
     };
 
 
@@ -445,15 +436,6 @@ public:
 
         return DoAttachListener(interested, notifier);
     }
-
-    /**
-     * @brief Checkout a reader-only of the entire global state.
-     *
-     * Reads return the global state, so can change at any time.
-     *
-     * @return A reader
-     */
-    ReadOnly CheckoutReadonly();
 
     /**
      * @brief Checkout a reader-writer of the entire global state.

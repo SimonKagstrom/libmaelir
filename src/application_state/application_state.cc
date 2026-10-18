@@ -101,9 +101,3 @@ ApplicationState::CheckoutReadWrite()
 {
     return ApplicationState::ReadWrite(*this);
 }
-
-ApplicationState::ReadOnly
-ApplicationState::CheckoutReadonly()
-{
-    return ApplicationState::ReadOnly(*this);
-}
