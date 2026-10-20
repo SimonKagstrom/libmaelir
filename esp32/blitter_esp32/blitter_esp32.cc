@@ -136,9 +136,6 @@ BlitterEsp32::BlitOperations(std::span<const hal::BlitOperation> operations)
         return;
     }
 
-    uint16_t* dst_buffer = operations.front().dst_data;
-    const size_t dst_buffer_bytes = GetDestinationBufferSizeBytes(operations.front());
-
     m_pending_transactions += static_cast<uint32_t>(operations.size());
     for (size_t i = 0; i < operations.size(); ++i)
     {

@@ -109,7 +109,7 @@ ButtonDebouncer::AddButton(std::unique_ptr<hal::IGpio> pin)
 
     m_buttons.push_back(button.get());
 
-    return std::move(button);
+    return button;
 }
 
 void

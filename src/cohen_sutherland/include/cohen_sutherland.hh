@@ -86,7 +86,7 @@ ClipLineToDisplay(auto &x0, auto &y0, auto &x1, auto &y1)
                 y = y0 + (y1 - y0) * (hal::kDisplayWidth - x0) / (x1 - x0);
                 x = hal::kDisplayWidth;
             }
-            else if (code_out & kLeft)
+            else // kLeft
             {
                 y = y0 + (y1 - y0) * (0 - x0) / (x1 - x0);
                 x = 0;

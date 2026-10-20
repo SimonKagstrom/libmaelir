@@ -125,7 +125,7 @@ NmeaParser::ParseGnggaData(std::string_view line)
 
     // time      latitude  N/S longitude E/W fix status satelites hdop altitude M height M time difftime checksum
     // 072446.00,3130.5226316,N,12024.0937010,E,4,27,0.5,31.924,M,0.000,M,2.0,*44
-    constexpr auto kTimeIndex = 0;
+    [[maybe_unused]] constexpr auto kTimeIndex = 0;
     constexpr auto kLatitudeIndex = 1;
     constexpr auto kLatitudeDirectionIndex = 2;
     constexpr auto kLongitudeIndex = 3;
@@ -187,7 +187,7 @@ NmeaParser::ParseGnrmcData(std::string_view line)
 
     // time      status latitude  N/S longitude E/W speed course date magnetic variation checksum
     // 072446.00,A,3130.5226316,N,12024.0937010,E,0.01,0.00,040620,0.0,E,D*3D
-    constexpr auto kTimeIndex = 0;
+    [[maybe_unused]] constexpr auto kTimeIndex = 0;
     constexpr auto kStatusIndex = 1;
     constexpr auto kLatitudeIndex = 2;
     constexpr auto kLatitudeDirectionIndex = 3;
@@ -258,18 +258,18 @@ NmeaParser::ParseGppgaData(std::string_view line)
 
     // time      latitude  N/S longitude E/W fix sat hdop altitude M height M time checksum
     // 174558.00,5917.60788,N,01757.40192,E,1,08,1.08,48.3,M,24.6,M,,*69
-    constexpr auto kTimeIndex = 0;
+    [[maybe_unused]] constexpr auto kTimeIndex = 0;
     constexpr auto kLatitudeIndex = 1;
     constexpr auto kLatitudeDirectionIndex = 2;
     constexpr auto kLongitudeIndex = 3;
     constexpr auto kLongitudeDirectionIndex = 4;
     constexpr auto kFixIndex = 5;
-    constexpr auto kSatIndex = 6;
-    constexpr auto kHdopIndex = 7;
-    constexpr auto kAltitudeIndex = 8;
-    constexpr auto kHeightIndex = 10;
-    constexpr auto kTimeSinceLastDgpsUpdateIndex = 12;
-    constexpr auto kChecksumIndex = 13;
+    [[maybe_unused]] constexpr auto kSatIndex = 6;
+    [[maybe_unused]] constexpr auto kHdopIndex = 7;
+    [[maybe_unused]] constexpr auto kAltitudeIndex = 8;
+    [[maybe_unused]] constexpr auto kHeightIndex = 10;
+    [[maybe_unused]] constexpr auto kTimeSinceLastDgpsUpdateIndex = 12;
+    [[maybe_unused]] constexpr auto kChecksumIndex = 13;
 
     auto valid = false;
     for (const auto sub_range : std::views::split(line, ','))
