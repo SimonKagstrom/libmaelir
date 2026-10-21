@@ -9,6 +9,7 @@
 #include <etl/mutex.h>
 #include <etl/queue.h>
 #include <etl/vector.h>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -61,35 +62,6 @@ class Mailbox
 public:
     friend class PostOffice<Messages>;
 
-    struct Envelope
-    {
-        template <typename T>
-        bool Is() const
-        {
-            return raw.index == detail::IndexOfImpl<T, Messages>::Get();
-        }
-
-        // Only valid if Is<T>() is true
-        template <typename T>
-        std::shared_ptr<const T> As() const
-        {
-            assert(Is<T>());
-            return std::static_pointer_cast<const T>(raw.message);
-        }
-
-        template <typename T>
-        const Envelope& On(std::function<void(std::shared_ptr<const T>)> handler) const
-        {
-            if (Is<T>())
-            {
-                handler(As<T>());
-            }
-
-            return *this;
-        }
-
-        detail::RawEnvelope raw;
-    };
     class Drainer
     {
     public:
@@ -153,17 +125,8 @@ public:
     Mailbox(Mailbox&&) = delete;
     Mailbox& operator=(Mailbox&&) = delete;
 
-    // The next message, or nullopt if the mailbox is empty
-    std::optional<Envelope> Pop()
-    {
-        if (auto raw = m_impl->Pop())
-        {
-            return Envelope {std::move(*raw)};
-        }
-
-        return std::nullopt;
-    }
-
+    // Handles all queued messages, in order, when the returned Drainer goes out of scope.
+    // Messages without a handler are dropped.
     Drainer Collect()
     {
         return Drainer(*this);

@@ -34,7 +34,16 @@ class Fixture : public ThreadFixture
 {
 public:
     MAKE_MOCK0(Samsa, void());
-    MAKE_MOCK0(Gregor, void());
+    MAKE_MOCK2(Gregor, void(std::string number, std::string name));
+
+    void Collect(Mailbox<MSG::AllMessages>& mailbox)
+    {
+        mailbox.Collect()
+            .On<MSG::samsa>([this]() { Samsa(); })
+            .On<MSG::gregor>([this](auto gregor) {
+                Gregor(gregor->caller_number, gregor->caller_name);
+            });
+    }
 
     PostOffice<MSG::AllMessages> post_office;
 };
@@ -55,7 +64,8 @@ TEST_CASE_FIXTURE(Fixture, "messages are not queued up for late listeners")
     post_office.Send<MSG::samsa>();
 
     auto samsa_listener = std::make_unique<ReceiverThread<MSG::samsa>>(post_office);
-    CHECK(samsa_listener->m_mailbox->Pop() == std::nullopt);
+    FORBID_CALL(*this, Samsa());
+    Collect(*samsa_listener->m_mailbox);
 }
 
 TEST_CASE_FIXTURE(Fixture, "listeners get notified when they get messages")
@@ -109,28 +119,22 @@ TEST_CASE_FIXTURE(Fixture, "messages can be handled")
     {
         post_office.Send<MSG::gregor>({"id99", "Gregor Samsa"});
 
-        THEN("the queue of the other listener is empty")
+        THEN("the other listener doesn't receive it")
         {
-            CHECK(samsa_listener->m_mailbox->Pop() == std::nullopt);
+            FORBID_CALL(*this, Samsa());
+            FORBID_CALL(*this, Gregor(trompeloeil::_, trompeloeil::_));
+            Collect(*samsa_listener->m_mailbox);
         }
 
-        THEN("the queue can be popped on the listener that")
+        THEN("the listener receives it, with contents")
         {
-            auto msg = gregor_listener->m_mailbox->Pop();
-            REQUIRE(msg != std::nullopt);
-            REQUIRE(msg->Is<MSG::gregor>());
+            REQUIRE_CALL(*this, Gregor("id99", "Gregor Samsa"));
+            Collect(*gregor_listener->m_mailbox);
 
-            THEN("no messages remain")
+            AND_THEN("it's not received twice")
             {
-                REQUIRE(gregor_listener->m_mailbox->Pop() == std::nullopt);
-            }
-
-            AND_THEN("it can be handled")
-            {
-                auto gregor = msg->As<MSG::gregor>();
-
-                CHECK(gregor->caller_number == "id99");
-                CHECK(gregor->caller_name == "Gregor Samsa");
+                FORBID_CALL(*this, Gregor(trompeloeil::_, trompeloeil::_));
+                Collect(*gregor_listener->m_mailbox);
             }
         }
     }
@@ -139,66 +143,103 @@ TEST_CASE_FIXTURE(Fixture, "messages can be handled")
     {
         post_office.Send<MSG::samsa>();
 
-        THEN("it can be handled")
+        THEN("the message can be passed to the handler")
         {
-            auto msg = samsa_listener->m_mailbox->Pop();
-            REQUIRE(msg != std::nullopt);
-            auto samsa = msg->As<MSG::samsa>();
-            REQUIRE(msg->Is<MSG::samsa>());
+            std::shared_ptr<const MSG::samsa> samsa;
 
+            samsa_listener->m_mailbox->Collect().On<MSG::samsa>([&samsa](auto msg) { samsa = msg; });
             CHECK(samsa);
-            // No fields in samsa
         }
     }
 }
 
-TEST_CASE_FIXTURE(Fixture, "messages can be handled through callbacks")
+TEST_CASE_FIXTURE(Fixture, "multiple messages are handled in order")
 {
     auto all_listener = std::make_unique<ReceiverThread<MSG::gregor, MSG::samsa>>(post_office);
     ALLOW_CALL(all_listener->notifier, Notify());
+    trompeloeil::sequence seq;
 
-    WHEN("a single message comes in")
+    WHEN("messages of different types come in")
     {
+        post_office.Send<MSG::gregor>({"id=15", "name"});
         post_office.Send<MSG::samsa>();
-        THEN("only that is handled")
+
+        THEN("all are handled, regardless of the order of the handlers")
         {
-            REQUIRE_CALL(*this, Samsa());
-            while (auto msg = all_listener->m_mailbox->Pop())
-            {
-                msg->On<MSG::samsa>([&](auto samsa) { Samsa(); }).On<MSG::gregor>([&](auto gregor) {
-                    Gregor();
-                });
-            }
+            REQUIRE_CALL(*this, Gregor("id=15", "name")).IN_SEQUENCE(seq);
+            REQUIRE_CALL(*this, Samsa()).IN_SEQUENCE(seq);
+
+            Collect(*all_listener->m_mailbox);
         }
     }
 
-    WHEN("multiple messages come in")
+    WHEN("several messages of the same type come in")
     {
+        post_office.Send<MSG::gregor>({"1", "first"});
         post_office.Send<MSG::samsa>();
-        post_office.Send<MSG::gregor>({"id=15", "name"});
+        post_office.Send<MSG::gregor>({"2", "second"});
 
-        trompeloeil::sequence seq;
-        THEN("all are handled")
+        THEN("each is handled with its own contents")
         {
+            REQUIRE_CALL(*this, Gregor("1", "first")).IN_SEQUENCE(seq);
             REQUIRE_CALL(*this, Samsa()).IN_SEQUENCE(seq);
-            REQUIRE_CALL(*this, Gregor()).IN_SEQUENCE(seq);
+            REQUIRE_CALL(*this, Gregor("2", "second")).IN_SEQUENCE(seq);
 
-            while (auto msg = all_listener->m_mailbox->Pop())
+            Collect(*all_listener->m_mailbox);
+        }
+    }
+
+    WHEN("a message has no handler")
+    {
+        post_office.Send<MSG::gregor>({"id=15", "name"});
+        post_office.Send<MSG::samsa>();
+
+        THEN("the others are still handled")
+        {
+            REQUIRE_CALL(*this, Samsa());
+            all_listener->m_mailbox->Collect().On<MSG::samsa>([this]() { Samsa(); });
+
+            AND_THEN("the unhandled message is dropped")
             {
-                msg->On<MSG::gregor>([&](auto gregor) { Gregor(); })
-                    .On<MSG::samsa>([&](auto samsa) { Samsa(); });
+                FORBID_CALL(*this, Gregor(trompeloeil::_, trompeloeil::_));
+                Collect(*all_listener->m_mailbox);
             }
         }
+    }
+}
 
-        AND_THEN("the collect short form can be used")
+TEST_CASE_FIXTURE(Fixture, "a full mailbox drops new messages")
+{
+    auto gregor_listener = std::make_unique<ReceiverThread<MSG::gregor>>(post_office);
+    ALLOW_CALL(gregor_listener->notifier, Notify());
+
+    for (auto i = 0; i < kMailboxSize + 2; i++)
+    {
+        post_office.Send<MSG::gregor>({std::to_string(i), "name"});
+    }
+
+    THEN("the oldest messages are kept")
+    {
+        trompeloeil::sequence seq;
+        std::vector<std::unique_ptr<trompeloeil::expectation>> expectations;
+        for (auto i = 0; i < kMailboxSize; i++)
         {
-            REQUIRE_CALL(*this, Samsa()).IN_SEQUENCE(seq);
-            REQUIRE_CALL(*this, Gregor()).IN_SEQUENCE(seq);
-
-            all_listener->m_mailbox->Collect()
-                .On<MSG::samsa>([&](auto samsa) { Samsa(); })
-                .On<MSG::gregor>([&](auto gregor) { Gregor(); });
+            expectations.push_back(
+                NAMED_REQUIRE_CALL(*this, Gregor(std::to_string(i), "name")).IN_SEQUENCE(seq));
         }
+
+        Collect(*gregor_listener->m_mailbox);
+    }
+
+    AND_THEN("new messages fit once it has been drained")
+    {
+        ALLOW_CALL(*this, Gregor(trompeloeil::_, trompeloeil::_));
+        Collect(*gregor_listener->m_mailbox);
+
+        post_office.Send<MSG::gregor>({"new", "name"});
+
+        REQUIRE_CALL(*this, Gregor("new", "name"));
+        Collect(*gregor_listener->m_mailbox);
     }
 }
 
