@@ -94,10 +94,3 @@ ApplicationState::NotifyMultipleChanges(const ParameterBitset& changed)
         m_listener_notifiers_by_index[listener_index]->Notify();
     }
 }
-
-
-ApplicationState::ReadWrite
-ApplicationState::CheckoutReadWrite()
-{
-    return ApplicationState::ReadWrite(*this);
-}

@@ -74,40 +74,6 @@ struct partial_state : public T...
 class ApplicationState
 {
 public:
-    class ReadWrite
-    {
-    public:
-        friend class ApplicationState;
-
-        ReadWrite(const ReadWrite&) = delete;
-        ReadWrite& operator=(const ReadWrite&) = delete;
-        ReadWrite(ReadWrite&&) = delete;
-        ReadWrite& operator=(ReadWrite&&) = delete;
-
-
-        template <typename T>
-        auto Get()
-        {
-            return m_parent.Get<T>();
-        }
-
-        template <typename T>
-        void Set(const auto& value)
-        {
-            std::lock_guard lock(m_parent.m_mutex);
-            m_parent.SetNoLock<T>(value);
-        }
-
-    private:
-        explicit ReadWrite(ApplicationState& parent)
-            : m_parent(parent)
-        {
-        }
-
-        ApplicationState& m_parent;
-    };
-
-
     template <class... T>
     class PartialReadOnlyCache
     {
@@ -438,17 +404,6 @@ public:
     }
 
     /**
-     * @brief Checkout a reader-writer of the entire global state.
-     *
-     * Reads return the global state, so can change at any time. Writes are
-     * done immediately.
-     *
-     * @return A reader-writer.
-     */
-    ReadWrite CheckoutReadWrite();
-
-
-    /**
      * @brief Checkout a snapshot of a subset of the global state
      *
      * The snapshot is cached, so global writes do not affect it. Writes are
@@ -500,6 +455,19 @@ public:
 
             return out;
         }
+    }
+
+    /**
+     * @brief Write a single member of the global state
+     *
+     * The write is done (and listeners notified) immediately. Use a queued writer
+     * to update multiple members together.
+     */
+    template <typename T>
+    void Set(const auto& value)
+    {
+        std::lock_guard lock(m_mutex);
+        SetNoLock<T>(value);
     }
 
 private:
