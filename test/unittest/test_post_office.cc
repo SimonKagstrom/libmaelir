@@ -1,6 +1,6 @@
+#include "messages.hh"
 #include "post_office.hh"
 #include "thread_fixture.hh"
-#include "unittest_messages.hh"
 
 namespace
 {

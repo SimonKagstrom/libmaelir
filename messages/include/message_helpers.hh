@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 namespace detail
 {
@@ -33,3 +34,12 @@ struct IndexOfImpl<T, std::tuple<Ts...>>
 };
 
 } // namespace detail
+
+namespace MSG
+{
+
+// Combine message tuples into one, e.g., the common messages and the application ones
+template <typename... Tuples>
+using ConcatMessages = decltype(std::tuple_cat(std::declval<Tuples>()...));
+
+} // namespace MSG
