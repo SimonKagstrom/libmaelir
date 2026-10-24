@@ -21,10 +21,24 @@ if(NOT TARGET display_properties)
     add_library(display_properties ALIAS display_800x800)
 endif()
 
+# Only the common state and messages. When built from an application's unittests, the
+# application's (which include the common ones) are used instead
+if(NOT TARGET generated_application_state)
+    generate_application_state(libmaelir_unittest_application_state
+        BASE
+            libmaelir_application_state
+    )
+    add_library(generated_application_state ALIAS libmaelir_unittest_application_state)
+endif()
+if(NOT TARGET messages)
+    add_library(messages ALIAS unittest_all_messages)
+endif()
+
 generate_state_machine(lamp_state_machine_base lamp_state_machine.md)
 
 add_executable(unittest_libmaelir
     main.cc
+    test_clock_handler.cc
     test_nmea_parser.cc
     test_opportunistic_scheduler.cc
     test_painter.cc
@@ -37,6 +51,7 @@ add_executable(unittest_libmaelir
 
 target_link_libraries(unittest_libmaelir
     base_thread
+    clock_handler
     doctest::doctest
     job_pool_thread
     lamp_state_machine_base

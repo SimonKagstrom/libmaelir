@@ -1,6 +1,6 @@
-#include "messages.hh"
 #include "post_office.hh"
 #include "thread_fixture.hh"
+#include "unittest_messages.hh"
 
 namespace
 {
@@ -21,13 +21,13 @@ template <typename... Messages>
 class ReceiverThread
 {
 public:
-    ReceiverThread(PostOffice<MSG::AllMessages>& post_office)
+    ReceiverThread(PostOffice<MSG::UnittestMessages>& post_office)
     {
         m_mailbox = post_office.Subscribe<Messages...>(notifier);
     }
 
     MockEventNotifier notifier;
-    std::unique_ptr<Mailbox<MSG::AllMessages>> m_mailbox;
+    std::unique_ptr<Mailbox<MSG::UnittestMessages>> m_mailbox;
 };
 
 class Fixture : public ThreadFixture
@@ -36,7 +36,7 @@ public:
     MAKE_MOCK0(Samsa, void());
     MAKE_MOCK2(Gregor, void(std::string number, std::string name));
 
-    void Collect(Mailbox<MSG::AllMessages>& mailbox)
+    void Collect(Mailbox<MSG::UnittestMessages>& mailbox)
     {
         mailbox.Collect()
             .On<MSG::samsa>([this]() { Samsa(); })
@@ -45,7 +45,7 @@ public:
             });
     }
 
-    PostOffice<MSG::AllMessages> post_office;
+    PostOffice<MSG::UnittestMessages> post_office;
 };
 
 } // namespace

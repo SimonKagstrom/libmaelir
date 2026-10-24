@@ -21,3 +21,11 @@ parameters:
   ota_update_active:
     type: bool
     default: false
+
+  # Seconds since the epoch
+  clock:
+    type: uint32_t
+
+  # Timezone offset from UTC in minutes
+  timezone:
+    type: int16_t

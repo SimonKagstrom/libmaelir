@@ -3,3 +3,5 @@ application_state:
   wifi_connected: false
   bluetooth_connected: false
   ota_update_active: false
+  clock: 0
+  timezone: 0
