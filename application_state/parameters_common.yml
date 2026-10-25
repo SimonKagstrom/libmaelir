@@ -1,5 +1,6 @@
 # This is the list of all possible parameters (common)
 cpp_includes:
+  - "brightness_mode.hh"
   - "gps_data.hh"
 
 parameters:
@@ -29,3 +30,7 @@ parameters:
   # Timezone offset from UTC in minutes
   timezone:
     type: int16_t
+
+  # The display brightness, see BrightnessController
+  brightness_mode:
+    type: enum BrightnessMode

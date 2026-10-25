@@ -38,6 +38,7 @@ generate_state_machine(lamp_state_machine_base lamp_state_machine.md)
 
 add_executable(unittest_libmaelir
     main.cc
+    test_brightness_controller.cc
     test_clock_handler.cc
     test_nmea_parser.cc
     test_opportunistic_scheduler.cc
@@ -51,6 +52,7 @@ add_executable(unittest_libmaelir
 
 target_link_libraries(unittest_libmaelir
     base_thread
+    brightness_controller
     clock_handler
     doctest::doctest
     job_pool_thread

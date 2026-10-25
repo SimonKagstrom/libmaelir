@@ -1,5 +1,6 @@
 add_subdirectory(application_state)
 add_subdirectory(base_thread)
+add_subdirectory(brightness_controller)
 add_subdirectory(bresenham)
 add_subdirectory(button_debouncer)
 add_subdirectory(clock_handler)
