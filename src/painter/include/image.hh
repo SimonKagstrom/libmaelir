@@ -62,11 +62,8 @@ public:
                     size_t width,
                     size_t height,
                     unsigned pixel_size)
-        : Image(std::span<const uint8_t>({data.get(), width * height * pixel_size}),
-                width,
-                height,
-                pixel_size != 2)
-        , m_data(std::move(data))
+        : StandaloneImage(
+              Data(data.release(), [](uint8_t* p) { delete[] p; }), width, height, pixel_size)
     {
     }
 
@@ -76,7 +73,19 @@ public:
     }
 
 protected:
-    static std::unique_ptr<uint8_t[]> AllocAlignedData(size_t size, unsigned alignment)
+    // Allocated either with new[] or posix_memalign, which must be freed differently
+    using Data = std::unique_ptr<uint8_t[], void (*)(uint8_t*)>;
+
+    StandaloneImage(Data data, size_t width, size_t height, unsigned pixel_size)
+        : Image(std::span<const uint8_t>({data.get(), width * height * pixel_size}),
+                width,
+                height,
+                pixel_size != 2)
+        , m_data(std::move(data))
+    {
+    }
+
+    static Data AllocAlignedData(size_t size, unsigned alignment)
     {
         // Ensure the data is 4-byte aligned for ARGB8888 format
         void* ptr = nullptr;
@@ -84,10 +93,10 @@ protected:
         {
             assert(false && "Failed to allocate aligned memory");
         }
-        return std::unique_ptr<uint8_t[]>(reinterpret_cast<uint8_t*>(ptr));
+        return Data(reinterpret_cast<uint8_t*>(ptr), [](uint8_t* p) { free(p); });
     }
 
-    std::unique_ptr<uint8_t[]> m_data;
+    Data m_data;
 };
 
 
