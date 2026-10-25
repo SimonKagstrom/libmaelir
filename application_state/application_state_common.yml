@@ -2,6 +2,8 @@ application_state:
   demo_mode: false
   wifi_connected: false
   bluetooth_connected: false
+  gps_status: GpsStatus::kSilent
+  position: {}
   ota_update_active: false
   clock: 0
   timezone: 0
