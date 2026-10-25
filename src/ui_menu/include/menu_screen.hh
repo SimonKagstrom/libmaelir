@@ -37,15 +37,20 @@ public:
                              bool default_value,
                              const std::function<void(bool)>& on_click);
 
+        // on_change is called when scrolling through the values, before selecting one
         void AddRollerEntry(const char* text,
                             std::span<const std::string_view> values,
                             std::string_view default_value,
-                            const std::function<void(int which)>& on_click);
+                            const std::function<void(int which)>& on_click,
+                            const std::function<void(int which)>& on_change = {});
 
         void AddNumericEntry(const char* text,
                              NumericEntryConfig config,
                              int default_value,
                              const std::function<void(int value)>& on_click);
+
+        // A centered image, not selectable. Returns the lv_image, to e.g. change the source
+        lv_obj_t* AddImage(const lv_image_dsc_t* image);
 
         Page(MenuScreen& parent, lv_obj_t* page, std::string_view title);
 

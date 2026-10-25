@@ -3,6 +3,7 @@
 #include "hal/i_display.hh"
 
 #include <algorithm>
+#include <memory>
 
 namespace
 {
@@ -273,8 +274,9 @@ MenuScreen::Page::AddSubPage(const char* text)
     lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
     lv_obj_set_flex_grow(label, 1);
 
-    LvEventListener::Create(
-        cont, LV_EVENT_FOCUSED, [cont](lv_event_t*) { lv_obj_scroll_to_view_recursive(cont, LV_ANIM_OFF); });
+    LvEventListener::Create(cont, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
+        lv_obj_scroll_to_view_recursive(cont, LV_ANIM_OFF);
+    });
     LvEventListener::Create(
         cont, LV_EVENT_CLICKED, [this, page, title = std::string(text), cont](lv_event_t*) {
             m_parent.EnterPage(page, title, cont);
@@ -294,8 +296,9 @@ MenuScreen::Page::AddEntry(const std::string& text, const std::function<void()>&
     lv_group_add_obj(m_parent.m_input_group, cont);
     lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
     lv_obj_set_flex_grow(label, 1);
-    LvEventListener::Create(
-        cont, LV_EVENT_FOCUSED, [cont](lv_event_t*) { lv_obj_scroll_to_view_recursive(cont, LV_ANIM_OFF); });
+    LvEventListener::Create(cont, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
+        lv_obj_scroll_to_view_recursive(cont, LV_ANIM_OFF);
+    });
 
     LvEventListener::Create(cont, LV_EVENT_CLICKED, [on_click](lv_event_t*) { on_click(); });
 }
@@ -339,7 +342,8 @@ void
 MenuScreen::Page::AddRollerEntry(const char* text,
                                  std::span<const std::string_view> values,
                                  std::string_view default_value,
-                                 const std::function<void(int which)>& on_click)
+                                 const std::function<void(int which)>& on_click,
+                                 const std::function<void(int which)>& on_change)
 {
     auto cont = CreateRow();
     auto label = lv_label_create(cont);
@@ -394,6 +398,43 @@ MenuScreen::Page::AddRollerEntry(const char* text,
 
         on_click(selected);
     });
+
+    if (on_change)
+    {
+        // The roller doesn't send VALUE_CHANGED while scrolling, and silently reverts to the
+        // original value when leaving it without selecting. So check after each of these
+        auto last = std::make_shared<int>(selected_index);
+        for (auto event : {LV_EVENT_KEY,
+                           LV_EVENT_ROTARY,
+                           LV_EVENT_FOCUSED,
+                           LV_EVENT_DEFOCUSED,
+                           LV_EVENT_VALUE_CHANGED})
+        {
+            LvEventListener::Create(roller, event, [on_change, last](lv_event_t* e) {
+                auto roller = static_cast<lv_obj_t*>(lv_event_get_target(e));
+                auto selected = static_cast<int>(lv_roller_get_selected(roller));
+
+                if (selected != *last)
+                {
+                    *last = selected;
+                    on_change(selected);
+                }
+            });
+        }
+    }
+}
+
+
+lv_obj_t*
+MenuScreen::Page::AddImage(const lv_image_dsc_t* image)
+{
+    auto cont = CreateRow();
+    lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    auto obj = lv_image_create(cont);
+    lv_image_set_src(obj, image);
+
+    return obj;
 }
 
 
