@@ -18,7 +18,9 @@ public:
 
     bool FileExists(std::string_view path) const;
 
-    void Move(std::string_view from, std::string_view to) const;
+    // Move a file or a directory. The parent directory of to is created if needed. Fails if to
+    // exists
+    bool Move(std::string_view from, std::string_view to) const;
 
 private:
     std::string m_root_path;

@@ -75,12 +75,28 @@ Filesystem::FileExists(std::string_view path) const
     return fs::exists(full_path);// && !fs::is_directory(full_path);
 }
 
-void
+bool
 Filesystem::Move(std::string_view from, std::string_view to) const
 {
     fs::path full_from = fs::path(m_root_path) / fs::path(from);
     fs::path full_to = fs::path(m_root_path) / fs::path(to);
 
     std::error_code ec;
+    if (!fs::exists(full_from, ec) || fs::exists(full_to, ec))
+    {
+        return false;
+    }
+
+    if (full_to.has_parent_path())
+    {
+        fs::create_directories(full_to.parent_path(), ec);
+        if (ec)
+        {
+            return false;
+        }
+    }
+
     fs::rename(full_from, full_to, ec);
+
+    return !ec;
 }
