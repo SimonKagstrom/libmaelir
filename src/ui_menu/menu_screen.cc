@@ -200,6 +200,26 @@ MenuScreen::Back()
 }
 
 void
+MenuScreen::ForgetPage(lv_obj_t* page)
+{
+    auto it = std::ranges::find(m_page_stack, page, &VisiblePage::page);
+    if (it == m_page_stack.end())
+    {
+        return;
+    }
+
+    // Also the pages entered from it. The openers are deleted too, so focus the back button
+    m_page_stack.erase(it, m_page_stack.end());
+    ShowPage(m_page_stack.back(), m_back_button);
+}
+
+bool
+MenuScreen::IsShown(lv_obj_t* page) const
+{
+    return m_page_stack.back().page == page;
+}
+
+void
 MenuScreen::ShowPage(const VisiblePage& visible_page, lv_obj_t* focus)
 {
     for (const auto& page : m_page_stack)
@@ -258,8 +278,44 @@ MenuScreen::Page::CreateRow()
     return row;
 }
 
+void
+MenuScreen::Page::AddToInputGroup(lv_obj_t* obj)
+{
+    lv_group_add_obj(m_parent.m_input_group, obj);
+
+    // Not if the user has left the page since it was cleared
+    if (m_focus_next_added && m_parent.IsShown(m_page))
+    {
+        lv_group_focus_obj(obj);
+    }
+    m_focus_next_added = false;
+}
+
+void
+MenuScreen::Page::Clear()
+{
+    // The sub pages are siblings of this page (in the content area), so delete them explicitly
+    for (auto& sub_page : m_sub_pages)
+    {
+        sub_page->Clear();
+        m_parent.ForgetPage(sub_page->m_page);
+        lv_obj_delete(sub_page->m_page);
+    }
+    m_sub_pages.clear();
+
+    const auto shown = m_parent.IsShown(m_page);
+    if (shown)
+    {
+        // Before the focused entry is deleted, so that focus doesn't move to another page
+        lv_group_focus_obj(m_parent.m_back_button);
+    }
+    lv_obj_clean(m_page);
+
+    m_focus_next_added = shown;
+}
+
 MenuScreen::Page&
-MenuScreen::Page::AddSubPage(const char* text)
+MenuScreen::Page::AddSubPage(const char* text, const std::function<void()>& on_enter)
 {
     auto cont = CreateRow();
     auto label = lv_label_create(cont);
@@ -270,7 +326,7 @@ MenuScreen::Page::AddSubPage(const char* text)
 
     lv_label_set_text(label, text);
     lv_label_set_text(next_indicator, LV_SYMBOL_RIGHT);
-    lv_group_add_obj(m_parent.m_input_group, cont);
+    AddToInputGroup(cont);
     lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
     lv_obj_set_flex_grow(label, 1);
 
@@ -278,7 +334,11 @@ MenuScreen::Page::AddSubPage(const char* text)
         lv_obj_scroll_to_view_recursive(cont, LV_ANIM_OFF);
     });
     LvEventListener::Create(
-        cont, LV_EVENT_CLICKED, [this, page, title = std::string(text), cont](lv_event_t*) {
+        cont,
+        LV_EVENT_CLICKED,
+        [this, page, title = std::string(text), cont, on_enter](lv_event_t*) {
+            // E.g., to fill the page with fresh content
+            on_enter();
             m_parent.EnterPage(page, title, cont);
         });
 
@@ -293,7 +353,7 @@ MenuScreen::Page::AddEntry(const std::string& text, const std::function<void()>&
     auto label = lv_label_create(cont);
 
     lv_label_set_text(label, text.c_str());
-    lv_group_add_obj(m_parent.m_input_group, cont);
+    AddToInputGroup(cont);
     lv_obj_add_style(cont, &m_parent.m_style_selected, LV_STATE_FOCUSED);
     lv_obj_set_flex_grow(label, 1);
     LvEventListener::Create(cont, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
@@ -325,7 +385,7 @@ MenuScreen::Page::AddBooleanEntry(const char* text,
     lv_obj_set_style_bg_color(
         boolean_switch, selected_switch_color, (int)LV_PART_INDICATOR | (int)LV_STATE_CHECKED);
 
-    lv_group_add_obj(m_parent.m_input_group, boolean_switch);
+    AddToInputGroup(boolean_switch);
 
     LvEventListener::Create(boolean_switch, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
         lv_obj_scroll_to_view_recursive(cont, LV_ANIM_OFF);
@@ -378,7 +438,7 @@ MenuScreen::Page::AddRollerEntry(const char* text,
     lv_roller_set_selected(roller, selected_index, LV_ANIM_OFF);
     lv_roller_set_visible_row_count(roller, 1);
 
-    lv_group_add_obj(m_parent.m_input_group, roller);
+    AddToInputGroup(roller);
 
     // Keep the row highlighted while the roller is focused/edited.
     LvEventListener::Create(roller, LV_EVENT_FOCUSED, [cont](lv_event_t*) {
@@ -480,7 +540,7 @@ MenuScreen::Page::AddNumericEntry(const char* text,
     lv_roller_set_selected(roller, selected_index, LV_ANIM_OFF);
     lv_roller_set_visible_row_count(roller, 1);
 
-    lv_group_add_obj(m_parent.m_input_group, roller);
+    AddToInputGroup(roller);
 
     // Keep the row highlighted while the roller is focused/edited.
 

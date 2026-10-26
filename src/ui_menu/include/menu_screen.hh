@@ -26,7 +26,15 @@ public:
         Page& operator=(const Page&) = delete;
         Page(Page&&) = default;
 
-        Page& AddSubPage(const char* text);
+        // on_enter is called when the sub page is entered, before focusing its first entry
+        Page& AddSubPage(
+            const char* text, const std::function<void()>& on_enter = []() { /* NOP */ });
+
+        // Remove all entries and sub pages, e.g., to fill the page again with new content. If
+        // the page is shown, the next added entry is focused. References to the sub pages are
+        // invalid afterwards. Not from an event callback of an entry on this page, since the
+        // entry is deleted
+        void Clear();
 
 
         void AddEntry(const std::string& text, const std::function<void()>& on_click);
@@ -58,9 +66,15 @@ public:
         // A row (description to the left, controls to the right)
         lv_obj_t* CreateRow();
 
+        // Add a selectable object to the input group
+        void AddToInputGroup(lv_obj_t* obj);
+
         MenuScreen& m_parent;
         lv_obj_t* m_page;
         std::string m_title;
+
+        // Cleared while shown, so focus the next added entry
+        bool m_focus_next_added {false};
 
         std::vector<std::unique_ptr<Page>> m_sub_pages;
     };
@@ -91,6 +105,9 @@ private:
     void EnterPage(lv_obj_t* page, std::string_view title, lv_obj_t* opener);
     // Back to the previous page, or close the menu from the main page
     void Back();
+    // The page is about to be deleted, so go back to the page before it if it's entered
+    void ForgetPage(lv_obj_t* page);
+    bool IsShown(lv_obj_t* page) const;
     void ShowPage(const VisiblePage& visible_page, lv_obj_t* focus);
 
     os::TimerManager& m_timer_manager;
