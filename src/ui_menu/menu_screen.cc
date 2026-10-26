@@ -234,8 +234,28 @@ MenuScreen::ShowPage(const VisiblePage& visible_page, lv_obj_t* focus)
 }
 
 void
+MenuScreen::SetExitTimerEnabled(bool enabled)
+{
+    m_exit_timer_enabled = enabled;
+    if (enabled)
+    {
+        BumpExitTimer();
+    }
+    else
+    {
+        // Releasing the handle cancels the timer
+        m_exit_timer = nullptr;
+    }
+}
+
+void
 MenuScreen::BumpExitTimer()
 {
+    if (!m_exit_timer_enabled)
+    {
+        return;
+    }
+
     m_exit_timer = m_timer_manager.StartTimer(10s, [this]() {
         m_on_close();
         return std::nullopt;

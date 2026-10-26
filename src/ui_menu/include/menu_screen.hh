@@ -92,6 +92,9 @@ public:
     void BumpExitTimer();
     void ExitMenu();
 
+    // E.g., while entering text, which has its own timeout. Restarted when enabled again
+    void SetExitTimerEnabled(bool enabled);
+
 private:
     // A page entered from another page (the opener), or the main page
     struct VisiblePage
@@ -131,5 +134,6 @@ private:
     std::vector<VisiblePage> m_page_stack;
 
     os::TimerHandle m_exit_timer;
+    bool m_exit_timer_enabled {true};
     std::unique_ptr<Page> m_main_page;
 };
