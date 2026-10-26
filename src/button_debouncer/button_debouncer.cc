@@ -4,6 +4,8 @@
 constexpr uint8_t kPressed = 0b11111111;
 constexpr uint8_t kReleased = 0b00000000;
 constexpr uint8_t kMaskBits = 0b11000111;
+// A press/release needs 3 stable samples, i.e., 15ms
+constexpr auto kSampleInterval = 5ms;
 
 namespace
 {
@@ -60,9 +62,9 @@ ButtonDebouncer::Button::ScanButton()
         return;
     }
 
-    m_timer = m_parent.StartTimer(1ms, [this]() {
+    m_timer = m_parent.StartTimer(kSampleInterval, [this]() {
         m_interrupt = false;
-        std::optional<milliseconds> out = 1ms;
+        std::optional<milliseconds> out = kSampleInterval;
 
         m_button_history <<= 1;
         m_button_history |= static_cast<int>(m_button_gpio->GetState());
