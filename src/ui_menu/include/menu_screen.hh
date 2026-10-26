@@ -37,7 +37,8 @@ public:
         void Clear();
 
 
-        void AddEntry(const std::string& text, const std::function<void()>& on_click);
+        // Returns the row, e.g., to add more labels (the text label is the first child)
+        lv_obj_t* AddEntry(const std::string& text, const std::function<void()>& on_click);
 
         void AddSeparator();
 

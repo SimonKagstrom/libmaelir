@@ -346,7 +346,7 @@ MenuScreen::Page::AddSubPage(const char* text, const std::function<void()>& on_e
     return *m_sub_pages.back();
 }
 
-void
+lv_obj_t*
 MenuScreen::Page::AddEntry(const std::string& text, const std::function<void()>& on_click)
 {
     auto cont = CreateRow();
@@ -361,6 +361,8 @@ MenuScreen::Page::AddEntry(const std::string& text, const std::function<void()>&
     });
 
     LvEventListener::Create(cont, LV_EVENT_CLICKED, [on_click](lv_event_t*) { on_click(); });
+
+    return cont;
 }
 
 void
