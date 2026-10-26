@@ -1,13 +1,14 @@
 #include "nvm_host.hh"
 
+#include <charconv>
 #include <fstream>
 #include <iostream>
-#include <sstream>
 
 NvmHost::NvmHost(std::string_view file_name)
     : m_file_name(file_name)
 {
-    // Read the file (key : value pairs) and populate m_storage_cache
+    // Read the file (key:value lines). The format doesn't say which values are strings, so
+    // values with only digits are numbers, and the rest (also empty ones) strings
     std::ifstream file(m_file_name);
     if (file.is_open())
     {
@@ -15,13 +16,24 @@ NvmHost::NvmHost(std::string_view file_name)
 
         while (std::getline(file, line))
         {
-            std::istringstream iss(line);
-            std::string key;
-            uint32_t value;
-
-            if (std::getline(iss, key, ':') && iss >> value)
+            auto separator = line.find(':');
+            if (separator == std::string::npos)
             {
-                m_storage_cache[key] = value;
+                continue;
+            }
+
+            auto key = line.substr(0, separator);
+            auto value = std::string_view(line).substr(separator + 1);
+
+            uint32_t number = 0;
+            auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), number);
+            if (!value.empty() && error == std::errc() && end == value.data() + value.size())
+            {
+                m_storage_cache[key] = number;
+            }
+            else
+            {
+                m_storage_cache_string[key] = std::string(value);
             }
         }
 
@@ -53,12 +65,14 @@ void
 NvmHost::EraseAll()
 {
     m_storage_cache.clear();
+    m_storage_cache_string.clear();
 }
 
 void
 NvmHost::EraseKey(const char* key)
 {
     m_storage_cache.erase(key);
+    m_storage_cache_string.erase(key);
 }
 
 
