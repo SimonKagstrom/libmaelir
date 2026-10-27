@@ -1,353 +1,504 @@
 // https://aprs.gids.nl/nmea
 #include "nmea_parser.hh"
 
+#include <cmath>
+#include <etl/vector.h>
 #include <ranges>
 
 namespace
 {
 
-std::optional<float>
-ToDegrees(auto word)
+// Everything which can be part of the data between $ and *
+bool
+IsSentenceCharacter(char c)
 {
-    if (word.empty())
+    return c >= ' ' && c <= '~' && c != '$' && c != '*';
+}
+
+bool
+IsEndOfLine(char c)
+{
+    return c == '\r' || c == '\n';
+}
+
+std::optional<uint8_t>
+HexValue(char c)
+{
+    if (c >= '0' && c <= '9')
+    {
+        return c - '0';
+    }
+    if (c >= 'A' && c <= 'F')
+    {
+        return c - 'A' + 10;
+    }
+    if (c >= 'a' && c <= 'f')
+    {
+        return c - 'a' + 10;
+    }
+
+    return std::nullopt;
+}
+
+uint8_t
+CalculateChecksum(std::string_view sentence)
+{
+    uint8_t checksum = 0;
+    for (auto c : sentence)
+    {
+        checksum ^= static_cast<uint8_t>(c);
+    }
+
+    return checksum;
+}
+
+// An unsigned decimal number, e.g., "4807.038". strtod would also accept, e.g., " 1e3",
+// "0x10" and "inf", and is locale dependent
+std::optional<double>
+ParseNumber(std::string_view word)
+{
+    auto value = 0.0;
+    auto scale = 1.0;
+    auto seen_digit = false;
+    auto seen_dot = false;
+
+    for (auto c : word)
+    {
+        if (c >= '0' && c <= '9')
+        {
+            seen_digit = true;
+            if (seen_dot)
+            {
+                scale /= 10;
+                value += (c - '0') * scale;
+            }
+            else
+            {
+                value = value * 10 + (c - '0');
+            }
+        }
+        else if (c == '.' && !seen_dot)
+        {
+            seen_dot = true;
+        }
+        else
+        {
+            return std::nullopt;
+        }
+    }
+
+    if (!seen_digit)
     {
         return std::nullopt;
     }
 
-    char* end = nullptr;
-    auto nmea = std::strtof(word.data(), &end);
-    if (end == nullptr)
+    return value;
+}
+
+// (d)ddmm.mmmm and a hemisphere, e.g., "4807.038", "N" -> 48.1173
+std::optional<float>
+ParseCoordinate(std::string_view value,
+                std::string_view hemisphere,
+                std::string_view positive,
+                std::string_view negative)
+{
+    auto nmea = ParseNumber(value);
+    if (!nmea)
     {
         return std::nullopt;
     }
 
-    int deg = static_cast<int>(nmea) / 100;
-    float min = nmea - (deg * 100);
-    nmea = deg + min / 60.0f;
+    auto degrees = std::floor(*nmea / 100);
+    auto minutes = *nmea - degrees * 100;
+    if (minutes >= 60)
+    {
+        return std::nullopt;
+    }
 
-    return nmea;
+    auto coordinate = static_cast<float>(degrees + minutes / 60);
+    if (hemisphere == positive)
+    {
+        return coordinate;
+    }
+    if (hemisphere == negative)
+    {
+        return -coordinate;
+    }
+
+    return std::nullopt;
+}
+
+std::optional<GpsPosition>
+ParsePosition(std::string_view latitude,
+              std::string_view latitude_hemisphere,
+              std::string_view longitude,
+              std::string_view longitude_hemisphere)
+{
+    auto lat = ParseCoordinate(latitude, latitude_hemisphere, "N", "S");
+    auto lon = ParseCoordinate(longitude, longitude_hemisphere, "E", "W");
+
+    if (lat && lon)
+    {
+        return GpsPosition {*lat, *lon};
+    }
+
+    return std::nullopt;
+}
+
+std::optional<float>
+ParseFloat(std::string_view word)
+{
+    if (auto value = ParseNumber(word))
+    {
+        return static_cast<float>(*value);
+    }
+
+    return std::nullopt;
 }
 
 } // namespace
+
+class NmeaParser::Fields
+{
+public:
+    explicit Fields(std::string_view sentence)
+    {
+        for (const auto sub_range : std::views::split(sentence, ','))
+        {
+            if (m_fields.full())
+            {
+                // Only the first fields are used
+                break;
+            }
+            m_fields.emplace_back(sub_range.begin(), sub_range.end());
+        }
+    }
+
+    // Missing fields are empty
+    std::string_view operator[](size_t index) const
+    {
+        return index < m_fields.size() ? m_fields[index] : std::string_view {};
+    }
+
+private:
+    etl::vector<std::string_view, 16> m_fields;
+};
+
 
 std::optional<hal::RawGpsData>
 NmeaParser::PushData(std::string_view data)
 {
     for (auto c : data)
     {
-        RunStateMachine(c);
+        m_next_char = c;
+        RunStateMachine();
     }
 
-    if (!m_pending_data.empty())
-    {
-        auto d = m_pending_data.back();
-        m_pending_data.clear();
-
-        return d;
-    }
-    return std::nullopt;
+    return std::exchange(m_pending_data, std::nullopt);
 }
 
-
-void
-NmeaParser::RunStateMachine(char c)
+std::optional<char>
+NmeaParser::PeekChar() const
 {
-    auto before = m_state;
+    return m_next_char;
+}
 
-    do
+char
+NmeaParser::ConsumeChar()
+{
+    // Only called when leaving a state, i.e., after a successful PeekChar()
+    debug_assert(m_next_char);
+
+    auto c = *m_next_char;
+    m_next_char = std::nullopt;
+
+    if (c == '$')
     {
-        before = m_state;
-        switch (m_state)
-        {
-        case State::kWaitForDollar:
-            m_current_line.clear();
+        // Starts a new sentence, from all states
+        m_sentence.clear();
+    }
 
-            if (c == '$')
-            {
-                m_state = State::kWaitForNewLine;
-                break;
-            }
-            break;
-        case State::kWaitForNewLine:
-            if (m_current_line.full())
-            {
-                m_state = State::kWaitForDollar;
-                break;
-            }
+    return c;
+}
 
-            m_current_line.push_back(c);
+std::string_view
+NmeaParser::SentenceView() const
+{
+    return std::string_view(m_sentence.data(), m_sentence.size());
+}
 
-            if (c == '\n')
-            {
-                m_state = State::kParseLine;
-                break;
-            }
-            break;
-        case State::kParseLine:
-            ParseLine(std::string_view(m_current_line.data(), m_current_line.size()));
-            m_state = State::kWaitForDollar;
-            break;
+NmeaParser::WaitForDollar::Next
+NmeaParser::Evaluate(WaitForDollar&)
+{
+    auto c = PeekChar();
+    if (!c)
+    {
+        return kStay;
+    }
+    if (*c == '$')
+    {
+        return State::kSentence;
+    }
 
-        case State::kValueCount:
-            break;
-        }
-    } while (before != m_state);
+    return State::kWaitForDollar;
 }
 
 void
-NmeaParser::ParseLine(std::string_view line)
+NmeaParser::Exit(WaitForDollar&)
 {
-    if (line.starts_with("$GPGGA,"))
+    ConsumeChar();
+}
+
+NmeaParser::Sentence::Next
+NmeaParser::Evaluate(Sentence&)
+{
+    auto c = PeekChar();
+    if (!c)
     {
-        // $GPGGA,174558.00,5917.60788,N,01757.40192,E,1,08,1.08,48.3,M,24.6,M,,*69
-        ParseGppgaData(line.substr(7));
+        return kStay;
     }
-    else if (line.starts_with("$GPVTG,"))
+    if (*c == '$')
     {
-        // $GPVTG,360.0,T,348.7,M,000.0,N,000.0,K*43
-        ParseGpvtgData(line.substr(7));
+        return State::kSentence;
     }
-    else if (line.starts_with("$GNRMC,"))
+    if (*c == '*')
     {
-        // $GNRMC,072446.00,A,3130.5226316,N,12024.0937010,E,0.01,0.00,040620,0.0,E,D*3D
-        ParseGnrmcData(line.substr(7));
+        return State::kChecksum0;
     }
-    // i2c one, but the same info can be found with GNRMC.
-    // $GNGGA,072446.00,3130.5226316,N,12024.0937010,E,4,27,0.5,31.924,M,0.000,M,2.0,*44
+    if (!IsSentenceCharacter(*c) || m_sentence.full())
+    {
+        return State::kWaitForDollar;
+    }
+
+    return State::kSentence;
 }
 
 void
-NmeaParser::ParseGnggaData(std::string_view line)
+NmeaParser::Exit(Sentence&)
 {
-    auto index = 0;
-    std::optional<float> latitude;
-    std::optional<float> longitude;
+    auto c = ConsumeChar();
 
-    // time      latitude  N/S longitude E/W fix status satelites hdop altitude M height M time difftime checksum
-    // 072446.00,3130.5226316,N,12024.0937010,E,4,27,0.5,31.924,M,0.000,M,2.0,*44
-    [[maybe_unused]] constexpr auto kTimeIndex = 0;
-    constexpr auto kLatitudeIndex = 1;
-    constexpr auto kLatitudeDirectionIndex = 2;
-    constexpr auto kLongitudeIndex = 3;
-    constexpr auto kLongitudeDirectionIndex = 4;
-    constexpr auto kFixIndex = 5;
-
-    auto valid = false;
-    for (const auto sub_range : std::views::split(line, ','))
+    if (IsSentenceCharacter(c) && !m_sentence.full())
     {
-        const auto word = std::string_view(sub_range.begin(), sub_range.end());
+        m_sentence.push_back(c);
+    }
+}
 
-        switch (index)
-        {
-        case kLatitudeIndex:
-            latitude = ToDegrees(word);
-            break;
-        case kLatitudeDirectionIndex:
-            if (word == "S")
-            {
-                latitude = -latitude.value();
-            }
-            break;
-        case kLongitudeIndex:
-            longitude = ToDegrees(word);
-            break;
-        case kLongitudeDirectionIndex:
-            if (word == "W")
-            {
-                longitude = -longitude.value();
-            }
-            break;
-        case kFixIndex:
-            valid = word != "0";
-            break;
-        default:
-            break;
-        }
-
-        index++;
+NmeaParser::Checksum0::Next
+NmeaParser::Evaluate(Checksum0&)
+{
+    auto c = PeekChar();
+    if (!c)
+    {
+        return kStay;
+    }
+    if (HexValue(*c))
+    {
+        return State::kChecksum1;
+    }
+    if (*c == '$')
+    {
+        return State::kSentence;
     }
 
-    if (valid && latitude && longitude)
-    {
-        hal::RawGpsData cur;
+    return State::kWaitForDollar;
+}
 
-        cur.position = {latitude.value(), longitude.value()};
-        m_pending_data.push_back(cur);
+void
+NmeaParser::Exit(Checksum0&)
+{
+    m_checksum = HexValue(ConsumeChar()).value_or(0) << 4;
+}
+
+NmeaParser::Checksum1::Next
+NmeaParser::Evaluate(Checksum1&)
+{
+    auto c = PeekChar();
+    if (!c)
+    {
+        return kStay;
+    }
+    if (HexValue(*c))
+    {
+        return State::kEndOfLine;
+    }
+    if (*c == '$')
+    {
+        return State::kSentence;
+    }
+
+    return State::kWaitForDollar;
+}
+
+void
+NmeaParser::Exit(Checksum1&)
+{
+    m_checksum |= HexValue(ConsumeChar()).value_or(0);
+}
+
+NmeaParser::EndOfLine::Next
+NmeaParser::Evaluate(EndOfLine&)
+{
+    auto c = PeekChar();
+    if (!c)
+    {
+        return kStay;
+    }
+    if (IsEndOfLine(*c) && CalculateChecksum(SentenceView()) == m_checksum)
+    {
+        return State::kComplete;
+    }
+    if (*c == '$')
+    {
+        return State::kSentence;
+    }
+
+    return State::kWaitForDollar;
+}
+
+void
+NmeaParser::Exit(EndOfLine&)
+{
+    ConsumeChar();
+}
+
+void
+NmeaParser::Enter(Complete&)
+{
+    ParseSentence(SentenceView());
+}
+
+NmeaParser::Complete::Next
+NmeaParser::Evaluate(Complete&)
+{
+    return State::kWaitForDollar;
+}
+
+void
+NmeaParser::ParseSentence(std::string_view sentence)
+{
+    auto fields = Fields(sentence);
+
+    // Talker ID (GP, GN, GL, ...) + sentence type
+    auto address = fields[0];
+    if (address.size() != 5)
+    {
+        // E.g., proprietary $PMTK...
+        return;
+    }
+
+    auto type = address.substr(2);
+    if (type == "GGA")
+    {
+        ParseGga(fields);
+    }
+    else if (type == "RMC")
+    {
+        ParseRmc(fields);
+    }
+    else if (type == "VTG")
+    {
+        ParseVtg(fields);
     }
 }
 
 void
-NmeaParser::ParseGnrmcData(std::string_view line)
+NmeaParser::ParseGga(const Fields& fields)
 {
-    auto index = 0;
-    std::optional<float> latitude;
-    std::optional<float> longitude;
-    std::optional<float> speed;
-    std::optional<float> heading;
-
-    // time      status latitude  N/S longitude E/W speed course date magnetic variation checksum
-    // 072446.00,A,3130.5226316,N,12024.0937010,E,0.01,0.00,040620,0.0,E,D*3D
-    [[maybe_unused]] constexpr auto kTimeIndex = 0;
-    constexpr auto kStatusIndex = 1;
+    // GPGGA,time,lat,N/S,lon,E/W,fix quality,satellites,hdop,altitude,M,height,M,dgps age,dgps id
+    // GPGGA,174558.00,5917.60788,N,01757.40192,E,1,08,1.08,48.3,M,24.6,M,,
     constexpr auto kLatitudeIndex = 2;
-    constexpr auto kLatitudeDirectionIndex = 3;
+    constexpr auto kLatitudeHemisphereIndex = 3;
     constexpr auto kLongitudeIndex = 4;
-    constexpr auto kLongitudeDirectionIndex = 5;
-    constexpr auto kSpeedIndex = 6;
-    constexpr auto kHeadingIndex = 7;
+    constexpr auto kLongitudeHemisphereIndex = 5;
+    constexpr auto kFixQualityIndex = 6;
 
-    auto valid = false;
-    for (const auto sub_range : std::views::split(line, ','))
+    // 0: invalid, 1: GPS, 2: DGPS, 3: PPS, 4: RTK, 5: float RTK, 6: estimated, 7: manual,
+    // 8: simulation
+    auto fix = fields[kFixQualityIndex];
+    if (fix.size() != 1 || fix[0] < '1' || fix[0] > '5')
     {
-        const auto word = std::string_view(sub_range.begin(), sub_range.end());
-
-        switch (index)
-        {
-        case kLatitudeIndex:
-            latitude = ToDegrees(word);
-            break;
-        case kLatitudeDirectionIndex:
-            if (word == "S")
-            {
-                latitude = -latitude.value();
-            }
-            break;
-        case kLongitudeIndex:
-            longitude = ToDegrees(word);
-            break;
-        case kLongitudeDirectionIndex:
-            if (word == "W")
-            {
-                longitude = -longitude.value();
-            }
-            break;
-        case kStatusIndex:
-            valid = word == "A";
-            break;
-        case kSpeedIndex:
-            speed = std::strtof(word.data(), nullptr);
-            break;
-        case kHeadingIndex:
-            heading = std::strtof(word.data(), nullptr);
-            break;
-        default:
-            break;
-        }
-
-        index++;
+        return;
     }
 
-    if (valid && latitude && longitude && speed && heading)
-    {
-        hal::RawGpsData cur;
-
-        cur.position = {latitude.value(), longitude.value()};
-        cur.speed = speed.value();
-        cur.heading = heading.value();
-
-        m_pending_data.push_back(cur);
-    }
+    Merge({
+        .position = ParsePosition(fields[kLatitudeIndex],
+                                  fields[kLatitudeHemisphereIndex],
+                                  fields[kLongitudeIndex],
+                                  fields[kLongitudeHemisphereIndex]),
+    });
 }
 
 void
-NmeaParser::ParseGppgaData(std::string_view line)
+NmeaParser::ParseRmc(const Fields& fields)
 {
-    auto index = 0;
-    std::optional<float> latitude;
-    std::optional<float> longitude;
+    // GPRMC,time,status,lat,N/S,lon,E/W,speed (knots),course,date,variation,E/W,mode
+    // GNRMC,072446.00,A,3130.5226316,N,12024.0937010,E,0.01,0.00,040620,0.0,E,D
+    constexpr auto kStatusIndex = 2;
+    constexpr auto kLatitudeIndex = 3;
+    constexpr auto kLatitudeHemisphereIndex = 4;
+    constexpr auto kLongitudeIndex = 5;
+    constexpr auto kLongitudeHemisphereIndex = 6;
+    constexpr auto kSpeedIndex = 7;
+    constexpr auto kCourseIndex = 8;
+    // NMEA 2.3 and later
+    constexpr auto kModeIndex = 12;
 
-    // time      latitude  N/S longitude E/W fix sat hdop altitude M height M time checksum
-    // 174558.00,5917.60788,N,01757.40192,E,1,08,1.08,48.3,M,24.6,M,,*69
-    [[maybe_unused]] constexpr auto kTimeIndex = 0;
-    constexpr auto kLatitudeIndex = 1;
-    constexpr auto kLatitudeDirectionIndex = 2;
-    constexpr auto kLongitudeIndex = 3;
-    constexpr auto kLongitudeDirectionIndex = 4;
-    constexpr auto kFixIndex = 5;
-    [[maybe_unused]] constexpr auto kSatIndex = 6;
-    [[maybe_unused]] constexpr auto kHdopIndex = 7;
-    [[maybe_unused]] constexpr auto kAltitudeIndex = 8;
-    [[maybe_unused]] constexpr auto kHeightIndex = 10;
-    [[maybe_unused]] constexpr auto kTimeSinceLastDgpsUpdateIndex = 12;
-    [[maybe_unused]] constexpr auto kChecksumIndex = 13;
-
-    auto valid = false;
-    for (const auto sub_range : std::views::split(line, ','))
+    if (fields[kStatusIndex] != "A" || fields[kModeIndex] == "N")
     {
-        const auto word = std::string_view(sub_range.begin(), sub_range.end());
-
-        switch (index)
-        {
-        case kLatitudeIndex:
-            latitude = ToDegrees(word);
-            break;
-        case kLatitudeDirectionIndex:
-            if (word == "S")
-            {
-                latitude = -latitude.value();
-            }
-            break;
-        case kLongitudeIndex:
-            longitude = ToDegrees(word);
-            break;
-        case kLongitudeDirectionIndex:
-            if (word == "W")
-            {
-                longitude = -longitude.value();
-            }
-            break;
-        case kFixIndex:
-            valid = word == "1" || word == "2";
-            break;
-        default:
-            break;
-        }
-
-        index++;
+        return;
     }
 
-    if (valid && latitude && longitude)
-    {
-        hal::RawGpsData cur;
-
-        cur.position = {latitude.value(), longitude.value()};
-        m_pending_data.push_back(cur);
-    }
+    Merge({
+        .position = ParsePosition(fields[kLatitudeIndex],
+                                  fields[kLatitudeHemisphereIndex],
+                                  fields[kLongitudeIndex],
+                                  fields[kLongitudeHemisphereIndex]),
+        .heading = ParseFloat(fields[kCourseIndex]),
+        .speed = ParseFloat(fields[kSpeedIndex]),
+    });
 }
 
 void
-NmeaParser::ParseGpvtgData(std::string_view line)
+NmeaParser::ParseVtg(const Fields& fields)
 {
-    auto index = 0;
-    std::optional<float> course;
-    std::optional<float> speed;
+    // GPVTG,course,T,magnetic course,M,speed (knots),N,speed (km/h),K,mode
+    // GPVTG,360.0,T,348.7,M,000.0,N,000.0,K
+    constexpr auto kCourseIndex = 1;
+    constexpr auto kSpeedIndex = 5;
+    // NMEA 2.3 and later
+    constexpr auto kModeIndex = 9;
 
-    // course T, course M, speed N, speed K
-    // 360.0,T,348.7,M,000.0,N,000.0,K*43
-    for (const auto sub_range : std::views::split(line, ','))
+    if (fields[kModeIndex] == "N")
     {
-        const auto word = std::string_view(sub_range.begin(), sub_range.end());
-        char* end;
-
-        if (index == 0)
-        {
-            course = std::strtof(word.data(), &end);
-        }
-        else if (index == 4)
-        {
-            speed = std::strtof(word.data(), &end);
-        }
-
-        index++;
+        return;
     }
 
-    if (speed && course)
+    Merge({
+        .heading = ParseFloat(fields[kCourseIndex]),
+        .speed = ParseFloat(fields[kSpeedIndex]),
+    });
+}
+
+void
+NmeaParser::Merge(const hal::RawGpsData& data)
+{
+    if (!data.position && !data.heading && !data.speed)
     {
-        hal::RawGpsData cur;
+        return;
+    }
 
-        cur.heading = course.value();
-        cur.speed = speed.value();
-
-        m_pending_data.push_back(cur);
+    auto& pending = m_pending_data ? *m_pending_data : m_pending_data.emplace();
+    if (data.position)
+    {
+        pending.position = data.position;
+    }
+    if (data.heading)
+    {
+        pending.heading = data.heading;
+    }
+    if (data.speed)
+    {
+        pending.speed = data.speed;
     }
 }
