@@ -239,6 +239,8 @@ TEST_CASE("the NMEA parser rejects sentences with invalid checksums")
     SUBCASE("non-hex checksum")
     {
         REQUIRE_FALSE(parser.PushData(
+            "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*G7\r\n"));
+        REQUIRE_FALSE(parser.PushData(
             "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*4G\r\n"));
     }
 
