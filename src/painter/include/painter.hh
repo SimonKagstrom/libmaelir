@@ -4,6 +4,11 @@
 #include "debug_assert.hh"
 #include "hal/i_display.hh"
 #include "image.hh"
+
+#include <algorithm>
+#include <array>
+#include <utility>
+
 namespace painter
 {
 
@@ -80,6 +85,62 @@ DrawClippedLine(uint16_t* frame_buffer, PointType from, PointType to, uint16_t c
             }
             frame_buffer[y * hal::kDisplayWidth + x] = color;
         }
+    }
+}
+
+// Covers the same pixels across as DrawClippedLine with the same thickness, so it can be used
+// for round joints between lines. The center can be anywhere, the circle is clipped to the display
+template <typename PointType, uint16_t diameter>
+inline void
+DrawFilledCircle(uint16_t* frame_buffer, PointType center, uint16_t color)
+{
+    static_assert(diameter > 0, "Diameter must be at least 1");
+
+    constexpr auto kFirst = -static_cast<int>(diameter) / 2;
+    constexpr auto kLast = (static_cast<int>(diameter) + 1) / 2 - 1;
+
+    // The first and last x offset for each row. Doubled coordinates keep the center exact for
+    // even diameters, where it's between two pixels
+    constexpr auto kSpans = []() {
+        constexpr auto kDoubledCenter = kFirst + kLast;
+        constexpr auto kRadiusSquared = static_cast<int>(diameter) * static_cast<int>(diameter);
+
+        std::array<std::pair<int, int>, diameter> spans {};
+        for (auto row = 0; row < static_cast<int>(diameter); ++row)
+        {
+            const auto dy = 2 * (kFirst + row) - kDoubledCenter;
+            auto first = kFirst;
+
+            while ((2 * first - kDoubledCenter) * (2 * first - kDoubledCenter) + dy * dy >
+                   kRadiusSquared)
+            {
+                first++;
+            }
+            // Symmetric around the center
+            spans[row] = {first, kDoubledCenter - first};
+        }
+
+        return spans;
+    }();
+
+    for (auto row = 0; row < static_cast<int>(diameter); ++row)
+    {
+        const auto y = static_cast<int>(center.y) + kFirst + row;
+        if (y < 0 || y >= static_cast<int>(hal::kDisplayHeight))
+        {
+            continue;
+        }
+
+        const auto x0 = std::max(static_cast<int>(center.x) + kSpans[row].first, 0);
+        const auto x1 = std::min(static_cast<int>(center.x) + kSpans[row].second,
+                                 static_cast<int>(hal::kDisplayWidth) - 1);
+        if (x0 > x1)
+        {
+            continue;
+        }
+
+        auto line = &frame_buffer[y * hal::kDisplayWidth];
+        std::fill(line + x0, line + x1 + 1, color);
     }
 }
 

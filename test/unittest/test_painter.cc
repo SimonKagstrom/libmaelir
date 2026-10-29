@@ -137,6 +137,72 @@ RequireSameAsReference()
     REQUIRE(optimized == reference);
 }
 
+// Per-pixel distance check, in doubled coordinates to handle even diameters
+void
+ReferenceCircle(uint16_t* frame_buffer, Point center, int diameter, uint16_t color)
+{
+    const auto first = -diameter / 2;
+    const auto last = (diameter + 1) / 2 - 1;
+
+    for (auto dy = first; dy <= last; ++dy)
+    {
+        for (auto dx = first; dx <= last; ++dx)
+        {
+            auto x = center.x + dx;
+            auto y = center.y + dy;
+            auto ddx = 2 * dx - (first + last);
+            auto ddy = 2 * dy - (first + last);
+
+            if (ddx * ddx + ddy * ddy > diameter * diameter || x < 0 || x >= kWidth || y < 0 ||
+                y >= kHeight)
+            {
+                continue;
+            }
+            frame_buffer[y * kWidth + x] = color;
+        }
+    }
+}
+
+template <uint16_t diameter>
+void
+RequireCircleSameAsReference()
+{
+    FrameBuffer reference;
+    FrameBuffer optimized;
+
+    std::vector<Point> centers {
+        {0, 0},
+        {kWidth - 1, kHeight - 1},
+        {kWidth / 2, kHeight / 2},
+        // Partly or fully outside the display
+        {-2, 10},
+        {kWidth + 1, 10},
+        {10, -3},
+        {10, kHeight + 2},
+        {-100, -100},
+    };
+    std::mt19937 rng(4711);
+    std::uniform_int_distribution<int> x_dist(-20, kWidth + 20);
+    std::uniform_int_distribution<int> y_dist(-20, kHeight + 20);
+    for (auto i = 0; i < 500; i++)
+    {
+        centers.push_back({x_dist(rng), y_dist(rng)});
+    }
+
+    auto color = uint16_t {1};
+    for (const auto& center : centers)
+    {
+        ReferenceCircle(reference.Pixels(), center, diameter, color);
+        painter::DrawFilledCircle<Point, diameter>(optimized.Pixels(), center, color);
+
+        color++;
+    }
+
+    REQUIRE(optimized.GuardsIntact());
+    REQUIRE(reference.GuardsIntact());
+    REQUIRE(optimized == reference);
+}
+
 } // namespace
 
 
@@ -176,6 +242,49 @@ TEST_CASE("a thick line at the edge is clipped")
     REQUIRE(fb.Pixels()[0 * kWidth + 15] == 0xffff);
     REQUIRE(fb.Pixels()[2 * kWidth + 15] == 0xffff);
     REQUIRE(fb.Pixels()[3 * kWidth + 15] == 0);
+}
+
+TEST_CASE("filled circles are drawn like with per-pixel bounds checks")
+{
+    SUBCASE("diameter 1")
+    {
+        RequireCircleSameAsReference<1>();
+    }
+
+    SUBCASE("even diameter")
+    {
+        RequireCircleSameAsReference<8>();
+    }
+
+    SUBCASE("odd diameter")
+    {
+        RequireCircleSameAsReference<5>();
+    }
+
+    SUBCASE("large diameter")
+    {
+        RequireCircleSameAsReference<16>();
+    }
+}
+
+TEST_CASE("a filled circle covers the same pixels across as a line of the same thickness")
+{
+    FrameBuffer line;
+    FrameBuffer circle;
+
+    // Horizontal line, so the width is vertical. Compare the column at the end point
+    painter::DrawClippedLine<Point, 8>(line.Pixels(), {100, 100}, {150, 100}, 1);
+    painter::DrawFilledCircle<Point, 8>(circle.Pixels(), Point {150, 100}, 1);
+
+    for (auto y = 90; y < 110; ++y)
+    {
+        REQUIRE(circle.Pixels()[y * kWidth + 150] == line.Pixels()[y * kWidth + 150]);
+    }
+    // ... and the same horizontally through the center
+    REQUIRE(circle.Pixels()[100 * kWidth + 145] == 0);
+    REQUIRE(circle.Pixels()[100 * kWidth + 146] == 1);
+    REQUIRE(circle.Pixels()[100 * kWidth + 153] == 1);
+    REQUIRE(circle.Pixels()[100 * kWidth + 154] == 0);
 }
 
 TEST_SUITE_END();
