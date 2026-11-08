@@ -5,6 +5,8 @@ projects, and these rules typically apply to them as well.
 
 ## Editing
 * Use the vscode API, if running via vscode, so that your reads and edits can be seen
+* If you, as an agent, runs the Qt application, please run it off-screen and take screenshots
+  so that it doesn't pop up a window
 
 ## General rules
 * C++ only for the project code. C etc is only allowed on human intervention.
