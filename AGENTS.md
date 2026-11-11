@@ -20,6 +20,12 @@ projects, and these rules typically apply to them as well.
   the target
 * The code should be unit tested, wherever possible
 
+## State machines
+* State machines are generated from .md files
+* Enter() and Exit() for each state is where the work should be done
+* The Evaluate() function should in general not do much work, but simply check if the next
+  state should be entered. There are exceptions
+
 ## Threads
 * The threading model uses BaseThread and PooledThreadBase, and all threads should inherit these
   - PooledThreadBase saves stack space since it's built on a single FreeRTOS thread
