@@ -8,7 +8,7 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(etl)
 
-
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(CONFIG_LV_BUILD_DEMOS OFF)
 set(CONFIG_LV_BUILD_EXAMPLES OFF)
 add_subdirectory(lvgl)
