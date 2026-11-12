@@ -25,7 +25,8 @@ add_library(os_implementation_unittest EXCLUDE_FROM_ALL
 # See https://github.com/rollbear/trompeloeil/issues/342
 target_compile_options(trompeloeil
 INTERFACE
-    -Wno-deprecated-this-capture
+    $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-deprecated-this-capture>
+    $<$<CXX_COMPILER_ID:GNU>:-Wno-deprecated>
 )
 
 target_link_libraries(os_implementation_unittest
