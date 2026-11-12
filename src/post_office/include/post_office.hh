@@ -7,16 +7,13 @@
 #include <cassert>
 #include <cstdint>
 #include <etl/mutex.h>
-#include <etl/queue.h>
 #include <etl/vector.h>
 #include <functional>
 #include <memory>
 #include <mutex>
-#include <optional>
 #include <tuple>
 #include <vector>
 
-constexpr auto kMailboxSize = 16;
 constexpr auto kMaxSubscribersPerMessage = 8;
 
 template <typename Messages>
@@ -39,9 +36,14 @@ class MailboxImpl
 public:
     explicit MailboxImpl(IEventNotifier& notifier);
 
-    // Drops the message if the mailbox is full
-    bool Push(RawEnvelope envelope);
-    std::optional<RawEnvelope> Pop();
+    void Push(RawEnvelope envelope);
+
+    // Receiver only: all messages pushed since the last call, in order. Recycle() must
+    // be called when done with them, before calling this again.
+    const std::vector<RawEnvelope>& RetrieveAll();
+
+    // Receiver only: frees the retrieved messages
+    void Recycle();
 
     void Notify();
     void Detach();
@@ -49,7 +51,11 @@ public:
 private:
     etl::mutex m_mutex;
     IEventNotifier* m_notifier;
-    etl::queue<RawEnvelope, kMailboxSize> m_queue;
+
+    // Pushed to by the senders, under the lock
+    std::vector<RawEnvelope> m_incoming;
+    // Swapped with m_incoming by RetrieveAll, and then only touched by the receiver
+    std::vector<RawEnvelope> m_retrieved;
 };
 
 } // namespace detail
@@ -75,13 +81,16 @@ public:
 
         ~Drainer()
         {
-            while (auto raw = m_mailbox.m_impl->Pop())
+            auto& impl = *m_mailbox.m_impl;
+
+            for (const auto& raw : impl.RetrieveAll())
             {
-                if (auto& handler = m_handlers[raw->index])
+                if (auto& handler = m_handlers[raw.index])
                 {
-                    handler(*raw);
+                    handler(raw);
                 }
             }
+            impl.Recycle();
         }
 
         template <typename T>
@@ -126,7 +135,10 @@ public:
     Mailbox& operator=(Mailbox&&) = delete;
 
     // Handles all queued messages, in order, when the returned Drainer goes out of scope.
-    // Messages without a handler are dropped.
+    // Messages without a handler are dropped. Messages sent while the handlers run are
+    // left for the next Collect() (the notifier is triggered for them).
+    //
+    // Not reentrant: a handler must not Collect() from its own mailbox.
     Drainer Collect()
     {
         return Drainer(*this);

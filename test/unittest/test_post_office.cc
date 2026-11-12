@@ -208,38 +208,107 @@ TEST_CASE_FIXTURE(Fixture, "multiple messages are handled in order")
     }
 }
 
-TEST_CASE_FIXTURE(Fixture, "a full mailbox drops new messages")
+TEST_CASE_FIXTURE(Fixture, "messages sent while handling are left for the next collect")
 {
+    auto all_listener = std::make_unique<ReceiverThread<MSG::gregor, MSG::samsa>>(post_office);
+    auto& mailbox = *all_listener->m_mailbox;
+
+    ALLOW_CALL(all_listener->notifier, Notify());
+    post_office.Send<MSG::samsa>();
+
+    WHEN("a handler sends to its own mailbox")
+    {
+        auto r_notify = NAMED_REQUIRE_CALL(all_listener->notifier, Notify());
+        FORBID_CALL(*this, Gregor(trompeloeil::_, trompeloeil::_));
+
+        mailbox.Collect().On<MSG::samsa>(
+            [this]() { post_office.Send<MSG::gregor>({"later", "name"}); });
+
+        THEN("the receiver is notified, and gets the message on the next collect")
+        {
+            r_notify = nullptr;
+
+            REQUIRE_CALL(*this, Gregor("later", "name"));
+            Collect(mailbox);
+        }
+    }
+}
+
+TEST_CASE_FIXTURE(Fixture, "handled messages are freed")
+{
+    auto all_listener = std::make_unique<ReceiverThread<MSG::gregor, MSG::samsa>>(post_office);
+    ALLOW_CALL(all_listener->notifier, Notify());
+
+    std::weak_ptr<const MSG::gregor> handled;
+    post_office.Send<MSG::gregor>({"id", "name"});
+    post_office.Send<MSG::samsa>();
+
+    WHEN("the messages are collected")
+    {
+        all_listener->m_mailbox->Collect().On<MSG::gregor>([&handled](auto msg) {
+            handled = msg;
+        });
+
+        THEN("they are no longer referenced by the mailbox")
+        {
+            CHECK(handled.expired());
+        }
+    }
+
+    WHEN("the mailbox is destroyed with messages in it")
+    {
+        // Get hold of a message via another listener, which handles it right away
+        auto other = std::make_unique<ReceiverThread<MSG::gregor>>(post_office);
+        ALLOW_CALL(other->notifier, Notify());
+        post_office.Send<MSG::gregor>({"id2", "name"});
+        other->m_mailbox->Collect().On<MSG::gregor>([&handled](auto msg) { handled = msg; });
+
+        // ... the unhandled mailbox still holds it
+        REQUIRE_FALSE(handled.expired());
+
+        all_listener = nullptr;
+
+        THEN("the messages are freed")
+        {
+            CHECK(handled.expired());
+        }
+    }
+}
+
+TEST_CASE_FIXTURE(Fixture, "a mailbox keeps all messages of a burst, and keeps working after it")
+{
+    constexpr auto kBurstSize = 100;
+
     auto gregor_listener = std::make_unique<ReceiverThread<MSG::gregor>>(post_office);
+    auto& mailbox = *gregor_listener->m_mailbox;
     ALLOW_CALL(gregor_listener->notifier, Notify());
 
-    for (auto i = 0; i < kMailboxSize + 2; i++)
+    // Several rounds, so that both of the swapped buffers grow and shrink
+    for (auto round = 0; round < 3; round++)
     {
-        post_office.Send<MSG::gregor>({std::to_string(i), "name"});
-    }
-
-    THEN("the oldest messages are kept")
-    {
-        trompeloeil::sequence seq;
-        std::vector<std::unique_ptr<trompeloeil::expectation>> expectations;
-        for (auto i = 0; i < kMailboxSize; i++)
+        for (auto i = 0; i < kBurstSize; i++)
         {
-            expectations.push_back(
-                NAMED_REQUIRE_CALL(*this, Gregor(std::to_string(i), "name")).IN_SEQUENCE(seq));
+            post_office.Send<MSG::gregor>({std::to_string(i), "burst"});
         }
 
-        Collect(*gregor_listener->m_mailbox);
-    }
+        auto received = 0;
+        mailbox.Collect().On<MSG::gregor>([&received](auto msg) {
+            REQUIRE(msg->caller_number == std::to_string(received));
+            received++;
+        });
+        REQUIRE(received == kBurstSize);
 
-    AND_THEN("new messages fit once it has been drained")
-    {
-        ALLOW_CALL(*this, Gregor(trompeloeil::_, trompeloeil::_));
-        Collect(*gregor_listener->m_mailbox);
+        // ... and then the common case, a few messages
+        for (auto i = 0; i < 2; i++)
+        {
+            post_office.Send<MSG::gregor>({"small", std::to_string(i)});
+            post_office.Send<MSG::gregor>({"small", std::to_string(i + 1)});
 
-        post_office.Send<MSG::gregor>({"new", "name"});
-
-        REQUIRE_CALL(*this, Gregor("new", "name"));
-        Collect(*gregor_listener->m_mailbox);
+            trompeloeil::sequence seq;
+            REQUIRE_CALL(*this, Gregor("small", std::to_string(i))).IN_SEQUENCE(seq);
+            REQUIRE_CALL(*this, Gregor("small", std::to_string(i + 1))).IN_SEQUENCE(seq);
+            Collect(mailbox);
+        }
     }
 }
 
