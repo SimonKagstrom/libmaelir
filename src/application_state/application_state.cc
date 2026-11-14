@@ -1,5 +1,6 @@
 #include "application_state.hh"
 
+#include "debug_assert.hh"
 #include "semaphore.hh"
 
 #include <mutex>
@@ -16,8 +17,11 @@ ApplicationState::DoAttachListener(const ParameterBitset& interested, IEventNoti
 {
     std::lock_guard lock(m_mutex);
 
-    if (m_reclaimed_listener_indices.empty() &&
-        m_listener_notifiers_by_index.size() >= kMaxApplicationStateListeners)
+    const auto full = m_reclaimed_listener_indices.empty() &&
+                      m_listener_notifiers_by_index.size() >= kMaxApplicationStateListeners;
+    // The listener would never be notified. Increase kMaxApplicationStateListeners if this triggers
+    debug_assert(!full);
+    if (full)
     {
         return {};
     }
