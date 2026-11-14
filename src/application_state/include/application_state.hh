@@ -345,10 +345,7 @@ public:
 
             std::lock_guard lock(m_parent.m_mutex);
 
-            (void)std::initializer_list<int> {
-                (m_changed.test(PartialState::template PartialIndexOf<T>())
-                     ? (m_parent.SetNoLockCollectChanged<T>(Get<T>(), global_changed), 0)
-                     : 0)...};
+            (WriteBack<T>(global_changed), ...);
 
             m_parent.NotifyMultipleChanges(global_changed);
         }
@@ -372,11 +369,11 @@ public:
 
 
         template <typename S>
-        void Set(const auto& value)
+        void Set(auto&& value)
         {
             static_assert(std::disjunction_v<std::is_same<S, T>...>);
 
-            m_state.template GetRef<S>() = value;
+            m_state.template GetRef<S>() = std::forward<decltype(value)>(value);
             m_changed.set(PartialState::template PartialIndexOf<S>());
         }
 
@@ -401,6 +398,17 @@ public:
             static_assert(std::disjunction_v<std::is_same<S, T>...>);
 
             return m_state.template GetRef<S>();
+        }
+
+        // Called with the lock held. The value is moved, since the snapshot is being destroyed
+        template <typename S>
+        void WriteBack(ParameterBitset& global_changed)
+        {
+            if (m_changed.test(PartialState::template PartialIndexOf<S>()))
+            {
+                m_parent.template SetNoLockCollectChanged<S>(std::move(GetReference<S>()),
+                                                             global_changed);
+            }
         }
 
         using PartialState = AS::storage::partial_state<T...>;
@@ -433,20 +441,17 @@ public:
 
             std::lock_guard lock(m_parent.m_mutex);
 
-            (void)std::initializer_list<int> {
-                (m_changed.test(PartialState::template PartialIndexOf<T>())
-                     ? (m_parent.SetNoLockCollectChanged<T>(Get<T>(), global_changed), 0)
-                     : 0)...};
+            (WriteBack<T>(global_changed), ...);
 
             m_parent.NotifyMultipleChanges(global_changed);
         }
 
         template <typename S>
-        void Set(const auto& value)
+        void Set(auto&& value)
         {
             static_assert(std::disjunction_v<std::is_same<S, T>...>);
 
-            m_state.template GetRef<S>() = value;
+            m_state.template GetRef<S>() = std::forward<decltype(value)>(value);
             m_changed.set(PartialState::template PartialIndexOf<S>());
         }
 
@@ -460,13 +465,15 @@ public:
             // No initialization, these are write-only
         }
 
+        // Called with the lock held. The value is moved, since the writer is being destroyed
         template <typename S>
-        auto Get()
+        void WriteBack(ParameterBitset& global_changed)
         {
-            // These are write-only, so reads are not allowed
-            static_assert(std::disjunction_v<std::is_same<S, T>...>);
-
-            return m_state.template GetRef<S>();
+            if (m_changed.test(PartialState::template PartialIndexOf<S>()))
+            {
+                m_parent.template SetNoLockCollectChanged<S>(
+                    std::move(m_state.template GetRef<S>()), global_changed);
+            }
         }
 
         using PartialState = AS::storage::partial_state<T...>;
@@ -536,13 +543,7 @@ public:
             /* On return, the shared_ptr to const ensures the value stays alive even if
              * it's written, until the reader is done with it.
              */
-            using pointer_type = std::remove_reference_t<decltype(m_global_state.GetRef<T>())>;
-            using element_type = typename pointer_type::element_type;
-
-            std::shared_ptr<const element_type> out =
-                std::atomic_load_explicit(&m_global_state.GetRef<T>(), std::memory_order_acquire);
-
-            return out;
+            return AS::storage::LoadShared(m_global_state.GetRef<T>());
         }
     }
 
@@ -550,13 +551,13 @@ public:
      * @brief Write a single member of the global state
      *
      * The write is done (and listeners notified) immediately. Use a queued writer
-     * to update multiple members together.
+     * to update multiple members together. An rvalue is moved into the global state.
      */
     template <typename T>
-    void Set(const auto& value)
+    void Set(auto&& value)
     {
         std::lock_guard lock(m_mutex);
-        SetNoLock<T>(value);
+        SetNoLock<T>(std::forward<decltype(value)>(value));
     }
 
 private:
@@ -572,15 +573,26 @@ private:
         }
         else
         {
-            auto value_ptr =
-                std::atomic_load_explicit(&m_global_state.GetRef<T>(), std::memory_order_acquire);
-            return *value_ptr;
+            return *AS::storage::LoadShared(m_global_state.GetRef<T>());
         }
     }
 
+    // Called with the lock held. Compares without copying the current value
+    template <typename T>
+    bool IsCurrentValue(const auto& value)
+    {
+        if constexpr (T::IsAtomic())
+        {
+            return value == m_global_state.GetRef<T>().load();
+        }
+        else
+        {
+            return value == *AS::storage::LoadShared(m_global_state.GetRef<T>());
+        }
+    }
 
     template <typename T>
-    void DoSetValue(const auto& value)
+    void DoSetValue(auto&& value)
     {
         if constexpr (T::IsAtomic())
         {
@@ -591,34 +603,34 @@ private:
             using pointer_type = std::remove_reference_t<decltype(m_global_state.GetRef<T>())>;
             using element_type = typename pointer_type::element_type;
 
-            auto out = std::make_shared<element_type>(value);
-            std::atomic_store_explicit(
-                &m_global_state.GetRef<T>(), std::move(out), std::memory_order_release);
+            AS::storage::StoreShared(
+                m_global_state.GetRef<T>(),
+                std::make_shared<element_type>(std::forward<decltype(value)>(value)));
         }
     }
 
     template <typename T>
-    void SetNoLock(const auto& value)
+    void SetNoLock(auto&& value)
     {
-        if (value == GetValue<T>())
+        if (IsCurrentValue<T>(value))
         {
             return;
         }
 
-        DoSetValue<T>(value);
+        DoSetValue<T>(std::forward<decltype(value)>(value));
 
         NotifyChange(AS::IndexOf<T>());
     }
 
     template <typename T>
-    void SetNoLockCollectChanged(const auto& value, ParameterBitset& changed)
+    void SetNoLockCollectChanged(auto&& value, ParameterBitset& changed)
     {
-        if (value == GetValue<T>())
+        if (IsCurrentValue<T>(value))
         {
             return;
         }
 
-        DoSetValue<T>(value);
+        DoSetValue<T>(std::forward<decltype(value)>(value));
 
         changed.set(AS::IndexOf<T>());
     }
