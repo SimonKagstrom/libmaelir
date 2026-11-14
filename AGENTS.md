@@ -51,3 +51,5 @@ add-hoc shared state.
 * Use BDD-style tests where appropriate
 * Use TEST_SUITE_BEGIN/END to define test suites
 * Use the ThreadFixture / PooledThreadFixture for deterministic tests
+* Use REQUIRE if later checks depend on it (e.g., that a pointer is valid), and CHECK otherwise
+  - REQUIRE will stop the test, CHECK will allow it to continue
