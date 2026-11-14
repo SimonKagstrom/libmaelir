@@ -13,6 +13,8 @@
 #include <memory>
 #include <mutex>
 #include <string_view>
+#include <type_traits>
+#include <utility>
 
 using ParameterBitset = etl::bitset<AS::kLastIndex + 1, uint32_t>;
 
@@ -69,6 +71,43 @@ struct partial_state : public T...
     using ParameterBitset = etl::bitset<sizeof...(T), uint32_t>;
 };
 
+// The type of the value of a parameter, e.g., GpsData for AS::position
+template <typename S>
+using value_type_of = std::remove_cvref_t<decltype(std::declval<S&>().template GetRef<S>())>;
+
+/*
+ * How a read-only cache holds a parameter: Atomics by value, and others as a pointer to the
+ * published value. A published value is never modified, and a changed value is always
+ * published with a new pointer. Pulling therefore only copies the pointer, and an unchanged
+ * pointer means an unchanged value.
+ */
+template <typename S>
+using cached_type_of = std::conditional_t<S::IsAtomic(),
+                                          value_type_of<S>,
+                                          std::shared_ptr<const value_type_of<S>>>;
+
+template <typename S>
+struct cache_slot
+{
+    cached_type_of<S> value {};
+};
+
+template <class... T>
+struct cached_state : public cache_slot<T>...
+{
+    template <typename S>
+    auto& Slot()
+    {
+        return static_cast<cache_slot<S>&>(*this).value;
+    }
+
+    template <typename S>
+    const auto& Slot() const
+    {
+        return static_cast<const cache_slot<S>&>(*this).value;
+    }
+};
+
 } // namespace AS::storage
 
 class ApplicationState
@@ -111,7 +150,7 @@ public:
             {
                 if (IsChanged<S>())
                 {
-                    callback(Get<S>());
+                    callback(ValueAt<S>(m_state_index));
                 }
 
                 return *this;
@@ -122,50 +161,94 @@ public:
             {
                 if (IsChanged<S>())
                 {
-                    callback(GetReference<S>(!m_state_index), GetReference<S>(m_state_index));
+                    callback(ValueAt<S>(!m_state_index), ValueAt<S>(m_state_index));
                 }
 
                 return *this;
             }
 
-            /// Return the value of the local storage
+            /**
+             * @brief Return the value of the local storage
+             *
+             * Atomic parameters are returned by value, and others by reference to avoid
+             * copying. The reference is valid until the second Pull() after it was taken,
+             * i.e., after the next Pull() it refers to the previous value.
+             */
             template <typename S>
-            auto Get() const
+            decltype(auto) Get() const
             {
-                return GetReference<S>(m_state_index);
+                if constexpr (S::IsAtomic())
+                {
+                    return AS::storage::value_type_of<S>(ValueAt<S>(m_state_index));
+                }
+                else
+                {
+                    return ValueAt<S>(m_state_index);
+                }
             }
 
         private:
+            using PartialState = AS::storage::partial_state<T...>;
+            using CachedState = AS::storage::cached_state<T...>;
+
             explicit Checkout(ApplicationState& parent)
                 : m_parent(parent)
             {
-                // Lock context
-                {
-                    // Hold the lock since the GetValue might refer to a shared_ptr
-                    auto lock = GetLock();
-
-                    (void)std::initializer_list<int> {
-                        (m_state[0].template GetRef<T>() = parent.GetValue<T>(), 0)...};
-                }
+                m_state[0] = Load();
                 m_state[1] = m_state[0];
+            }
+
+            // Read the global state. Only pointers are copied for non-atomics, so the
+            // lock (for a consistent view of multiple parameters) is held only briefly
+            CachedState Load() const
+            {
+                CachedState out;
+                auto lock = GetLock();
+
+                ((out.template Slot<T>() = m_parent.template Get<T>()), ...);
+
+                return out;
             }
 
             template <typename S>
             void UpdateChanges(uint8_t cur, uint8_t next)
             {
-                if (GetReference<S>(cur) != GetReference<S>(next))
+                const auto& old_value = m_state[cur].template Slot<S>();
+                const auto& new_value = m_state[next].template Slot<S>();
+
+                bool changed;
+                if constexpr (S::IsAtomic())
+                {
+                    changed = old_value != new_value;
+                }
+                else
+                {
+                    // Only compare the values if a new value has been published. They can
+                    // still be equal, e.g., if changed back and forth between two pulls
+                    changed = old_value != new_value && *old_value != *new_value;
+                }
+
+                if (changed)
                 {
                     m_changed.set(PartialState::template PartialIndexOf<S>());
                 }
             }
 
             template <typename S>
-            const auto& GetReference(uint8_t index) const
+            const auto& ValueAt(uint8_t index) const
             {
                 // Require that S is in T...
                 static_assert(std::disjunction_v<std::is_same<S, T>...>);
 
-                return m_state[index].template GetConstRef<S>();
+                const auto& slot = m_state[index].template Slot<S>();
+                if constexpr (S::IsAtomic())
+                {
+                    return slot;
+                }
+                else
+                {
+                    return *slot;
+                }
             }
 
             std::unique_lock<etl::mutex> GetLock() const
@@ -179,9 +262,8 @@ public:
             }
 
             ApplicationState& m_parent;
-            using PartialState = AS::storage::partial_state<T...>;
 
-            std::array<PartialState, 2> m_state;
+            std::array<CachedState, 2> m_state;
             uint8_t m_state_index {0};
             PartialState::ParameterBitset m_changed;
         };
@@ -204,28 +286,21 @@ public:
             const uint8_t cur = m_checkout.m_state_index;
             const uint8_t next = !cur;
 
-            // Only do the sync with the lock held, the rest is local
-            {
-                auto mutex = m_checkout.GetLock();
+            // Assigned outside the lock, since replacing the old pointers can free values
+            m_checkout.m_state[next] = m_checkout.Load();
 
-                (void)std::initializer_list<int> {(m_checkout.m_state[next].template GetRef<T>() =
-                                                       m_checkout.m_parent.template GetValue<T>(),
-                                                   0)...};
-            }
-
-            (void)std::initializer_list<int> {
-                (m_checkout.template UpdateChanges<T>(cur, next), 0)...};
+            (m_checkout.template UpdateChanges<T>(cur, next), ...);
             m_checkout.m_state_index = next;
 
             return m_checkout;
         }
 
 
-        /// Return the value of the local storage
+        /// Return the value of the local storage, see Checkout::Get()
         template <typename S>
-        auto Get() const
+        decltype(auto) Get() const
         {
-            return m_checkout.template GetReference<S>(m_checkout.m_state_index);
+            return m_checkout.template Get<S>();
         }
 
     private:
