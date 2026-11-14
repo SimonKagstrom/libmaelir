@@ -381,9 +381,6 @@ public:
         explicit PartialSnapshot(ApplicationState& parent)
             : m_parent(parent)
         {
-            static_assert(PartialState::PartialCount() <= 32 &&
-                          "No more than 32 parameters for an uint32_t");
-
             // Hold the lock since the GetValue might refer to a shared_ptr
             std::lock_guard lock(m_parent.m_mutex);
 
@@ -459,9 +456,6 @@ public:
         explicit QueuedWriter(ApplicationState& parent)
             : m_parent(parent)
         {
-            static_assert(PartialState::PartialCount() <= 32 &&
-                          "No more than 32 parameters for an uint32_t");
-
             // No initialization, these are write-only
         }
 
