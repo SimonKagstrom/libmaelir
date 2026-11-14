@@ -499,6 +499,12 @@ public:
      * The snapshot is cached, so global writes do not affect it. Writes are
      * written back on destruction. Reads/writes can only be done of the subset.
      *
+     * Note that the write-back is of whole values, without checking for other writes
+     * since the checkout. A read-modify-write in a snapshot can therefore overwrite (lose)
+     * a concurrent write from another thread, e.g., two threads changing different fields
+     * of the same struct. This is fine with a single writer thread per parameter, which is
+     * the normal case.
+     *
      * @tparam T a list of members of the global state
      * @return the partial snapshot
      */
