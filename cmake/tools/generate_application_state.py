@@ -21,18 +21,22 @@ type_size_mapping = {
 }
 
 
-def is_number(str):
+def is_number(value):
     try:
-        float(str)
-    except ValueError:
-        if str.startswith("0x"):
-            try:
-                int(str, 16)
-            except ValueError:
-                return False
-        return False
-    else:  # Succeeded
+        float(value)
         return True
+    except ValueError:
+        pass
+
+    # float() doesn't accept hex, e.g., 0x1f
+    if value.startswith("0x"):
+        try:
+            int(value, 16)
+            return True
+        except ValueError:
+            pass
+
+    return False
 
 
 class Parameter:
