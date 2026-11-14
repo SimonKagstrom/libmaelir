@@ -21,15 +21,29 @@ using ParameterBitset = etl::bitset<AS::kLastIndex + 1, uint32_t>;
 // Fit in an uint32_t
 constexpr auto kMaxApplicationStateListeners = 32;
 
-/*
- * We'd like to use std::atomic<std::shared_ptr<T>> + .load() etc, but clang doesn't support that.
- *
- * Instead, silence the deprecation warning for GCC
- */
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-
 namespace AS::storage
 {
+
+/*
+ * We'd like to use std::atomic<std::shared_ptr<T>>, but libc++ (clang) doesn't support that.
+ * The free functions are deprecated since C++20, so silence that warning for these only.
+ */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+template <typename T>
+std::shared_ptr<const T>
+LoadShared(const std::shared_ptr<T>& pointer)
+{
+    return std::atomic_load_explicit(&pointer, std::memory_order_acquire);
+}
+
+template <typename T>
+void
+StoreShared(std::shared_ptr<T>& pointer, std::shared_ptr<T> value)
+{
+    std::atomic_store_explicit(&pointer, std::move(value), std::memory_order_release);
+}
+#pragma GCC diagnostic pop
 
 template <class... T>
 struct partial_state : public T...
