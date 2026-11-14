@@ -368,12 +368,13 @@ public:
         }
 
 
+        /// Write a value, which is converted to the type of the parameter by the caller
         template <typename S>
-        void Set(auto&& value)
+        void Set(AS::storage::value_type_of<S> value)
         {
             static_assert(std::disjunction_v<std::is_same<S, T>...>);
 
-            m_state.template GetRef<S>() = std::forward<decltype(value)>(value);
+            m_state.template GetRef<S>() = std::move(value);
             m_changed.set(PartialState::template PartialIndexOf<S>());
         }
 
@@ -443,12 +444,13 @@ public:
             m_parent.NotifyMultipleChanges(global_changed);
         }
 
+        /// Write a value, which is converted to the type of the parameter by the caller
         template <typename S>
-        void Set(auto&& value)
+        void Set(AS::storage::value_type_of<S> value)
         {
             static_assert(std::disjunction_v<std::is_same<S, T>...>);
 
-            m_state.template GetRef<S>() = std::forward<decltype(value)>(value);
+            m_state.template GetRef<S>() = std::move(value);
             m_changed.set(PartialState::template PartialIndexOf<S>());
         }
 
@@ -551,13 +553,16 @@ public:
      * @brief Write a single member of the global state
      *
      * The write is done (and listeners notified) immediately. Use a queued writer
-     * to update multiple members together. An rvalue is moved into the global state.
+     * to update multiple members together.
+     *
+     * The value is converted to the type of the parameter by the caller, i.e., before
+     * comparing it with the current value. An rvalue is moved into the global state.
      */
     template <typename T>
-    void Set(auto&& value)
+    void Set(AS::storage::value_type_of<T> value)
     {
         std::lock_guard lock(m_mutex);
-        SetNoLock<T>(std::forward<decltype(value)>(value));
+        SetNoLock<T>(std::move(value));
     }
 
 private:
