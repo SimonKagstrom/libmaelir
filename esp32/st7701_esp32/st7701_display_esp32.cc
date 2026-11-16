@@ -4,10 +4,54 @@
 #include <esp_idf_version.h>
 #include <esp_lcd_panel_ops.h>
 
-DisplaySt7701::DisplaySt7701(esp_lcd_panel_io_handle_t io_handle,
-                             const esp_lcd_panel_dev_config_t& panel_config)
+DisplaySt7701::DisplaySt7701(const st7701::MipiPanel& panel, const BoardConfig& board)
 {
-    ESP_ERROR_CHECK(esp_lcd_new_panel_st7701(io_handle, &panel_config, &m_panel_handle));
+    esp_ldo_channel_config_t ldo_config {};
+    ldo_config.chan_id = board.phy_ldo_channel;
+    ldo_config.voltage_mv = board.phy_ldo_voltage_mv;
+    ESP_ERROR_CHECK(esp_ldo_acquire_channel(&ldo_config, &m_phy_ldo));
+
+    // phy_clk_src is left at default, which esp-idf selects based on the minimum chip revision
+    esp_lcd_dsi_bus_config_t bus_config {};
+    bus_config.bus_id = 0;
+    bus_config.num_data_lanes = panel.num_data_lanes;
+    bus_config.lane_bit_rate_mbps = panel.lane_bit_rate_mbps;
+    bus_config.flags.clock_lane_force_hs = false;
+    ESP_ERROR_CHECK(esp_lcd_new_dsi_bus(&bus_config, &m_dsi_bus));
+
+    esp_lcd_dbi_io_config_t dbi_config {};
+    dbi_config.virtual_channel = 0;
+    dbi_config.lcd_cmd_bits = 8;
+    dbi_config.lcd_param_bits = 8;
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_dbi(m_dsi_bus, &dbi_config, &m_dbi_io));
+
+    // The frame buffer handling below assumes double-buffered RGB565
+    esp_lcd_dpi_panel_config_t dpi_config {};
+    dpi_config.virtual_channel = 0;
+    dpi_config.dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT;
+    dpi_config.dpi_clock_freq_mhz = panel.dpi_clock_freq_mhz;
+    dpi_config.in_color_format = LCD_COLOR_FMT_RGB565;
+    dpi_config.out_color_format = LCD_COLOR_FMT_RGB565;
+    dpi_config.num_fbs = 2;
+    dpi_config.video_timing = panel.timing;
+    dpi_config.flags.disable_lp = false;
+
+    // The ST7701 driver keeps a pointer to the init commands, the rest is copied
+    st7701_vendor_config_t vendor_config {};
+    vendor_config.init_cmds = panel.init_cmds.data();
+    vendor_config.init_cmds_size = static_cast<uint16_t>(panel.init_cmds.size());
+    vendor_config.mipi_config.dsi_bus = m_dsi_bus;
+    vendor_config.mipi_config.dpi_config = &dpi_config;
+    vendor_config.flags.use_mipi_interface = 1;
+
+    esp_lcd_panel_dev_config_t panel_config {};
+    panel_config.reset_gpio_num = board.reset_pin;
+    panel_config.bits_per_pixel = 16;
+    panel_config.rgb_ele_order = panel.rgb_element_order;
+    panel_config.data_endian = LCD_RGB_DATA_ENDIAN_BIG;
+    panel_config.vendor_config = &vendor_config;
+
+    ESP_ERROR_CHECK(esp_lcd_new_panel_st7701(m_dbi_io, &panel_config, &m_panel_handle));
     ESP_ERROR_CHECK(esp_lcd_panel_reset(m_panel_handle));
     ESP_ERROR_CHECK(esp_lcd_panel_init(m_panel_handle));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(m_panel_handle, true));
