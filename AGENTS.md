@@ -7,6 +7,8 @@ projects, and these rules typically apply to them as well.
 * Use the vscode API, if running via vscode, so that your reads and edits can be seen
 * If you, as an agent, runs the Qt application, please run it off-screen and take screenshots
   so that it doesn't pop up a window
+* Use /** */ doctest comments for APIs, especially in interfaces
+* Be terse in comments
 
 ## General rules
 * C++ only for the project code. C etc is only allowed on human intervention.
@@ -15,6 +17,7 @@ projects, and these rules typically apply to them as well.
   - #pragma once is used for headers
   - Member variables use the m_ prefix
   - Constants use the k prefix
+  - Interfaces are pure abstract classes, and named as IInterfaceName
 * Tools may use Python etc
 * Unless it targets e.g., esp-idf specifically, code should build for unit tests, Qt and
   the target
