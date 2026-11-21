@@ -25,6 +25,8 @@ String(std::span<const std::byte> data)
     return std::string(reinterpret_cast<const char*>(data.data()), data.size());
 }
 
+using Entries = std::vector<Filesystem::DirectoryEntry>;
+
 // The whole file as a string, or "(missing)"
 std::string
 Contents(const Filesystem& filesystem, std::string_view path)
@@ -314,4 +316,157 @@ TEST_CASE_FIXTURE(Fixture, "an open file can be moved")
 
     CHECK(Contents(filesystem, "first.txt") == "moved twice");
     CHECK(Contents(filesystem, "second.txt") == "");
+}
+
+TEST_CASE_FIXTURE(Fixture, "files and directories exist")
+{
+    REQUIRE(filesystem.WriteFile("dir/file.txt", Bytes("contents")));
+
+    CHECK(filesystem.FileExists("dir/file.txt"));
+    CHECK(filesystem.FileExists("dir"));
+
+    CHECK_FALSE(filesystem.FileExists("di"));
+    CHECK_FALSE(filesystem.FileExists("dir/file"));
+    CHECK_FALSE(filesystem.FileExists("dir/other.txt"));
+}
+
+TEST_CASE_FIXTURE(Fixture, "directories can be listed")
+{
+    REQUIRE(filesystem.WriteFile("dir/b.txt", Bytes("b")));
+    REQUIRE(filesystem.WriteFile("dir/a.txt", Bytes("a")));
+    REQUIRE(filesystem.WriteFile("dir/sub/deeper.txt", Bytes("deeper")));
+    REQUIRE(filesystem.WriteFile("dir/sub/deepest/file.txt", Bytes("deepest")));
+    // Sorts before and after "sub/" by full path
+    REQUIRE(filesystem.WriteFile("dir/sub.txt", Bytes("sub")));
+    REQUIRE(filesystem.WriteFile("dir/sub0", Bytes("sub0")));
+    REQUIRE(filesystem.WriteFile("top.txt", Bytes("top")));
+
+    THEN("the entries are listed by name, without the contents of subdirectories")
+    {
+        CHECK(filesystem.ListDirectory("dir") == Entries {
+                                                     {"a.txt", false},
+                                                     {"b.txt", false},
+                                                     {"sub", true},
+                                                     {"sub.txt", false},
+                                                     {"sub0", false},
+                                                 });
+        CHECK(filesystem.ListDirectory("dir/sub") == Entries {
+                                                         {"deeper.txt", false},
+                                                         {"deepest", true},
+                                                     });
+    }
+
+    THEN("the root can be listed")
+    {
+        CHECK(filesystem.ListDirectory("") == Entries {
+                                                  {"dir", true},
+                                                  {"top.txt", false},
+                                              });
+    }
+
+    THEN("a missing directory, or a file, gives nothing")
+    {
+        CHECK(filesystem.ListDirectory("missing").empty());
+        CHECK(filesystem.ListDirectory("di").empty());
+        CHECK(filesystem.ListDirectory("top.txt").empty());
+    }
+}
+
+TEST_CASE_FIXTURE(Fixture, "files can be removed")
+{
+    REQUIRE(filesystem.WriteFile("dir/a.txt", Bytes("a")));
+    REQUIRE(filesystem.WriteFile("dir/b.txt", Bytes("b")));
+
+    WHEN("a file is removed")
+    {
+        REQUIRE(filesystem.Remove("dir/a.txt"));
+
+        THEN("it's gone, but the others are kept")
+        {
+            CHECK_FALSE(filesystem.FileExists("dir/a.txt"));
+            CHECK_FALSE(filesystem.ReadFile("dir/a.txt"));
+            CHECK(filesystem.ListDirectory("dir") == Entries {{"b.txt", false}});
+        }
+
+        AND_WHEN("it's removed again")
+        {
+            THEN("it fails")
+            {
+                CHECK_FALSE(filesystem.Remove("dir/a.txt"));
+            }
+        }
+    }
+
+    WHEN("a directory is removed")
+    {
+        THEN("it fails, and the files are kept")
+        {
+            CHECK_FALSE(filesystem.Remove("dir"));
+            CHECK(Contents(filesystem, "dir/a.txt") == "a");
+            CHECK(Contents(filesystem, "dir/b.txt") == "b");
+        }
+    }
+
+    WHEN("a missing file is removed")
+    {
+        THEN("it fails")
+        {
+            CHECK_FALSE(filesystem.Remove("dir/missing.txt"));
+            CHECK_FALSE(filesystem.Remove("missing/a.txt"));
+        }
+    }
+}
+
+TEST_CASE_FIXTURE(Fixture, "files and directories can be moved")
+{
+    REQUIRE(filesystem.WriteFile("from/a.txt", Bytes("a")));
+    REQUIRE(filesystem.WriteFile("from/sub/b.txt", Bytes("b")));
+    REQUIRE(filesystem.WriteFile("other/c.txt", Bytes("c")));
+
+    WHEN("a file is moved to a new directory")
+    {
+        REQUIRE(filesystem.Move("from/a.txt", "to/renamed.txt"));
+
+        THEN("it's only in the new place")
+        {
+            CHECK_FALSE(filesystem.FileExists("from/a.txt"));
+            CHECK(Contents(filesystem, "to/renamed.txt") == "a");
+        }
+    }
+
+    WHEN("a directory is moved")
+    {
+        REQUIRE(filesystem.Move("from", "to/moved"));
+
+        THEN("its contents are moved with it")
+        {
+            CHECK_FALSE(filesystem.FileExists("from/a.txt"));
+            CHECK(Contents(filesystem, "to/moved/a.txt") == "a");
+            CHECK(Contents(filesystem, "to/moved/sub/b.txt") == "b");
+        }
+    }
+
+    WHEN("the destination exists")
+    {
+        THEN("it fails, and nothing is changed")
+        {
+            CHECK_FALSE(filesystem.Move("from/a.txt", "other/c.txt"));
+            CHECK_FALSE(filesystem.Move("from/a.txt", "other"));
+            CHECK_FALSE(filesystem.Move("from", "other"));
+
+            CHECK(Contents(filesystem, "from/a.txt") == "a");
+            CHECK(Contents(filesystem, "from/sub/b.txt") == "b");
+            CHECK(Contents(filesystem, "other/c.txt") == "c");
+        }
+    }
+
+    WHEN("the source is missing")
+    {
+        THEN("it fails")
+        {
+            CHECK_FALSE(filesystem.Move("from/missing.txt", "to/missing.txt"));
+            CHECK_FALSE(filesystem.Move("missing", "to"));
+            CHECK_FALSE(filesystem.FileExists("to"));
+        }
+    }
 }

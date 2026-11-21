@@ -1,5 +1,6 @@
 #include "filesystem.hh"
 
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <sys/stat.h>
@@ -169,6 +170,39 @@ Filesystem::FileExists(std::string_view path) const
 
     // Check for non-directory, since FAT might mess things up with is_regular_file()
     return fs::exists(full_path);// && !fs::is_directory(full_path);
+}
+
+std::vector<Filesystem::DirectoryEntry>
+Filesystem::ListDirectory(std::string_view path) const
+{
+    fs::path full_path = fs::path(m_root_path) / fs::path(path);
+
+    std::vector<DirectoryEntry> out;
+    std::error_code ec;
+    for (auto it = fs::directory_iterator(full_path, ec); !ec && it != fs::directory_iterator();
+         it.increment(ec))
+    {
+        out.push_back({it->path().filename().string(), it->is_directory(ec)});
+    }
+
+    // The iteration order is unspecified
+    std::ranges::sort(out, {}, &DirectoryEntry::name);
+
+    return out;
+}
+
+bool
+Filesystem::Remove(std::string_view path) const
+{
+    fs::path full_path = fs::path(m_root_path) / fs::path(path);
+
+    std::error_code ec;
+    if (!fs::is_regular_file(full_path, ec))
+    {
+        return false;
+    }
+
+    return fs::remove(full_path, ec);
 }
 
 bool

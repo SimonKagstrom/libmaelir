@@ -79,6 +79,14 @@ public:
         kTruncate,
     };
 
+    struct DirectoryEntry
+    {
+        std::string name;
+        bool is_directory;
+
+        bool operator==(const DirectoryEntry&) const = default;
+    };
+
     /**
      * @param root_path the directory which all paths are relative to
      */
@@ -115,6 +123,22 @@ public:
 
     /// @brief Check if a file or directory exists
     bool FileExists(std::string_view path) const;
+
+    /**
+     * @brief List the files and directories in a directory, but not their contents
+     *
+     * @param path the directory, or "" for the root
+     *
+     * @return the entries sorted by name, or nothing if the directory doesn't exist
+     */
+    std::vector<DirectoryEntry> ListDirectory(std::string_view path) const;
+
+    /**
+     * @brief Remove a file
+     *
+     * @return true on success, false if it doesn't exist or is a directory
+     */
+    bool Remove(std::string_view path) const;
 
     /**
      * @brief Move a file or a directory, creating the parent directories of to if needed

@@ -7,7 +7,30 @@
 namespace
 {
 
+// Only files are stored, so directories exist implicitly while they contain files
 std::map<std::string, std::vector<std::byte>, std::less<>> g_files;
+
+// The prefix of everything in a directory, where "" is the root
+std::string
+DirectoryPrefix(std::string_view path)
+{
+    return path.empty() ? std::string() : std::string(path) + "/";
+}
+
+bool
+IsDirectory(std::string_view path)
+{
+    auto prefix = DirectoryPrefix(path);
+    auto it = g_files.lower_bound(prefix);
+
+    return it != g_files.end() && it->first.starts_with(prefix);
+}
+
+bool
+Exists(std::string_view path)
+{
+    return g_files.contains(path) || IsDirectory(path);
+}
 
 } // namespace
 
@@ -135,8 +158,7 @@ std::optional<File>
 Filesystem::OpenWritable(std::string_view path, WriteMode mode) const
 {
     // Like a real filesystem: the path can't be a directory, or have a file as a parent
-    auto dir = std::string(path) + "/";
-    if (auto it = g_files.lower_bound(dir); it != g_files.end() && it->first.starts_with(dir))
+    if (IsDirectory(path))
     {
         return std::nullopt;
     }
@@ -160,13 +182,59 @@ Filesystem::OpenWritable(std::string_view path, WriteMode mode) const
 bool
 Filesystem::FileExists(std::string_view path) const
 {
-    return g_files.contains(path);
+    return Exists(path);
+}
+
+std::vector<Filesystem::DirectoryEntry>
+Filesystem::ListDirectory(std::string_view path) const
+{
+    auto prefix = DirectoryPrefix(path);
+
+    std::vector<DirectoryEntry> out;
+    for (auto it = g_files.lower_bound(prefix); it != g_files.end() && it->first.starts_with(prefix);
+         ++it)
+    {
+        auto name = std::string_view(it->first).substr(prefix.size());
+
+        if (auto slash = name.find('/'); slash != std::string_view::npos)
+        {
+            // In a subdirectory, which is listed once. Its contents are adjacent in the map
+            auto directory = DirectoryEntry {std::string(name.substr(0, slash)), true};
+            if (out.empty() || out.back() != directory)
+            {
+                out.push_back(std::move(directory));
+            }
+        }
+        else
+        {
+            out.push_back({std::string(name), false});
+        }
+    }
+
+    // The map is sorted by full path, so e.g., "a.txt" comes before "a/b.txt"
+    std::ranges::sort(out, {}, &DirectoryEntry::name);
+
+    return out;
+}
+
+bool
+Filesystem::Remove(std::string_view path) const
+{
+    auto it = g_files.find(path);
+    if (it == g_files.end())
+    {
+        return false;
+    }
+
+    g_files.erase(it);
+
+    return true;
 }
 
 bool
 Filesystem::Move(std::string_view from, std::string_view to) const
 {
-    if (g_files.contains(to))
+    if (Exists(to))
     {
         return false;
     }
