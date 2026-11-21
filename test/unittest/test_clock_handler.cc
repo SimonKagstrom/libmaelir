@@ -26,6 +26,13 @@ public:
         RunLoopWhileReady();
     }
 
+    // Like the GPS reader, which does this every second while there is a fix
+    void SetGpsTime(uint32_t utc)
+    {
+        state.Set<AS::gps_utc>(utc);
+        RunLoopWhileReady();
+    }
+
     ApplicationState state;
     PostOffice<MSG::AllMessages> post_office;
 
@@ -161,6 +168,180 @@ TEST_CASE_FIXTURE(Fixture, "the clock follows the network time")
             {
                 CHECK(state.Get<AS::timezone>() == -210);
             }
+        }
+    }
+}
+
+TEST_CASE_FIXTURE(Fixture, "the clock follows the GPS time")
+{
+    AdvanceTimeAndRunLoop(1s);
+
+    WHEN("a GPS time arrives in the middle of a second")
+    {
+        AdvanceTimeAndRunLoop(500ms);
+        SetGpsTime(kTime);
+
+        THEN("the clock is set immediately")
+        {
+            CHECK(state.Get<AS::clock>() == kTime);
+        }
+
+        AND_THEN("the clock ticks a second after the GPS time, not at the old second")
+        {
+            AdvanceTimeAndRunLoop(999ms);
+            CHECK(state.Get<AS::clock>() == kTime);
+            AdvanceTimeAndRunLoop(1ms);
+            CHECK(state.Get<AS::clock>() == kTime + 1);
+        }
+
+        AND_WHEN("the GPS time keeps arriving every second")
+        {
+            for (auto i = 1u; i <= 10; i++)
+            {
+                AdvanceTimeAndRunLoop(1s);
+                SetGpsTime(kTime + i);
+                REQUIRE(state.Get<AS::clock>() == kTime + i);
+            }
+
+            THEN("the clock follows it")
+            {
+                CHECK(state.Get<AS::clock>() == kTime + 10);
+            }
+        }
+
+        AND_WHEN("the GPS time jumps forward")
+        {
+            AdvanceTimeAndRunLoop(200ms);
+            SetGpsTime(kTime + 60);
+
+            THEN("the clock follows it")
+            {
+                CHECK(state.Get<AS::clock>() == kTime + 60);
+            }
+        }
+
+        AND_WHEN("the GPS time jumps back")
+        {
+            AdvanceTimeAndRunLoop(200ms);
+            SetGpsTime(kTime - 60);
+
+            THEN("the clock follows it")
+            {
+                CHECK(state.Get<AS::clock>() == kTime - 60);
+            }
+        }
+
+        AND_WHEN("the fix is lost, so the GPS time is no longer updated")
+        {
+            AdvanceTimeAndRunLoop(1h);
+
+            THEN("the clock keeps ticking, and isn't set back to the last GPS time")
+            {
+                CHECK(state.Get<AS::clock>() == kTime + 3600);
+            }
+
+            AND_WHEN("the fix comes back")
+            {
+                AdvanceTimeAndRunLoop(500ms);
+                SetGpsTime(kTime + 3605);
+
+                THEN("the clock follows the GPS time again")
+                {
+                    CHECK(state.Get<AS::clock>() == kTime + 3605);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE_FIXTURE(Fixture, "the GPS time has priority over the network time")
+{
+    WHEN("the network time comes first")
+    {
+        SendTime(kTime, 60);
+
+        AND_WHEN("a GPS time arrives")
+        {
+            SetGpsTime(kTime + 2);
+
+            THEN("the GPS time is used, and the timezone is kept")
+            {
+                CHECK(state.Get<AS::clock>() == kTime + 2);
+                CHECK(state.Get<AS::timezone>() == 60);
+            }
+
+            AND_WHEN("another network time arrives while there is a fix")
+            {
+                state.Set<AS::gps_status>(GpsStatus::kPositionValid);
+                SendTime(kTime + 100, 120);
+
+                THEN("only its timezone is used")
+                {
+                    CHECK(state.Get<AS::clock>() == kTime + 2);
+                    CHECK(state.Get<AS::timezone>() == 120);
+                }
+            }
+
+            AND_WHEN("another network time arrives without a fix")
+            {
+                state.Set<AS::gps_status>(GpsStatus::kNoFix);
+                SendTime(kTime + 100, 120);
+
+                THEN("it's used")
+                {
+                    CHECK(state.Get<AS::clock>() == kTime + 100);
+                    CHECK(state.Get<AS::timezone>() == 120);
+                }
+            }
+        }
+    }
+
+    WHEN("the GPS time comes first, with a fix")
+    {
+        state.Set<AS::gps_status>(GpsStatus::kPositionValid);
+        SetGpsTime(kTime);
+        SendTime(1000, 120);
+
+        THEN("only the timezone is taken from the network time")
+        {
+            CHECK(state.Get<AS::clock>() == kTime);
+            CHECK(state.Get<AS::timezone>() == 120);
+        }
+
+        AND_WHEN("the fix is lost, and a network time arrives")
+        {
+            state.Set<AS::gps_status>(GpsStatus::kSilent);
+            SendTime(1000, 60);
+
+            THEN("the network time is used")
+            {
+                CHECK(state.Get<AS::clock>() == 1000);
+                CHECK(state.Get<AS::timezone>() == 60);
+            }
+
+            AND_WHEN("the fix comes back")
+            {
+                state.Set<AS::gps_status>(GpsStatus::kPositionValid);
+                SetGpsTime(kTime + 5);
+
+                THEN("the GPS time is used again")
+                {
+                    CHECK(state.Get<AS::clock>() == kTime + 5);
+                }
+            }
+        }
+    }
+
+    WHEN("there is a valid position, but no GPS time")
+    {
+        // E.g., demo mode, or a GPS with week rollover dates (which are dropped)
+        state.Set<AS::gps_status>(GpsStatus::kPositionValid);
+        SendTime(kTime, 120);
+
+        THEN("the network time is used")
+        {
+            CHECK(state.Get<AS::clock>() == kTime);
+            CHECK(state.Get<AS::timezone>() == 120);
         }
     }
 }

@@ -5,6 +5,8 @@
 ClockHandler::ClockHandler(ApplicationState& state, PostOffice<MSG::AllMessages>& post_office)
     : m_state(state)
     , m_mailbox(post_office.Subscribe<MSG::network_time>(*this))
+    , m_gps_listener(m_state.AttachListener<AS::gps_utc>(*this))
+    , m_state_cache(m_state)
 {
 }
 
@@ -16,7 +18,20 @@ ClockHandler::OnActivation()
         {
             m_state.Set<AS::timezone>(*time->timezone_minutes);
         }
-        SetTime(time->utc);
+
+        if (m_state.Get<AS::gps_status>() != GpsStatus::kPositionValid ||
+            m_state.Get<AS::gps_utc>() == 0)
+        {
+            SetTime(time->utc);
+            // Not exact (the job pool wakes up irregularly), but good enough for showing minutes
+            StartTimerTick();
+        }
+    });
+
+    // Only changes, i.e., not a value from a fix which has since been lost
+    m_state_cache.Pull().OnNewValue<AS::gps_utc>([this](auto gps_utc) {
+        SetTime(gps_utc);
+        StartTimerTick();
     });
 
     return std::nullopt;
@@ -29,13 +44,17 @@ ClockHandler::SetTime(uint32_t utc)
     m_sub_second = 0ms;
     m_last_update = os::GetTimeStamp();
     m_state.Set<AS::clock>(m_utc);
+}
 
-    // Not exact (the job pool wakes up irregularly), but good enough for showing minutes
+void
+ClockHandler::StartTimerTick()
+{
     m_tick_timer = StartTimer(1s, [this]() {
         Tick();
         return 1s;
     });
 }
+
 
 void
 ClockHandler::Tick()
