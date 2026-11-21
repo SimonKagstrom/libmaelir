@@ -40,6 +40,7 @@ add_executable(unittest_libmaelir
     main.cc
     test_brightness_controller.cc
     test_clock_handler.cc
+    test_filesystem.cc
     test_nmea_parser.cc
     test_opportunistic_scheduler.cc
     test_painter.cc
@@ -57,6 +58,7 @@ target_link_libraries(unittest_libmaelir
     doctest::doctest
     job_pool_thread
     lamp_state_machine_base
+    mock_filesystem
     nmea_parser
     opportunistic_semaphore
     os_unittest
@@ -67,3 +69,16 @@ target_link_libraries(unittest_libmaelir
     unittest_messages
 )
 add_test(NAME unittest_libmaelir COMMAND unittest_libmaelir)
+
+# The same filesystem tests, but for the real filesystem (in a temporary directory). A separate
+# executable, since it implements the same classes as the in-memory one above
+add_executable(unittest_std_filesystem
+    main.cc
+    test_std_filesystem.cc
+)
+
+target_link_libraries(unittest_std_filesystem
+    doctest::doctest
+    std_filesystem
+)
+add_test(NAME unittest_std_filesystem COMMAND unittest_std_filesystem)

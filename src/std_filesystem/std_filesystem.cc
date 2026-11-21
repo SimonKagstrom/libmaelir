@@ -1,69 +1,165 @@
 #include "filesystem.hh"
 
+#include <cstdio>
 #include <filesystem>
-#include <fstream>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace fs = std::filesystem;
+
+// stdio rather than fstream, since Sync() needs the file descriptor
+class File::Impl
+{
+public:
+    Impl(FILE* file, bool writable)
+        : m_file(file)
+        , m_writable(writable)
+    {
+    }
+
+    ~Impl()
+    {
+        fclose(m_file);
+    }
+
+    Impl(const Impl&) = delete;
+    Impl& operator=(const Impl&) = delete;
+
+    size_t Read(std::span<std::byte> out)
+    {
+        if (m_writable)
+        {
+            return 0;
+        }
+
+        return fread(out.data(), 1, out.size(), m_file);
+    }
+
+    bool Write(std::span<const std::byte> data)
+    {
+        if (!m_writable)
+        {
+            return false;
+        }
+
+        return fwrite(data.data(), 1, data.size(), m_file) == data.size();
+    }
+
+    bool Sync()
+    {
+        if (!m_writable)
+        {
+            // Nothing to store
+            return true;
+        }
+
+        return fflush(m_file) == 0 && fsync(fileno(m_file)) == 0;
+    }
+
+    std::optional<size_t> Size()
+    {
+        // Include what's buffered by stdio
+        if (m_writable && fflush(m_file) != 0)
+        {
+            return std::nullopt;
+        }
+
+        struct stat st;
+        if (fstat(fileno(m_file), &st) != 0)
+        {
+            return std::nullopt;
+        }
+
+        return static_cast<size_t>(st.st_size);
+    }
+
+private:
+    FILE* m_file;
+    const bool m_writable;
+};
+
+
+File::File(std::unique_ptr<Impl> impl)
+    : m_impl(std::move(impl))
+{
+}
+
+File::~File() = default;
+File::File(File&& other) noexcept = default;
+File& File::operator=(File&& other) noexcept = default;
+
+size_t
+File::Read(std::span<std::byte> out)
+{
+    return m_impl->Read(out);
+}
+
+bool
+File::Write(std::span<const std::byte> data)
+{
+    return m_impl->Write(data);
+}
+
+bool
+File::Sync()
+{
+    return m_impl->Sync();
+}
+
+std::optional<size_t>
+File::Size()
+{
+    return m_impl->Size();
+}
+
 
 Filesystem::Filesystem(std::string_view root_path)
     : m_root_path(root_path)
 {
 }
 
-std::optional<std::vector<std::byte>>
-Filesystem::ReadFile(std::string_view path) const
+std::optional<File>
+Filesystem::OpenReadOnly(std::string_view path) const
 {
     fs::path full_path = fs::path(m_root_path) / fs::path(path);
 
-    if (!fs::exists(full_path) || !fs::is_regular_file(full_path))
+    std::error_code ec;
+    if (!fs::is_regular_file(full_path, ec))
     {
         return std::nullopt;
     }
 
-    std::ifstream file(full_path, std::ios::binary | std::ios::ate);
+    auto file = fopen(full_path.c_str(), "rb");
     if (!file)
     {
         return std::nullopt;
     }
 
-    std::streamsize size = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    std::vector<std::byte> buffer(size);
-    if (!file.read(reinterpret_cast<char*>(buffer.data()), size))
-    {
-        return std::nullopt;
-    }
-
-    return buffer;
+    return File(std::make_unique<File::Impl>(file, false));
 }
 
-bool
-Filesystem::WriteFile(std::string_view path, std::span<const std::byte> data) const
+std::optional<File>
+Filesystem::OpenWritable(std::string_view path, WriteMode mode) const
 {
-    namespace fs = std::filesystem;
     fs::path full_path = fs::path(m_root_path) / fs::path(path);
 
-    // Ensure parent directory exists
     if (full_path.has_parent_path())
     {
         std::error_code ec;
         fs::create_directories(full_path.parent_path(), ec);
         if (ec)
         {
-            return false;
+            return std::nullopt;
         }
     }
 
-    std::ofstream file(full_path, std::ios::binary | std::ios::trunc);
+    auto file = fopen(full_path.c_str(), mode == WriteMode::kAppend ? "ab" : "wb");
     if (!file)
     {
-        return false;
+        return std::nullopt;
     }
 
-    file.write(reinterpret_cast<const char*>(data.data()), data.size());
-
-    return file.good();
+    return File(std::make_unique<File::Impl>(file, true));
 }
 
 bool
