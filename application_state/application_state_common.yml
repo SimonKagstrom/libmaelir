@@ -6,5 +6,6 @@ application_state:
   position: {}
   ota_update_active: false
   clock: 0
+  gps_utc: 0
   timezone: 0
   brightness_mode: BrightnessMode::kAuto

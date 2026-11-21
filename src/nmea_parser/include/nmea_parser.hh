@@ -11,8 +11,12 @@ class NmeaParser : public NmeaParserStateMachineBase<>
 {
 public:
     // Return the data from all valid GGA, RMC and VTG sentences completed by this call, where
-    // later sentences override earlier ones. Speed is in knots, heading in degrees
+    // later sentences override earlier ones. Speed is in knots, heading in degrees. The UTC
+    // comes from RMC only, in whole seconds, and dates before kMinimumYear are dropped
     std::optional<hal::RawGpsData> PushData(std::string_view data);
+
+    // GPS modules hit by the week number rollover report dates 1024 weeks (~20 years) too early
+    static constexpr auto kMinimumYear = 2025;
 
 private:
     // NmeaParserStateMachineBase, see nmea_parser_state_machine.md

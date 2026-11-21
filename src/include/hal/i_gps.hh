@@ -23,6 +23,8 @@ struct RawGpsData
     std::optional<GpsPosition> position;
     std::optional<float> heading;
     std::optional<float> speed;
+    // UTC of the fix, in seconds since the epoch
+    std::optional<uint32_t> utc;
 };
 
 class IGps

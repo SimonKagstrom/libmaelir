@@ -1,6 +1,7 @@
 #include "nmea_parser.hh"
 #include "test.hh"
 
+#include <chrono>
 #include <format>
 #include <string>
 
@@ -26,6 +27,20 @@ Sentence(std::string_view body)
 
     return std::format("${}*{:02X}\r\n", body, checksum);
 }
+
+// UTC to seconds since the epoch
+constexpr uint32_t
+Epoch(int year, unsigned month, unsigned day, int hour = 0, int minute = 0, int second = 0)
+{
+    const auto date = std::chrono::year(year) / std::chrono::month(month) / std::chrono::day(day);
+    const auto time = std::chrono::sys_days(date) + std::chrono::hours(hour) +
+                      std::chrono::minutes(minute) + std::chrono::seconds(second);
+
+    return static_cast<uint32_t>(time.time_since_epoch().count());
+}
+
+// Cross-checked with Python's calendar.timegm()
+static_assert(Epoch(2026, 3, 23, 12, 35, 19) == 1774269319);
 
 void
 RequireMunichPosition(const std::optional<hal::RawGpsData>& data)
@@ -357,6 +372,139 @@ TEST_CASE("the NMEA parser handles empty fields")
         REQUIRE_FALSE(parser.PushData("$*00\r\n"));
         REQUIRE_FALSE(parser.PushData(Sentence("GPGGA")));
         REQUIRE_FALSE(parser.PushData(Sentence("GPGGA,")));
+    }
+}
+
+TEST_CASE("the NMEA parser reports the UTC from RMC")
+{
+    NmeaParser parser;
+
+    constexpr auto kUtc = Epoch(2026, 3, 23, 12, 35, 19);
+
+    auto Utc = [&parser](std::string_view time, std::string_view date) {
+        auto data = parser.PushData(Sentence(std::format(
+            "GPRMC,{},A,4807.038,N,01131.000,E,022.4,084.4,{},003.1,W,A", time, date)));
+
+        // The rest of the sentence is fine, so there is always data
+        REQUIRE(data);
+        RequireMunichPosition(data);
+
+        return data->utc;
+    };
+
+    SUBCASE("in the sunny-day case")
+    {
+        CHECK(Utc("123519", "230326") == kUtc);
+    }
+
+    SUBCASE("fractions of a second are dropped")
+    {
+        CHECK(Utc("123519.00", "230326") == kUtc);
+        CHECK(Utc("123519.999", "230326") == kUtc);
+        CHECK(Utc("123519.", "230326") == kUtc);
+    }
+
+    SUBCASE("at the range limits")
+    {
+        CHECK(Utc("000000", "010125") == Epoch(2025, 1, 1));
+        // Two-digit years: 80-99 is 1980-1999
+        CHECK(Utc("235959", "311279") == Epoch(2079, 12, 31, 23, 59, 59));
+        // Leap year
+        CHECK(Utc("000000", "290228") == Epoch(2028, 2, 29));
+    }
+
+    SUBCASE("dates before the minimum year are dropped")
+    {
+        // E.g., the GPS week rollover, 1024 weeks back
+        CHECK_FALSE(Utc("123519", "070807"));
+        CHECK_FALSE(Utc("123519", "311224"));
+        CHECK_FALSE(Utc("123519", "230394"));
+        CHECK_FALSE(Utc("000000", "010180"));
+        CHECK_FALSE(Utc("235959", "311299"));
+    }
+
+    SUBCASE("invalid dates are dropped")
+    {
+        CHECK_FALSE(Utc("123519", "320326"));
+        CHECK_FALSE(Utc("123519", "000326"));
+        CHECK_FALSE(Utc("123519", "231326"));
+        CHECK_FALSE(Utc("123519", "230026"));
+        CHECK_FALSE(Utc("123519", "310426"));
+        // Not a leap year
+        CHECK_FALSE(Utc("123519", "290226"));
+    }
+
+    SUBCASE("invalid times are dropped")
+    {
+        CHECK_FALSE(Utc("243519", "230326"));
+        CHECK_FALSE(Utc("126019", "230326"));
+        // Leap second
+        CHECK_FALSE(Utc("123560", "230326"));
+    }
+
+    SUBCASE("broken fields are dropped")
+    {
+        CHECK_FALSE(Utc("", "230326"));
+        CHECK_FALSE(Utc("123519", ""));
+        CHECK_FALSE(Utc("", ""));
+        CHECK_FALSE(Utc("12351", "230326"));
+        CHECK_FALSE(Utc("1235190", "230326"));
+        CHECK_FALSE(Utc("12:35:19", "230326"));
+        CHECK_FALSE(Utc("123519.0.0", "230326"));
+        CHECK_FALSE(Utc(".123519", "230326"));
+        CHECK_FALSE(Utc("12351x", "230326"));
+        CHECK_FALSE(Utc("-23519", "230326"));
+        CHECK_FALSE(Utc("123519", "23032"));
+        CHECK_FALSE(Utc("123519", "2303266"));
+        CHECK_FALSE(Utc("123519", "23-326"));
+        CHECK_FALSE(Utc("123519", "23 326"));
+    }
+
+    SUBCASE("there is no time without a fix")
+    {
+        CHECK_FALSE(parser.PushData(
+            Sentence("GPRMC,123519,V,4807.038,N,01131.000,E,022.4,084.4,230326,003.1,W,N")));
+        CHECK_FALSE(parser.PushData(Sentence("GPRMC,123519,V,,,,,,,230326,,,N")));
+    }
+
+    SUBCASE("the time alone is reported")
+    {
+        // E.g., a fix where the position was garbled
+        auto data = parser.PushData(Sentence("GPRMC,123519,A,,,,,,,230326,,,A"));
+
+        REQUIRE(data);
+        CHECK(data->utc == kUtc);
+        CHECK_FALSE(data->position);
+        CHECK_FALSE(data->speed);
+        CHECK_FALSE(data->heading);
+    }
+
+    SUBCASE("GGA and VTG don't carry a time")
+    {
+        auto data = parser.PushData(std::string(kGga) + kVtg);
+
+        REQUIRE(data);
+        CHECK_FALSE(data->utc);
+    }
+
+    SUBCASE("the time is kept when merged with later sentences")
+    {
+        auto data = parser.PushData(
+            Sentence("GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230326,003.1,W,A") + kGga +
+            kVtg);
+
+        REQUIRE(data);
+        CHECK(data->utc == kUtc);
+    }
+
+    SUBCASE("a later RMC overrides the time")
+    {
+        auto data = parser.PushData(
+            Sentence("GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230326,003.1,W,A") +
+            Sentence("GPRMC,123520,A,4807.038,N,01131.000,E,022.4,084.4,230326,003.1,W,A"));
+
+        REQUIRE(data);
+        CHECK(data->utc == kUtc + 1);
     }
 }
 

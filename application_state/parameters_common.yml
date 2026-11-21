@@ -26,6 +26,10 @@ parameters:
   clock:
     type: uint32_t
 
+  # UTC from the last GPS fix, in seconds since the epoch, or 0 if there hasn't been one.
+  gps_utc:
+    type: uint32_t
+
   # Timezone offset from UTC in minutes
   timezone:
     type: int16_t

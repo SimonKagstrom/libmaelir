@@ -1,6 +1,8 @@
 // https://aprs.gids.nl/nmea
 #include "nmea_parser.hh"
 
+#include <array>
+#include <chrono>
 #include <cmath>
 #include <etl/vector.h>
 #include <ranges>
@@ -154,6 +156,72 @@ ParseFloat(std::string_view word)
     }
 
     return std::nullopt;
+}
+
+// Exactly six digits as three two-digit numbers, e.g., "230394" -> 23, 3, 94
+std::optional<std::array<unsigned, 3>>
+ParseDigitPairs(std::string_view word)
+{
+    if (word.size() != 6)
+    {
+        return std::nullopt;
+    }
+
+    std::array<unsigned, 3> out;
+    for (auto i = 0u; i < out.size(); i++)
+    {
+        auto high = word[i * 2];
+        auto low = word[i * 2 + 1];
+        if (high < '0' || high > '9' || low < '0' || low > '9')
+        {
+            return std::nullopt;
+        }
+        out[i] = (high - '0') * 10 + (low - '0');
+    }
+
+    return out;
+}
+
+// hhmmss(.ss) and ddmmyy, e.g., "123519.00", "230326" -> seconds since the epoch. Fractions of
+// a second are dropped
+std::optional<uint32_t>
+ParseUtc(std::string_view time, std::string_view date)
+{
+    // Validates the fraction, if any
+    if (!ParseNumber(time))
+    {
+        return std::nullopt;
+    }
+
+    auto hms = ParseDigitPairs(time.substr(0, time.find('.')));
+    auto dmy = ParseDigitPairs(date);
+    if (!hms || !dmy)
+    {
+        return std::nullopt;
+    }
+
+    const auto [hour, minute, second] = *hms;
+    const auto [day, month, year] = *dmy;
+
+    // A leap second (60) is dropped, since the epoch time doesn't have it
+    if (hour > 23 || minute > 59 || second > 59)
+    {
+        return std::nullopt;
+    }
+
+    // Two-digit years, with the GPS epoch (1980) as the pivot
+    const auto century = year >= 80 ? 1900 : 2000;
+    const auto ymd = std::chrono::year(century + static_cast<int>(year)) /
+                     std::chrono::month(month) / std::chrono::day(day);
+    if (!ymd.ok() || ymd.year() < std::chrono::year(NmeaParser::kMinimumYear))
+    {
+        return std::nullopt;
+    }
+
+    const auto utc = std::chrono::sys_days(ymd) + std::chrono::hours(hour) +
+                     std::chrono::minutes(minute) + std::chrono::seconds(second);
+
+    return static_cast<uint32_t>(utc.time_since_epoch().count());
 }
 
 } // namespace
@@ -434,6 +502,7 @@ NmeaParser::ParseRmc(const Fields& fields)
 {
     // GPRMC,time,status,lat,N/S,lon,E/W,speed (knots),course,date,variation,E/W,mode
     // GNRMC,072446.00,A,3130.5226316,N,12024.0937010,E,0.01,0.00,040620,0.0,E,D
+    constexpr auto kTimeIndex = 1;
     constexpr auto kStatusIndex = 2;
     constexpr auto kLatitudeIndex = 3;
     constexpr auto kLatitudeHemisphereIndex = 4;
@@ -441,9 +510,11 @@ NmeaParser::ParseRmc(const Fields& fields)
     constexpr auto kLongitudeHemisphereIndex = 6;
     constexpr auto kSpeedIndex = 7;
     constexpr auto kCourseIndex = 8;
+    constexpr auto kDateIndex = 9;
     // NMEA 2.3 and later
     constexpr auto kModeIndex = 12;
 
+    // Without a fix, the time can come from the receiver's own clock, which might be wrong
     if (fields[kStatusIndex] != "A" || fields[kModeIndex] == "N")
     {
         return;
@@ -456,6 +527,7 @@ NmeaParser::ParseRmc(const Fields& fields)
                                   fields[kLongitudeHemisphereIndex]),
         .heading = ParseFloat(fields[kCourseIndex]),
         .speed = ParseFloat(fields[kSpeedIndex]),
+        .utc = ParseUtc(fields[kTimeIndex], fields[kDateIndex]),
     });
 }
 
@@ -483,7 +555,7 @@ NmeaParser::ParseVtg(const Fields& fields)
 void
 NmeaParser::Merge(const hal::RawGpsData& data)
 {
-    if (!data.position && !data.heading && !data.speed)
+    if (!data.position && !data.heading && !data.speed && !data.utc)
     {
         return;
     }
@@ -500,5 +572,9 @@ NmeaParser::Merge(const hal::RawGpsData& data)
     if (data.speed)
     {
         pending.speed = data.speed;
+    }
+    if (data.utc)
+    {
+        pending.utc = data.utc;
     }
 }
