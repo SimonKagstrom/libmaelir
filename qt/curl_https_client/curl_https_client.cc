@@ -65,5 +65,13 @@ HttpsClient::Get(const std::string& url, milliseconds timeout)
         return std::nullopt; // Handle error appropriately
     }
 
+    // The request went through, but e.g., 404 returns an error page. The same as on the ESP32
+    long status = 0;
+    curl_easy_getinfo(m_impl->curl, CURLINFO_RESPONSE_CODE, &status);
+    if (status != 200)
+    {
+        return std::nullopt;
+    }
+
     return m_impl->response_data;
 }
