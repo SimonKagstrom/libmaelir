@@ -39,11 +39,104 @@ def is_number(value):
     return False
 
 
+def fail(message):
+    print(message)
+    sys.exit(1)
+
+
+def is_group(node):
+    "Groups have named parameters or groups, while parameters have a type"
+    return (
+        isinstance(node, dict)
+        and len(node) > 0
+        and not isinstance(node.get("type"), str)
+    )
+
+
+def flatten_parameters(node, prefix=""):
+    "Yield the (qualified C++ name, definition) of all parameters, also in groups"
+    for name, value in node.items():
+        # Generated in the parameters and groups
+        if name == "parameters":
+            fail(f"Reserved name: {prefix}{name}")
+        # Not allowed in C++
+        if prefix and name == prefix.split("::")[-2]:
+            fail(f"Same name as its group: {prefix}{name}")
+
+        if is_group(value):
+            yield from flatten_parameters(value, f"{prefix}{name}::")
+        else:
+            yield f"{prefix}{name}", value
+
+
+def flatten_default_values(node, parameters, prefix=""):
+    "Yield the (qualified C++ name, default value) of all parameters, also in groups"
+    for name, value in node.items():
+        qualified = f"{prefix}{name}"
+
+        # Default values can be mappings ({}), so only the parameters tell what the groups are
+        if qualified in parameters:
+            yield qualified, value
+        elif isinstance(value, dict) and any(
+            parameter.startswith(f"{qualified}::") for parameter in parameters
+        ):
+            yield from flatten_default_values(value, parameters, f"{qualified}::")
+        else:
+            fail(f"Unknown parameter in application_state: {qualified}")
+
+
+class Group:
+    "Parameters and groups, by name"
+
+    def __init__(self):
+        self.parameters = {}
+        self.groups = {}
+
+    def __dict__(self):
+        return {
+            "parameters": [param.__dict__() for param in self.parameters.values()],
+            "groups": {name: group.__dict__() for name, group in self.groups.items()},
+            "all_parameters": self.all_parameters(),
+        }
+
+    def all_parameters(self):
+        "The parameters of the group and its subgroups, relative to the group"
+        out = [param.leaf for param in self.parameters.values() if not param.is_orphan]
+        for name, group in self.groups.items():
+            out += [f"{name}::{param}" for param in group.all_parameters()]
+
+        return out
+
+
+def create_groups(parameters):
+    "Create the root group, with all parameters"
+    root = Group()
+
+    for param in parameters.values():
+        group = root
+        for name in param.name.split("::")[:-1]:
+            if name in group.parameters:
+                fail(f"{name} is both a parameter and a group, for {param.name}")
+            group = group.groups.setdefault(name, Group())
+
+        if param.leaf in group.groups:
+            fail(f"{param.name} is both a parameter and a group")
+        group.parameters[param.leaf] = param
+
+    return root
+
+
 class Parameter:
     "A parameter"
 
     def __init__(self, name, type):
+        # With the groups, e.g., configuration::max_watts
         self.name = name
+        # Without the groups
+        self.leaf = name.split("::")[-1]
+        # As a C++ identifier
+        self.id = name.replace("::", "__")
+        self.is_orphan = False
         self.is_event = True if type == "Event" else False
         self.type = type if not self.is_event else "uint8_t"
         self.return_type = ""
@@ -60,6 +153,8 @@ class Parameter:
     def __dict__(self):
         return {
             "name": self.name,
+            "leaf": self.leaf,
+            "id": self.id,
             "type": self.type,
             "is_event": self.is_event,
             "return_type": self.return_type,
@@ -117,6 +212,7 @@ def generate_output(
 
     context = {
         "parameters": [param.__dict__() for param in parameters.values()],
+        "root": create_groups(parameters).__dict__(),
         "orphans": [param.__dict__() for param in orphans],
         "application_state_parameters": [
             asp.__dict__() for asp in application_state_parameters
@@ -130,6 +226,7 @@ def generate_output(
     hh_template = template_env.get_template("generated_application_state.hh.jinja2")
     hh_output = hh_template.render(
         parameters=context["parameters"],
+        root=context["root"],
         application_state_parameters=context["application_state_parameters"],
         max_index=context["max_index"],
         orphans=context["orphans"],
@@ -180,7 +277,7 @@ if __name__ == "__main__":
                 print(f"Invalid parameters setup in {input_file}: expected mapping")
                 sys.exit(1)
 
-            for name, param in data["parameters"].items():
+            for name, param in flatten_parameters(data["parameters"]):
                 if not isinstance(param, dict) or "type" not in param:
                     print(f"Invalid parameter setup in {input_file}: {name}")
                     sys.exit(1)
@@ -197,24 +294,23 @@ if __name__ == "__main__":
                 )
                 sys.exit(1)
 
-            for name, default_value in data["application_state"].items():
-                application_state_raw.append((name, default_value))
+            application_state_raw.append(data["application_state"])
 
     # Resolve the application state
     application_state = []
-    for name, default_value in application_state_raw:
-        if name not in parameters:
-            print(f"Unknown parameter in application_state: {name}")
-            sys.exit(1)
-        application_state.append(
-            ApplicationStateParameter(name, parameters[name], default_value)
-        )
+    for default_values in application_state_raw:
+        for name, default_value in flatten_default_values(default_values, parameters):
+            application_state.append(
+                ApplicationStateParameter(name, parameters[name], default_value)
+            )
 
     orphans = [
         param
         for param in parameters.values()
         if param not in [asp.parameter for asp in application_state]
     ]
+    for param in orphans:
+        param.is_orphan = True
 
     # Sort the application state by alignment (largest first)
     application_state.sort(

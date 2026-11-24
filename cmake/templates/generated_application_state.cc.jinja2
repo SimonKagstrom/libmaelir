@@ -11,9 +11,9 @@ void AS::storage::state::SetupDefaultValues()
     {%- for asp in application_state_parameters %}
     {%- if asp.parameter.type != 'void' %}
     {%- if asp.parameter.is_atomic == false %}
-    {{ asp.parameter.name }} = std::make_shared<{{ asp.parameter.type }}>(DefaultValue<struct {{ asp.parameter.name }}>());
+    {{ asp.parameter.id }} = std::make_shared<{{ asp.parameter.type }}>(DefaultValue<struct {{ asp.parameter.name }}>());
     {%- else %}
-    {{ asp.parameter.name }} = DefaultValue<struct {{ asp.parameter.name }}>();
+    {{ asp.parameter.id }} = DefaultValue<struct {{ asp.parameter.name }}>();
     {%- endif %}
     {%- endif %}
     {%- endfor %}

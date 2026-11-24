@@ -1,5 +1,7 @@
 #pragma once
 
+#include "parameter_list.hh"
+
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -14,11 +16,12 @@ namespace AS
 
 constexpr auto kLastIndex = {{ max_index }};
 
-{% for parameter in parameters %}
-struct {{ parameter.name }}
+{% macro emit_group(group) %}
+{% for parameter in group.parameters %}
+struct {{ parameter.leaf }}
 {
     {%- if parameter.type != 'void' %}
-    {{parameter.type}} {{ parameter.name }};
+    {{parameter.type}} {{ parameter.leaf }};
 
     template<typename T>
     auto &GetRef();
@@ -36,19 +39,38 @@ struct {{ parameter.name }}
     {
         return {{ 'true' if parameter.is_event else 'false' }};
     }
-};
 
+    using parameters = parameter_list<struct {{ parameter.leaf }}>;
+};
+{% endfor %}
+{% for name, subgroup in group.groups.items() %}
+struct {{ name }}
+{
+{{ emit_group(subgroup) }}
+// Those in the application state
+using parameters = parameter_list<
+    {%- for name in subgroup.all_parameters %}
+    struct {{ name }}{{ ',' if not loop.last else '' }}
+    {%- endfor %}
+>;
+};
+{% endfor %}
+{%- endmacro %}
+
+{{ emit_group(root) }}
+
+{% for parameter in parameters %}
 {% if parameter.type != 'void' %}
 template<>
 inline auto &{{ parameter.name }}::GetRef<struct {{ parameter.name }}>()
 {
-    return {{parameter.name}};
+    return {{parameter.leaf}};
 }
 
 template<>
 inline const auto &{{ parameter.name }}::GetConstRef<struct {{ parameter.name }}>() const
 {
-    return {{parameter.name}};
+    return {{parameter.leaf}};
 }
 {% endif %}
 
@@ -93,9 +115,9 @@ struct state
     {%- for asp in application_state_parameters %}
     {%- if asp.parameter.type != 'void' %}
     {%- if asp.parameter.is_atomic == false %}
-    std::shared_ptr<{{ asp.parameter.type }}> {{ asp.parameter.name }};
+    std::shared_ptr<{{ asp.parameter.type }}> {{ asp.parameter.id }};
     {%- else %}
-    std::atomic<{{ asp.parameter.type }}> {{ asp.parameter.name }};
+    std::atomic<{{ asp.parameter.type }}> {{ asp.parameter.id }};
     {%- endif %}
     {%- endif %}
     {%- endfor %}
@@ -112,7 +134,7 @@ struct state
 template<>
 inline auto &state::GetRef<struct {{ asp.parameter.name }}>()
 {
-    return {{asp.parameter.name}};
+    return {{asp.parameter.id}};
 }
 
 {% endif %}

@@ -96,9 +96,8 @@ using value_type_of = std::remove_cvref_t<decltype(std::declval<S&>().template G
  * pointer means an unchanged value.
  */
 template <typename S>
-using cached_type_of = std::conditional_t<S::IsAtomic(),
-                                          value_type_of<S>,
-                                          std::shared_ptr<const value_type_of<S>>>;
+using cached_type_of =
+    std::conditional_t<S::IsAtomic(), value_type_of<S>, std::shared_ptr<const value_type_of<S>>>;
 
 template <typename S>
 struct cache_slot
@@ -124,17 +123,24 @@ struct cached_state : public cache_slot<T>...
 
 } // namespace AS::storage
 
+/**
+ * @brief The state shared between threads
+ *
+ * A list of parameters (AttachListener<...>() etc) can also contain groups, which is the same as
+ * listing all parameters in the group. This is what AS::expand does below.
+ */
 class ApplicationState
 {
 public:
+    // Use via PartialReadOnlyCache, where T... can also be groups
     template <class... T>
-    class PartialReadOnlyCache
+    class PartialReadOnlyCacheImpl
     {
     public:
         class Checkout
         {
         public:
-            friend class PartialReadOnlyCache;
+            friend class PartialReadOnlyCacheImpl;
 
             Checkout() = delete;
             Checkout(const Checkout&) = delete;
@@ -284,12 +290,12 @@ public:
 
         friend class ApplicationState;
 
-        PartialReadOnlyCache(const PartialReadOnlyCache&) = delete;
-        PartialReadOnlyCache& operator=(const PartialReadOnlyCache&) = delete;
-        PartialReadOnlyCache(PartialReadOnlyCache&&) = delete;
-        PartialReadOnlyCache& operator=(PartialReadOnlyCache&&) = delete;
+        PartialReadOnlyCacheImpl(const PartialReadOnlyCacheImpl&) = delete;
+        PartialReadOnlyCacheImpl& operator=(const PartialReadOnlyCacheImpl&) = delete;
+        PartialReadOnlyCacheImpl(PartialReadOnlyCacheImpl&&) = delete;
+        PartialReadOnlyCacheImpl& operator=(PartialReadOnlyCacheImpl&&) = delete;
 
-        explicit PartialReadOnlyCache(ApplicationState& parent)
+        explicit PartialReadOnlyCacheImpl(ApplicationState& parent)
             : m_checkout(parent)
         {
         }
@@ -320,6 +326,9 @@ public:
     private:
         Checkout m_checkout;
     };
+
+    template <class... T>
+    using PartialReadOnlyCache = AS::expand<PartialReadOnlyCacheImpl, T...>;
 
 
     template <class... T>
@@ -490,7 +499,7 @@ public:
         static_assert((sizeof...(T) > 0) && "AttachListener requires at least one parameter");
         ParameterBitset interested;
 
-        (void)std::initializer_list<int> {(interested.set<AS::IndexOf<T>()>(), 0)...};
+        (SetBits(interested, typename T::parameters {}), ...);
 
         return DoAttachListener(interested, notifier);
     }
@@ -505,7 +514,7 @@ public:
      * since the checkout. A read-modify-write in a snapshot can therefore overwrite (lose)
      * a concurrent write from another thread, e.g., two threads changing different fields
      * of the same struct. This is fine with a single writer thread per parameter, which is
-     * the normal case.
+     * the normal case. Use a group instead of a struct if the fields have different writers.
      *
      * @tparam T a list of members of the global state
      * @return the partial snapshot
@@ -513,7 +522,7 @@ public:
     template <class... T>
     auto CheckoutPartialSnapshot()
     {
-        return PartialSnapshot<T...>(*this);
+        return AS::expand<PartialSnapshot, T...>(*this);
     }
 
     /**
@@ -529,7 +538,7 @@ public:
     template <class... T>
     auto CheckoutQueuedWriter()
     {
-        return QueuedWriter<T...>(*this);
+        return AS::expand<QueuedWriter, T...>(*this);
     }
 
     // Read-only gets are allowed, so this is public
@@ -568,6 +577,13 @@ public:
 private:
     class ListenerImpl;
     class StateImpl;
+
+    // Set the bits of all parameters in the list
+    template <class... T>
+    static void SetBits(ParameterBitset& bits, AS::parameter_list<T...>)
+    {
+        (bits.set<AS::IndexOf<T>()>(), ...);
+    }
 
     template <typename T>
     auto GetValue()
@@ -640,8 +656,7 @@ private:
         changed.set(AS::IndexOf<T>());
     }
 
-    ListenerCookie DoAttachListener(const ParameterBitset& interested,
-                                                     IEventNotifier& notifier);
+    ListenerCookie DoAttachListener(const ParameterBitset& interested, IEventNotifier& notifier);
     void NotifyChange(unsigned index);
 
     void NotifyMultipleChanges(const ParameterBitset& changed);

@@ -6,6 +6,16 @@
 # The base files come before the own files, and relative paths are from the calling directory.
 # The base is linked, so its usage requirements (include directories etc) come along. It can be
 # defined before or after, since its files are only looked up at generate time.
+#
+# Parameters can be grouped (also in several levels) in the YAML files, e.g.,
+#
+#   parameters:                  application_state:
+#     configuration:               configuration:
+#       max_watts:                   max_watts: 1000
+#         type: uint16_t
+#
+# which is accessed as AS::configuration::max_watts. Parameters are independent of others in the
+# group, but AS::configuration can be used in lists of parameters instead of listing all of them.
 
 # Collect the YAML files of BASE and FILES into OUT_VAR
 function(_collect_application_state_files DEST_LIBRARY OUT_VAR)
@@ -79,6 +89,8 @@ function(generate_application_state DEST_LIBRARY)
     target_include_directories(${DEST_LIBRARY}
     PUBLIC
         ${OUTPUT_DIRECTORY}
+        # parameter_list.hh, also without a base
+        ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../application_state/include
     )
     if(files_BASE)
         target_link_libraries(${DEST_LIBRARY} PUBLIC ${files_BASE})
