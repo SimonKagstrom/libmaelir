@@ -20,7 +20,6 @@ constexpr auto kLastIndex = {{ max_index }};
 {% for parameter in group.parameters %}
 struct {{ parameter.leaf }}
 {
-    {%- if parameter.type != 'void' %}
     {{parameter.type}} {{ parameter.leaf }};
 
     template<typename T>
@@ -32,12 +31,6 @@ struct {{ parameter.leaf }}
     static consteval bool IsAtomic()
     {
         return {{ parameter.is_atomic|lower }};
-    }
-
-    {%- endif %}
-    static consteval bool IsEvent()
-    {
-        return {{ 'true' if parameter.is_event else 'false' }};
     }
 
     using parameters = parameter_list<struct {{ parameter.leaf }}>;
@@ -60,7 +53,6 @@ using parameters = parameter_list<
 {{ emit_group(root) }}
 
 {% for parameter in parameters %}
-{% if parameter.type != 'void' %}
 template<>
 inline auto &{{ parameter.name }}::GetRef<struct {{ parameter.name }}>()
 {
@@ -72,7 +64,6 @@ inline const auto &{{ parameter.name }}::GetConstRef<struct {{ parameter.name }}
 {
     return {{parameter.leaf}};
 }
-{% endif %}
 
 
 {% endfor %}
@@ -82,13 +73,11 @@ template<typename T>
 auto DefaultValue();
 
 {% for asp in application_state_parameters %}
-{%- if asp.parameter.type != 'void' %}
 template<>
 constexpr auto DefaultValue<struct {{ asp.parameter.name }}>()
 {
     return {{ asp.parameter.return_type }} {% for item in asp.default_value %}{{ item }}{{ ',' if not loop.last else '' }}{% endfor %};
 }
-{%- endif %}
 {% endfor %}
 
 
@@ -113,12 +102,10 @@ std::atomic<bool>
 struct state
 {
     {%- for asp in application_state_parameters %}
-    {%- if asp.parameter.type != 'void' %}
     {%- if asp.parameter.is_atomic == false %}
     std::shared_ptr<{{ asp.parameter.type }}> {{ asp.parameter.id }};
     {%- else %}
     std::atomic<{{ asp.parameter.type }}> {{ asp.parameter.id }};
-    {%- endif %}
     {%- endif %}
     {%- endfor %}
 
@@ -130,14 +117,12 @@ struct state
 };
 
 {% for asp in application_state_parameters %}
-{%- if asp.parameter.type != 'void' %}
 template<>
 inline auto &state::GetRef<struct {{ asp.parameter.name }}>()
 {
     return {{asp.parameter.id}};
 }
 
-{% endif %}
 {% endfor %}
 
 {% for param in orphans %}

@@ -9,12 +9,10 @@ static_assert(sizeof({{ asp.parameter.type }}) == 1, "Enum size must be 1 byte")
 void AS::storage::state::SetupDefaultValues()
 {
     {%- for asp in application_state_parameters %}
-    {%- if asp.parameter.type != 'void' %}
     {%- if asp.parameter.is_atomic == false %}
     {{ asp.parameter.id }} = std::make_shared<{{ asp.parameter.type }}>(DefaultValue<struct {{ asp.parameter.name }}>());
     {%- else %}
     {{ asp.parameter.id }} = DefaultValue<struct {{ asp.parameter.name }}>();
-    {%- endif %}
     {%- endif %}
     {%- endfor %}
 }

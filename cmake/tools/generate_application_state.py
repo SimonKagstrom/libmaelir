@@ -6,7 +6,6 @@ import sys
 import os
 
 type_size_mapping = {
-    "Event" : 0,
     "bool" : 1,
     "enum" : 1,
     "uint8_t": 1,
@@ -137,8 +136,7 @@ class Parameter:
         # As a C++ identifier
         self.id = name.replace("::", "__")
         self.is_orphan = False
-        self.is_event = True if type == "Event" else False
-        self.type = type if not self.is_event else "uint8_t"
+        self.type = type
         self.return_type = ""
         self.is_atomic = type in type_size_mapping.keys()
 
@@ -156,7 +154,6 @@ class Parameter:
             "leaf": self.leaf,
             "id": self.id,
             "type": self.type,
-            "is_event": self.is_event,
             "return_type": self.return_type,
             "is_atomic": self.is_atomic,
         }
