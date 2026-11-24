@@ -20,6 +20,7 @@ using ParameterBitset = etl::bitset<AS::kLastIndex + 1, uint32_t>;
 
 // Fit in an uint32_t
 constexpr auto kMaxApplicationStateListeners = 32;
+using ListenerBitset = etl::bitset<kMaxApplicationStateListeners, uint32_t>;
 
 namespace AS::storage
 {
@@ -661,11 +662,14 @@ private:
 
     void NotifyMultipleChanges(const ParameterBitset& changed);
 
+    void NotifyListeners(const ListenerBitset& listeners);
+
     AS::storage::state m_global_state;
 
     etl::mutex m_mutex;
 
-    std::array<std::vector<uint8_t>, AS::kLastIndex + 1> m_listeners;
+    // The listeners of each parameter
+    std::array<ListenerBitset, AS::kLastIndex + 1> m_listeners;
     std::vector<IEventNotifier*> m_listener_notifiers_by_index;
     std::vector<uint8_t> m_reclaimed_listener_indices;
 };

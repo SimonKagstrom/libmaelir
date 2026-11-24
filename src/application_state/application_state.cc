@@ -42,20 +42,17 @@ ApplicationState::DoAttachListener(const ParameterBitset& interested, IEventNoti
     for (auto param_index = interested.find_first(true); param_index != interested.npos;
          param_index = interested.find_next(true, param_index + 1))
     {
-        m_listeners[param_index].push_back(index);
+        m_listeners[param_index].set(index);
     }
 
 
-    return ListenerCookie([this, index, interested]() {
+    return ListenerCookie([this, index]() {
         std::lock_guard lock(m_mutex);
 
         m_listener_notifiers_by_index[index] = &g_dummy_sem;
-        for (auto param_index = interested.find_first(true); param_index != interested.npos;
-             param_index = interested.find_next(true, param_index + 1))
+        for (auto& listeners : m_listeners)
         {
-            auto& listeners = m_listeners[param_index];
-            listeners.erase(std::remove(listeners.begin(), listeners.end(), index),
-                            listeners.end());
+            listeners.reset(index);
         }
         m_reclaimed_listener_indices.push_back(index);
     });
@@ -69,31 +66,29 @@ ApplicationState::NotifyChange(unsigned parameter_index)
         return;
     }
 
-    for (auto listener_index : m_listeners[parameter_index])
-    {
-        m_listener_notifiers_by_index[listener_index]->Notify();
-    }
+    NotifyListeners(m_listeners[parameter_index]);
 }
 
 void
 ApplicationState::NotifyMultipleChanges(const ParameterBitset& changed)
 {
-    etl::bitset<kMaxApplicationStateListeners, uint32_t> notified_listeners;
+    ListenerBitset listeners;
 
     // Collect the listeners to notify (avoid notifying the same listener multiple times)
     for (auto param_index = changed.find_first(true); param_index != changed.npos;
          param_index = changed.find_next(true, param_index + 1))
     {
-        for (auto listener_index : m_listeners[param_index])
-        {
-            notified_listeners.set(listener_index);
-        }
+        listeners |= m_listeners[param_index];
     }
 
-    // Notify the changed listeners
-    for (size_t listener_index = notified_listeners.find_first(true);
-         listener_index != notified_listeners.npos;
-         listener_index = notified_listeners.find_next(true, listener_index + 1))
+    NotifyListeners(listeners);
+}
+
+void
+ApplicationState::NotifyListeners(const ListenerBitset& listeners)
+{
+    for (auto listener_index = listeners.find_first(true); listener_index != listeners.npos;
+         listener_index = listeners.find_next(true, listener_index + 1))
     {
         m_listener_notifiers_by_index[listener_index]->Notify();
     }
