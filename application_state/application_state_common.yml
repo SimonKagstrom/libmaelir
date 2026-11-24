@@ -8,4 +8,5 @@ application_state:
   clock: 0
   gps_utc: 0
   timezone: 0
-  brightness_mode: BrightnessMode::kAuto
+  configuration:
+    brightness_mode: BrightnessMode::kAuto

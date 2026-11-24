@@ -25,9 +25,9 @@ BrightnessLevel
 AutoBrightnessLevel(float sun_elevation, bool sun_rising, std::optional<BrightnessLevel> current);
 
 /**
- * Sets the display brightness from AS::brightness_mode. In auto mode, the level follows the sun
- * elevation at the current position (the fallback position until there is a GPS fix), and is
- * re-evaluated once a minute.
+ * Sets the display brightness from AS::configuration::brightness_mode. In auto mode, the level
+ * follows the sun elevation at the current position (the fallback position until there is a GPS
+ * fix), and is re-evaluated once a minute.
  */
 class BrightnessController : public PooledThreadBase
 {

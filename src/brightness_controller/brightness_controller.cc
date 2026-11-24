@@ -51,7 +51,8 @@ BrightnessController::BrightnessController(hal::IDisplayBrightness& display,
     : m_display(display)
     , m_state(state)
     , m_levels(levels)
-    , m_state_listener(m_state.AttachListener<AS::gps_status, AS::brightness_mode>(*this))
+    , m_state_listener(
+          m_state.AttachListener<AS::gps_status, AS::configuration::brightness_mode>(*this))
     , m_position(fallback_position)
 {
 }
@@ -65,7 +66,7 @@ BrightnessController::OnActivation()
         m_position = m_state.Get<AS::position>()->position;
     }
 
-    const auto mode = m_state.Get<AS::brightness_mode>();
+    const auto mode = m_state.Get<AS::configuration::brightness_mode>();
     if (mode != BrightnessMode::kAuto)
     {
         // Start over when auto is selected again

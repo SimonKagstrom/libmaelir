@@ -34,6 +34,8 @@ parameters:
   timezone:
     type: int16_t
 
-  # The display brightness, see BrightnessController
-  brightness_mode:
-    type: enum BrightnessMode
+  # Settings. The application can add its own to the group
+  configuration:
+    # The display brightness, see BrightnessController
+    brightness_mode:
+      type: enum BrightnessMode

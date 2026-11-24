@@ -196,26 +196,26 @@ TEST_CASE_FIXTURE(Fixture, "the manual brightness modes are constant")
     BrightnessController controller(display, state, kLevels, kStockholm);
     state.Set<AS::clock>(kWinterSolstice);
 
-    state.Set<AS::brightness_mode>(BrightnessMode::kLow);
+    state.Set<AS::configuration::brightness_mode>(BrightnessMode::kLow);
     {
         REQUIRE_CALL(display, SetBrightness(kLevels.dusk));
         CHECK(controller.OnActivation() == 1min);
     }
 
-    state.Set<AS::brightness_mode>(BrightnessMode::kMedium);
+    state.Set<AS::configuration::brightness_mode>(BrightnessMode::kMedium);
     {
         REQUIRE_CALL(display, SetBrightness(kLevels.low_sun));
         controller.OnActivation();
     }
 
-    state.Set<AS::brightness_mode>(BrightnessMode::kMax);
+    state.Set<AS::configuration::brightness_mode>(BrightnessMode::kMax);
     REQUIRE_CALL(display, SetBrightness(kLevels.day));
     controller.OnActivation();
 }
 
 TEST_CASE_FIXTURE(Fixture, "auto brightness is max until the time is known")
 {
-    state.Set<AS::brightness_mode>(BrightnessMode::kAuto);
+    state.Set<AS::configuration::brightness_mode>(BrightnessMode::kAuto);
     BrightnessController controller(display, state, kLevels, kStockholm);
 
     {
@@ -231,7 +231,7 @@ TEST_CASE_FIXTURE(Fixture, "auto brightness is max until the time is known")
 
 TEST_CASE_FIXTURE(Fixture, "auto brightness follows the sun through the day")
 {
-    state.Set<AS::brightness_mode>(BrightnessMode::kAuto);
+    state.Set<AS::configuration::brightness_mode>(BrightnessMode::kAuto);
     BrightnessController controller(display, state, kLevels, kStockholm);
 
     std::vector<uint8_t> changes;
@@ -263,7 +263,7 @@ TEST_CASE_FIXTURE(Fixture, "auto brightness follows the sun through the day")
 TEST_CASE_FIXTURE(Fixture,
                   "auto brightness uses the fallback position, and the GPS position when known")
 {
-    state.Set<AS::brightness_mode>(BrightnessMode::kAuto);
+    state.Set<AS::configuration::brightness_mode>(BrightnessMode::kAuto);
     // 13:00 in New York, night in Stockholm
     state.Set<AS::clock>(kWinterSolstice + 18 * kHour);
 
