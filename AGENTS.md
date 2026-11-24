@@ -22,6 +22,7 @@ projects, and these rules typically apply to them as well.
 * Unless it targets e.g., esp-idf specifically, code should build for unit tests, Qt and
   the target
 * The code should be unit tested, wherever possible
+* Sort filenames in CMakeLists.txt
 
 ## State machines
 * State machines are generated from .md files
