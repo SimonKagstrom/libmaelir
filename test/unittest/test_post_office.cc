@@ -1,21 +1,10 @@
+#include "mock_event_notifier.hh"
 #include "post_office.hh"
 #include "thread_fixture.hh"
 #include "unittest_messages.hh"
 
 namespace
 {
-
-class MockEventNotifier : public IEventNotifier
-{
-public:
-    MAKE_MOCK0(Notify, void(), final);
-
-    bool NotifyFromIsr() final
-    {
-        REQUIRE(false); // NotifyFromIsr should not be called by messages
-        return false;
-    }
-};
 
 template <typename... Messages>
 class ReceiverThread
