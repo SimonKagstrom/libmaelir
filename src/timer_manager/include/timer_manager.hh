@@ -44,8 +44,9 @@ public:
      * @return A handle to the timer, or nullptr if all kMaxTimers timers are in use. Releasing
      * the handle will cancel the timer
      */
-    TimerHandle StartTimer(milliseconds timeout,
-                           std::function<std::optional<milliseconds>()> on_timeout);
+    TimerHandle StartTimer(
+        milliseconds timeout,
+        std::function<std::optional<milliseconds>()> on_timeout = []() { return std::nullopt; });
 
     std::optional<milliseconds> Expire();
 
