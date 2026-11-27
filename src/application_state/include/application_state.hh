@@ -542,6 +542,19 @@ public:
         return AS::expand<QueuedWriter, T...>(*this);
     }
 
+    /**
+     * @brief Set parameters (or all in groups) to their default values
+     *
+     * Written together, as by a queued writer.
+     *
+     * @tparam T a list of members of the global state
+     */
+    template <class... T>
+    void Reset()
+    {
+        DoReset(AS::expand<AS::parameter_list, T...> {});
+    }
+
     // Read-only gets are allowed, so this is public
     template <typename T>
     auto Get()
@@ -584,6 +597,14 @@ private:
     static void SetBits(ParameterBitset& bits, AS::parameter_list<T...>)
     {
         (bits.set<AS::IndexOf<T>()>(), ...);
+    }
+
+    template <class... T>
+    void DoReset(AS::parameter_list<T...>)
+    {
+        QueuedWriter<T...> qw(*this);
+
+        (qw.template Set<T>(AS::DefaultValue<T>()), ...);
     }
 
     template <typename T>
