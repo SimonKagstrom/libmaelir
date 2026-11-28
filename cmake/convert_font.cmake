@@ -73,5 +73,8 @@ function(convert_font BASE_NAME TTF SIZE_PIXELS RANGE EXTRA_SYMBOLS)
 endfunction()
 
 function(convert_symbols BASE_NAME SIZE_PIXELS RANGE )
-    convert_font(${BASE_NAME} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../external/lvgl/scripts/generators/built_in_font/FontAwesome5-Solid+Brands+Regular.woff ${SIZE_PIXELS} ${RANGE} "")
+    # The FontAwesome font shipped with LVGL. A generator expression, since LVGL is fetched
+    # after users of this function may have been configured
+    set(font $<TARGET_PROPERTY:lvgl,SOURCE_DIR>/scripts/generators/built_in_font/FontAwesome5-Solid+Brands+Regular.woff)
+    convert_font(${BASE_NAME} ${font} ${SIZE_PIXELS} ${RANGE} "")
 endfunction()

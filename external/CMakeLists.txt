@@ -15,13 +15,19 @@ FetchContent_Declare(
   GIT_SHALLOW    TRUE
 )
 
-FetchContent_MakeAvailable(etl pngdec)
-set(PNGDEC_SRC ${pngdec_SOURCE_DIR}/src)
+FetchContent_Declare(
+  lvgl
+  GIT_REPOSITORY https://github.com/lvgl/lvgl.git
+  GIT_TAG        v9.6.0
+  GIT_SHALLOW    TRUE
+)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(CONFIG_LV_BUILD_DEMOS OFF)
 set(CONFIG_LV_BUILD_EXAMPLES OFF)
-add_subdirectory(lvgl)
+
+FetchContent_MakeAvailable(etl pngdec lvgl)
+set(PNGDEC_SRC ${pngdec_SOURCE_DIR}/src)
 
 if ("${IDF_TARGET}" STREQUAL "")
     # Build as shared for host, since this otherwise conflicts with libz
