@@ -3,7 +3,8 @@ include(FetchContent)
 FetchContent_Declare(
   etl
   GIT_REPOSITORY https://github.com/ETLCPP/etl.git
-  GIT_TAG        20.47.1
+  GIT_TAG        20.49.0
+  GIT_SHALLOW    TRUE
 )
 
 # No CMakeLists.txt, so only populated. Targets are defined below
