@@ -6,7 +6,16 @@ FetchContent_Declare(
   GIT_TAG        20.47.1
 )
 
-FetchContent_MakeAvailable(etl)
+# No CMakeLists.txt, so only populated. Targets are defined below
+FetchContent_Declare(
+  pngdec
+  GIT_REPOSITORY https://github.com/bitbank2/PNGdec.git
+  GIT_TAG        1.1.7
+  GIT_SHALLOW    TRUE
+)
+
+FetchContent_MakeAvailable(etl pngdec)
+set(PNGDEC_SRC ${pngdec_SOURCE_DIR}/src)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(CONFIG_LV_BUILD_DEMOS OFF)
@@ -23,14 +32,13 @@ else()
 endif()
 
 add_library(pngdec_zlib ${LIB_TYPE} EXCLUDE_FROM_ALL
-    PNGdec/src/adler32.c
-    PNGdec/src/crc32.c
-    PNGdec/src/infback.c
-    PNGdec/src/inffast.c
-    PNGdec/src/inflate.c
-    PNGdec/src/inftrees.c
-    PNGdec/src/inftrees.c
-    PNGdec/src/zutil.c
+    ${PNGDEC_SRC}/adler32.c
+    ${PNGDEC_SRC}/crc32.c
+    ${PNGDEC_SRC}/infback.c
+    ${PNGDEC_SRC}/inffast.c
+    ${PNGDEC_SRC}/inflate.c
+    ${PNGDEC_SRC}/inftrees.c
+    ${PNGDEC_SRC}/zutil.c
 )
 
 target_compile_options(pngdec_zlib
@@ -38,9 +46,8 @@ PRIVATE
     -Wno-deprecated-non-prototype
 )
 
-# Add here, since pngdec doesn't have a CMakeLists.txt
 add_library(pngdec ${LIB_TYPE} EXCLUDE_FROM_ALL
-    PNGdec/src/PNGdec.cpp
+    ${PNGDEC_SRC}/PNGdec.cpp
 )
 target_link_libraries(pngdec
 PRIVATE
@@ -54,5 +61,5 @@ PUBLIC
 )
 
 target_include_directories(pngdec PUBLIC
-    PNGdec/src/
+    ${PNGDEC_SRC}
 )
